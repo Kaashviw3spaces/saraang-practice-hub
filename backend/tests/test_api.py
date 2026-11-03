@@ -14,8 +14,14 @@ import pytest
 import httpx
 from datetime import date, timedelta
 import uuid
+import random
 
 BASE_URL = "http://localhost:8000"
+
+
+def get_unique_test_date() -> str:
+    """Generates a random future date to prevent collision between repeated test runs."""
+    return str(date.today() + timedelta(days=random.randint(100, 100000)))
 
 
 @pytest.fixture
@@ -128,7 +134,7 @@ async def test_rule_1_daily_booking_limit(client):
         json={"name": "Daily Limit Tester", "email": f"daily_{uuid.uuid4().hex[:8]}@test.com"},
     )
     user_id = u_resp.json()["id"]
-    test_date = str(date.today() + timedelta(days=20))
+    test_date = get_unique_test_date()
 
     # Booking 1: should succeed
     b1_resp = await client.post(
@@ -172,7 +178,7 @@ async def test_rule_2_capacity_enforcement(client):
         json={"name": "Capacity Tester", "email": f"cap_{uuid.uuid4().hex[:8]}@test.com"},
     )
     user_id = u_resp.json()["id"]
-    test_date = str(date.today() + timedelta(days=21))
+    test_date = get_unique_test_date()
 
     # Recording Session limit is 3 participants. Try booking with 5.
     resp = await client.post(
@@ -200,7 +206,7 @@ async def test_rule_3_acoustic_rejection_on_booking(client):
         json={"name": "Noise Tester", "email": f"noise_{uuid.uuid4().hex[:8]}@test.com"},
     )
     user_id = u_resp.json()["id"]
-    test_date = str(date.today() + timedelta(days=22))
+    test_date = get_unique_test_date()
 
     resp = await client.post(
         "/api/bookings",
@@ -240,7 +246,7 @@ async def test_concurrency_exclusion_and_rebooking(client):
     )
     user_a = u1_resp.json()["id"]
     user_b = u2_resp.json()["id"]
-    test_date = str(date.today() + timedelta(days=25))
+    test_date = get_unique_test_date()
 
     # 1. User A books 14:00 to 16:00
     b_a = await client.post(
