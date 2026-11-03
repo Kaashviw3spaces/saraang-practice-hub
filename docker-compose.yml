@@ -60,7 +60,7 @@ services:
       dockerfile: Dockerfile
     container_name: saraang_celery_worker
     restart: unless-stopped
-    command: ["celery", "-A", "notifier.celery_app", "worker", "--loglevel=info", "-Q", "notifications"]
+    command: ["celery", "-A", "notifier.celery_app", "worker", "--beat", "--loglevel=info", "-Q", "notifications"]
     depends_on:
       redis:
         condition: service_healthy
