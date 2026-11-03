@@ -107,6 +107,12 @@ async def get_db():
 # Pydantic Schemas
 # ---------------------------------------------------------
 
+class PushTokenRequest(BaseModel):
+    user_id: int
+    push_token: str
+    platform: Optional[str] = "expo"
+
+
 class UserCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     email: str = Field(..., pattern=r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
@@ -245,9 +251,99 @@ async def list_users(conn=Depends(get_db)):
     return [dict(r) for r in rows]
 
 
+@app.post("/api/users/push-token", tags=["Users"])
+async def register_push_token(req: PushTokenRequest, conn=Depends(get_db)):
+    """Registers an FCM / Expo push notification token for a user."""
+    user = await conn.fetchrow("SELECT id, name FROM users WHERE id = $1", req.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    await conn.execute("UPDATE users SET push_token = $1 WHERE id = $2", req.push_token, req.user_id)
+    return {
+        "status": "success",
+        "message": f"Push notification token successfully registered for user {user['name']}.",
+        "user_id": req.user_id,
+        "token": req.push_token,
+    }
+
+
 # ---------------------------------------------------------
 # Rooms, Session Types & Instruments Endpoints
 # ---------------------------------------------------------
+
+@app.get("/api/rooms/live", tags=["Catalogue", "Dashboard"])
+async def get_live_rooms_status(conn=Depends(get_db)):
+    """
+    Returns real-time occupancy and acoustic states for all rooms,
+    polling-compatible for the mobile app home screen (every 30s).
+    """
+    rooms = await conn.fetch("SELECT id, name, base_capacity, max_decibel_threshold, echo_factor FROM rooms ORDER BY id ASC")
+    
+    current_time_bookings = await conn.fetch(
+        """
+        SELECT 
+            b.id AS booking_id, b.room_id, b.participant_count,
+            b.start_time, b.end_time,
+            u.name AS user_name, s.name AS session_name
+        FROM bookings b
+        JOIN users u ON b.user_id = u.id
+        JOIN session_types s ON b.session_type_id = s.id
+        WHERE b.booking_date = CURRENT_DATE
+          AND b.status = 'Confirmed'
+          AND CURRENT_TIME BETWEEN b.start_time AND b.end_time
+        """
+    )
+    active_by_room = {b["room_id"]: dict(b) for b in current_time_bookings}
+    
+    result = []
+    for r in rooms:
+        r_dict = dict(r)
+        room_id = r["id"]
+        
+        # Check Redis cached state first
+        redis_state = await NowPlayingCache.get_room_state(room_id)
+        active_db = active_by_room.get(room_id)
+        
+        is_occupied = redis_state is not None or active_db is not None
+        current_session = None
+        current_db = 35.0  # Ambient baseline
+        
+        if redis_state:
+            current_session = {
+                "booking_id": redis_state.get("booking_id"),
+                "session_type": redis_state.get("session_type"),
+                "user_name": redis_state.get("user_name"),
+                "start_time": redis_state.get("start_time"),
+                "end_time": redis_state.get("end_time"),
+                "participant_count": redis_state.get("participant_count"),
+                "effective_decibels": redis_state.get("effective_decibels", 75.0),
+                "instruments": redis_state.get("instruments", []),
+            }
+            current_db = redis_state.get("effective_decibels", 75.0)
+        elif active_db:
+            current_session = {
+                "booking_id": active_db["booking_id"],
+                "session_type": active_db["session_name"],
+                "user_name": active_db["user_name"],
+                "start_time": str(active_db["start_time"]),
+                "end_time": str(active_db["end_time"]),
+                "participant_count": active_db["participant_count"],
+                "effective_decibels": 70.0,
+                "instruments": [],
+            }
+            current_db = 70.0
+            
+        r_dict["status"] = "Occupied" if is_occupied else "Available"
+        r_dict["is_occupied"] = is_occupied
+        r_dict["current_decibels"] = current_db
+        r_dict["current_session"] = current_session
+        result.append(r_dict)
+        
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "total_rooms": len(rooms),
+        "occupied_count": sum(1 for r in result if r["is_occupied"]),
+        "rooms": result,
+    }
 
 @app.get("/api/rooms", response_model=List[RoomOut], tags=["Catalogue"])
 async def list_rooms(conn=Depends(get_db)):
@@ -384,7 +480,7 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
         )
 
     # ---------------------------------------------------------
-    # RULE 1: Enforce Daily User Booking Limit
+    # RULE 1: Enforce Daily User Booking Limit (Limit: 3/day)
     # ---------------------------------------------------------
     active_user_bookings = await conn.fetchval(
         """
@@ -397,10 +493,10 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
         booking.user_id,
         booking.booking_date,
     )
-    if active_user_bookings >= 1:
+    if active_user_bookings >= 3:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"User already has an active booking on {booking.booking_date}. Daily limit is 1 booking.",
+            detail=f"User already has 3 active bookings on {booking.booking_date}. Daily limit of 3 bookings reached.",
         )
 
     # ---------------------------------------------------------
@@ -470,12 +566,20 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
     )
 
     if not evaluation.compatible:
+        primary_reason = evaluation.rejection_reasons[0] if evaluation.rejection_reasons else "Acoustic noise ceiling exceeded."
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "message": "AI Acoustic Compatibility Engine rejected this booking.",
-                "rejection_reasons": evaluation.rejection_reasons,
-                "diagnostics": evaluation.model_dump(),
+                "message": f"Booking rejected by Acoustic AI: {primary_reason}",
+                "ai_acoustics": {
+                    "compatible": False,
+                    "reason": primary_reason,
+                    "rejection_reasons": evaluation.rejection_reasons,
+                    "effective_decibels": evaluation.effective_decibels,
+                    "max_allowed_decibels": evaluation.max_allowed_decibels,
+                    "frequency_collisions": evaluation.frequency_collisions,
+                    "warnings": evaluation.warnings,
+                },
             },
         )
 

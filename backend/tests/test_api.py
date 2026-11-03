@@ -127,7 +127,7 @@ async def test_ai_acoustic_dry_run(client):
 
 @pytest.mark.asyncio
 async def test_rule_1_daily_booking_limit(client):
-    """RULE 1: A user cannot hold more than 1 active booking on the same date."""
+    """RULE 1: A user cannot hold more than 3 active bookings on the same date."""
     # Create distinct user
     u_resp = await client.post(
         "/api/users",
@@ -136,38 +136,39 @@ async def test_rule_1_daily_booking_limit(client):
     user_id = u_resp.json()["id"]
     test_date = get_unique_test_date()
 
-    # Booking 1: should succeed
-    b1_resp = await client.post(
+    # Bookings 1, 2, and 3 on the same day in different rooms/slots: should succeed
+    for i, (room, s_time, e_time) in enumerate([(1, "09:00:00", "11:00:00"), (2, "11:00:00", "13:00:00"), (3, "13:00:00", "15:00:00")], 1):
+        b_resp = await client.post(
+            "/api/bookings",
+            json={
+                "user_id": user_id,
+                "room_id": room,
+                "session_type_id": 1,
+                "booking_date": test_date,
+                "start_time": s_time,
+                "end_time": e_time,
+                "participant_count": 2,
+                "instruments": [],
+            },
+        )
+        assert b_resp.status_code == 201, f"Booking #{i} failed: {b_resp.text}"
+
+    # Booking 4 on the same day: MUST FAIL with HTTP 400 (Limit: 3/day)
+    b4_resp = await client.post(
         "/api/bookings",
         json={
             "user_id": user_id,
             "room_id": 1,
             "session_type_id": 1,
             "booking_date": test_date,
-            "start_time": "09:00:00",
-            "end_time": "11:00:00",
+            "start_time": "16:00:00",
+            "end_time": "18:00:00",
             "participant_count": 2,
             "instruments": [],
         },
     )
-    assert b1_resp.status_code == 201
-
-    # Booking 2 on the same day: MUST FAIL with HTTP 400
-    b2_resp = await client.post(
-        "/api/bookings",
-        json={
-            "user_id": user_id,
-            "room_id": 2,
-            "session_type_id": 1,
-            "booking_date": test_date,
-            "start_time": "13:00:00",
-            "end_time": "15:00:00",
-            "participant_count": 2,
-            "instruments": [],
-        },
-    )
-    assert b2_resp.status_code == 400
-    assert "Daily limit is 1 booking" in b2_resp.json()["detail"]
+    assert b4_resp.status_code == 400
+    assert "Daily limit of 3 bookings reached" in b4_resp.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -200,7 +201,7 @@ async def test_rule_2_capacity_enforcement(client):
 
 @pytest.mark.asyncio
 async def test_rule_3_acoustic_rejection_on_booking(client):
-    """RULE 3: Bookings that exceed acoustic limits are rejected before saving."""
+    """RULE 3: Bookings that exceed acoustic limits are rejected with 400 Bad Request and ai_acoustics detail."""
     u_resp = await client.post(
         "/api/users",
         json={"name": "Noise Tester", "email": f"noise_{uuid.uuid4().hex[:8]}@test.com"},
@@ -223,8 +224,12 @@ async def test_rule_3_acoustic_rejection_on_booking(client):
             ],
         },
     )
-    assert resp.status_code == 422
-    assert "AI Acoustic Compatibility Engine rejected this booking" in resp.json()["detail"]["message"]
+    assert resp.status_code == 400
+    detail = resp.json()["detail"]
+    assert "Booking rejected by Acoustic AI" in detail["message"]
+    assert "ai_acoustics" in detail
+    assert "reason" in detail["ai_acoustics"]
+    assert detail["ai_acoustics"]["compatible"] is False
 
 
 @pytest.mark.asyncio
@@ -312,3 +317,34 @@ async def test_redis_dashboard(client):
     data = resp.json()
     assert "active_rooms_count" in data
     assert isinstance(data["rooms"], list)
+
+
+@pytest.mark.asyncio
+async def test_live_rooms_status(client):
+    """Tests the polling endpoint GET /api/rooms/live for mobile home screen."""
+    resp = await client.get("/api/rooms/live")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "rooms" in data
+    assert len(data["rooms"]) >= 4
+    for r in data["rooms"]:
+        assert "is_occupied" in r
+        assert "status" in r
+        assert "current_decibels" in r
+
+
+@pytest.mark.asyncio
+async def test_push_token_registration(client):
+    """Tests POST /api/users/push-token registration."""
+    u_resp = await client.post(
+        "/api/users",
+        json={"name": "Token User", "email": f"token_{uuid.uuid4().hex[:8]}@test.com"},
+    )
+    user_id = u_resp.json()["id"]
+
+    token_resp = await client.post(
+        "/api/users/push-token",
+        json={"user_id": user_id, "push_token": "ExponentPushToken[xxxxxxxxxxxx]"},
+    )
+    assert token_resp.status_code == 200
+    assert token_resp.json()["status"] == "success"
