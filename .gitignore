@@ -1,6 +1,19 @@
 # Environment variables
 .env
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Celery
+celerybeat-schedule
+celerybeat-schedule.*
+
 # Logs
 *.log
 
