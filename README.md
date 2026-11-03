@@ -18,7 +18,7 @@ flowchart TD
     CeleryWorker -->|Push Notifications| FCM["FCM / SMS Gateway"]
 
     subgraph "Core Business Guardrails"
-        Rule1["Rule 1: Daily User Limit (1/day)"]
+        Rule1["Rule 1: Daily User Limit (3/day)"]
         Rule2["Rule 2: Capacity & Lockdown Check"]
         Rule3["Rule 3: AI Acoustic & Frequency Engine"]
         Excl["Database: EXCLUDE USING gist (Range Overlap Guard)"]
@@ -64,7 +64,14 @@ Expected output:
 }
 ```
 
-### 4. Interactive Swagger / OpenAPI Docs
+### 4. Launch the Mobile / Web Frontend (Expo)
+```bash
+cd frontend
+npm start        # Launches Expo dev server (Scan QR on iOS/Android or press 'w' for web)
+npm run web      # Directly launches Web view
+```
+
+### 5. Interactive Swagger / OpenAPI Docs
 Visit [`http://localhost:8001/docs`](http://localhost:8001/docs) in your browser for the interactive OpenAPI documentation and live request playground.
 
 ---
