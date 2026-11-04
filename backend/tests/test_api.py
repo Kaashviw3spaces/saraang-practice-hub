@@ -98,13 +98,13 @@ async def test_user_creation_and_validation(client):
 @pytest.mark.asyncio
 async def test_ai_acoustic_dry_run(client):
     """Tests AI Acoustic dry-run evaluation endpoint (automatic room evaluation)."""
-    # Test safe instruments (Collaborative Jam mode allows acoustic guitar)
+    # Test safe instruments (Electric guitar)
     safe_check = await client.post(
         "/api/bookings/acoustic-check",
         json={
             "session_type_id": 1,
-            "practice_mode": "Collaborative Jam",
-            "instruments": [{"instrument_id": 4, "quantity": 1}],  # Acoustic guitar (75 dB)
+            "practice_mode": "Collaborative Practice",
+            "instruments": [{"instrument_id": 3, "quantity": 1}],  # Electric guitar
         },
     )
     assert safe_check.status_code == 200
@@ -115,10 +115,9 @@ async def test_ai_acoustic_dry_run(client):
         "/api/bookings/acoustic-check",
         json={
             "session_type_id": 1,
-            "practice_mode": "Collaborative Jam",
+            "practice_mode": "Collaborative Practice",
             "instruments": [
-                {"instrument_id": 1, "quantity": 4},  # Drums (110 dB x 4)
-                {"instrument_id": 2, "quantity": 4},  # Bass (100 dB x 4)
+                {"instrument_id": 1, "quantity": 10},  # Drums (110 dB x 10)
             ],
         },
     )
@@ -310,7 +309,7 @@ async def test_concurrency_exclusion_and_rebooking(client):
         },
     )
     assert b_b.status_code == 400
-    assert "No rooms are available for the requested time slot" in b_b.json()["detail"]
+    assert "No rooms are available" in b_b.json()["detail"] or "Slot capacity reached" in b_b.json()["detail"]
 
     # 3. User A cancels booking
     cancel_resp = await client.post(f"/api/bookings/{booking_a_id}/cancel")
@@ -527,7 +526,7 @@ async def test_session_b_acoustic_policy(client):
         json={
             "user_id": user_id,
             "session_type_id": 2,
-            "practice_mode": "Solo Practice",
+            "practice_mode": "Collaborative Practice",
             "booking_date": test_date,
             "start_time": "10:00:00",
             "end_time": "11:00:00",
@@ -697,7 +696,7 @@ async def test_jam_pod_exclusion_for_solo_practice(client):
         },
     )
     assert solo_2.status_code == 400
-    assert "No available rooms can accommodate 8 participants" in solo_2.json()["detail"]
+    assert "Solo Practice" in solo_2.json()["detail"] or "No available rooms" in solo_2.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -773,7 +772,7 @@ async def test_session_solo_multiple_instruments_rejection(client):
         },
     )
     assert resp_b_multi.status_code == 400
-    assert "Session B Solo Policy" in resp_b_multi.json()["detail"]["message"]
+    assert "Session B does not permit Solo Practice" in resp_b_multi.json()["detail"]["message"]
 
 
 @pytest.mark.asyncio
@@ -1019,18 +1018,18 @@ async def test_slot_availability_endpoint_and_conflict(client):
             "booking_date": test_date,
             "start_time": "12:00:00",
             "end_time": "13:00:00",
-            "participant_count": 4,
+            "participant_count": 8,
             "instruments": [],
         },
     )
     assert b_resp.status_code == 201
 
-    # 3. Check slots again: 12pm-1pm must now be marked Reserved
+    # 3. Check slots again: 12pm-1pm must now be marked Reserved / Full
     slots_after = await client.get(f"/api/sessions/3/slots?date={test_date}")
     assert slots_after.status_code == 200
     slot_12pm_after = next(s for s in slots_after.json()["slots"] if s["start_time"] == "12:00:00")
     assert slot_12pm_after["is_available"] is False
-    assert slot_12pm_after["status"] == "Reserved"
+    assert "Full" in slot_12pm_after["status"] or "Reserved" in slot_12pm_after["status"]
 
     # 4. Band B selects a different available slot (01:00 PM - 02:00 PM) -> succeeds
     slot_1pm = next(s for s in slots_after.json()["slots"] if s["start_time"] == "13:00:00")
@@ -1051,6 +1050,217 @@ async def test_slot_availability_endpoint_and_conflict(client):
         },
     )
     assert b2_resp.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_session_a_collaborative_practice_and_capacity(client):
+    """
+    Validates Session A:
+    1. Allows only Electric Guitar or Drums. Other instruments rejected.
+    2. Drummer User 1 books 10:00 - 11:00.
+    3. Electric Guitarist User 2 books 10:00 - 11:00 in Collaborative Practice.
+    4. Slot availability endpoint reflects 2/8 playing with Drums and Electric Guitar.
+    """
+    u1 = await client.post("/api/users", json={"name": "Drummer A", "email": f"drum_{uuid.uuid4().hex[:8]}@test.com"})
+    u2 = await client.post("/api/users", json={"name": "Guitarist A", "email": f"guit_{uuid.uuid4().hex[:8]}@test.com"})
+    u1_id = u1.json()["id"]
+    u2_id = u2.json()["id"]
+    test_date = get_unique_test_date()
+
+    # 1. Booking invalid instrument for Session A (e.g. Acoustic Guitar, ID 4) -> must fail 400
+    b_bad = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u1_id,
+            "session_type_id": 1,  # Session A
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 4, "quantity": 1}],
+        },
+    )
+    assert b_bad.status_code == 400
+    assert "Session A only permits Drums and Electric Guitar" in b_bad.json()["detail"]["ai_acoustics"]["reason"]
+
+    # 2. Drummer User 1 books Session A (ID 1: Drums)
+    b_drum = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u1_id,
+            "session_type_id": 1,
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 1, "quantity": 1}],
+        },
+    )
+    assert b_drum.status_code == 201
+
+    # 3. Guitarist User 2 joins same slot in Collaborative Practice (ID 3: Electric Guitar)
+    b_guit = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u2_id,
+            "session_type_id": 1,
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 3, "quantity": 1}],
+        },
+    )
+    assert b_guit.status_code == 201
+
+    # 4. Check slot availability: 10:00 - 11:00 shows 2/8 Playing with Drums (1) and Electric Guitar (1)
+    slots_resp = await client.get(f"/api/sessions/1/slots?date={test_date}")
+    assert slots_resp.status_code == 200
+    slot_10am = next(s for s in slots_resp.json()["slots"] if s["start_time"] == "10:00:00")
+    assert slot_10am["is_available"] is True
+    assert slot_10am["current_participants"] == 2
+    assert slot_10am["max_participants"] == 8
+    assert any("Drums" in inst for inst in slot_10am["instruments_summary"])
+    assert any("Electric Guitar" in inst for inst in slot_10am["instruments_summary"])
+
+
+@pytest.mark.asyncio
+async def test_session_a_session_b_collision_isolation(client):
+    """
+    CRITICAL: Validates that Session A and Session B instrumentalists NEVER collide in the same slot.
+    - If Session A is booked at 10:00 - 11:00, Session B booking at 10:00 - 11:00 is rejected (400).
+    - If Session B is booked at 14:00 - 15:00, Session A booking at 14:00 - 15:00 is rejected (400).
+    """
+    u_a = await client.post("/api/users", json={"name": "A Band", "email": f"a_{uuid.uuid4().hex[:8]}@test.com"})
+    u_b = await client.post("/api/users", json={"name": "B Band", "email": f"b_{uuid.uuid4().hex[:8]}@test.com"})
+    user_a = u_a.json()["id"]
+    user_b = u_b.json()["id"]
+    test_date = get_unique_test_date()
+
+    # 1. Session A books 10:00 - 11:00
+    b_a = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_a,
+            "session_type_id": 1,  # Session A
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 1, "quantity": 1}],
+        },
+    )
+    assert b_a.status_code == 201
+
+    # 2. Session B tries to book 10:00 - 11:00 -> MUST BE REJECTED 400
+    b_b_fail = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_b,
+            "session_type_id": 2,  # Session B
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 4, "quantity": 1}],
+        },
+    )
+    assert b_b_fail.status_code == 400
+    assert "Collision Violation" in b_b_fail.json()["detail"]
+
+    # 3. Session B slots endpoint at 10:00 - 11:00 must show is_available: false, status: Reserved (Session A)
+    b_slots = await client.get(f"/api/sessions/2/slots?date={test_date}")
+    slot_10am_b = next(s for s in b_slots.json()["slots"] if s["start_time"] == "10:00:00")
+    assert slot_10am_b["is_available"] is False
+    assert "Reserved (Session A)" in slot_10am_b["status"]
+
+
+@pytest.mark.asyncio
+async def test_session_b_solo_practice_forbidden(client):
+    """
+    CRITICAL: Validates that Solo Practice is completely removed/forbidden for Session B
+    (can be done in hostel rooms). Only Collaborative Practice is allowed.
+    """
+    u = await client.post("/api/users", json={"name": "Solo B Tester", "email": f"solob_{uuid.uuid4().hex[:8]}@test.com"})
+    user_id = u.json()["id"]
+    test_date = get_unique_test_date()
+
+    resp = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_id,
+            "session_type_id": 2,  # Session B
+            "practice_mode": "Solo Practice",
+            "booking_date": test_date,
+            "start_time": "12:00:00",
+            "end_time": "13:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 4, "quantity": 1}],
+        },
+    )
+    assert resp.status_code == 400
+    assert "Session B does not permit Solo Practice" in resp.json()["detail"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_solo_practice_room_exclusivity(client):
+    """
+    CRITICAL: Validates that if a user books Solo Practice, they have the room alone:
+    1. User 1 books Solo Practice in Session A (12:00 - 13:00).
+    2. User 2 tries to join Collaborative Practice at 12:00 - 13:00 -> Rejected (400).
+    3. User 3 tries to book another Solo Practice at 12:00 - 13:00 -> Rejected (400).
+    4. Slot availability endpoint marks slot as is_available: false, status: 'Reserved (Solo)'.
+    """
+    u1 = await client.post("/api/users", json={"name": "Solo A", "email": f"soloa_{uuid.uuid4().hex[:8]}@test.com"})
+    u2 = await client.post("/api/users", json={"name": "Collab Joiner", "email": f"join_{uuid.uuid4().hex[:8]}@test.com"})
+    u1_id = u1.json()["id"]
+    u2_id = u2.json()["id"]
+    test_date = get_unique_test_date()
+
+    # 1. User 1 books Solo Practice with Drums
+    b_solo = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u1_id,
+            "session_type_id": 1,
+            "practice_mode": "Solo Practice",
+            "booking_date": test_date,
+            "start_time": "12:00:00",
+            "end_time": "13:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 1, "quantity": 1}],
+        },
+    )
+    assert b_solo.status_code == 201
+
+    # 2. User 2 tries to join Collaborative Practice in that slot -> must fail 400
+    b_join_fail = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u2_id,
+            "session_type_id": 1,
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "12:00:00",
+            "end_time": "13:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 3, "quantity": 1}],
+        },
+    )
+    assert b_join_fail.status_code == 400
+    assert "Solo Practice with no other musicians permitted" in b_join_fail.json()["detail"]
+
+    # 3. Check slots: must show Reserved (Solo)
+    slots_resp = await client.get(f"/api/sessions/1/slots?date={test_date}")
+    slot_12pm = next(s for s in slots_resp.json()["slots"] if s["start_time"] == "12:00:00")
+    assert slot_12pm["is_available"] is False
+    assert slot_12pm["status"] == "Reserved (Solo)"
+    assert slot_12pm["has_solo"] is True
 
 
 

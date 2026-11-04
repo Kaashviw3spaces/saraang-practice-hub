@@ -119,8 +119,10 @@ export const useStore = create<AppState>((set, get) => ({
 
   selectSession: (session) => {
     const sName = (session.name || '').toLowerCase();
-    const defaultMode = sName.includes('jam')
-      ? 'Collaborative Jam'
+    const defaultMode = sName.includes('session b')
+      ? 'Collaborative Practice'
+      : sName.includes('jam')
+      ? 'Collaborative Practice'
       : sName.includes('meeting')
       ? 'Meeting'
       : 'Solo Practice';
@@ -130,7 +132,7 @@ export const useStore = create<AppState>((set, get) => ({
         ...state.wizard,
         selectedSession: session,
         practiceMode: defaultMode,
-        participantCount: defaultMode === 'Solo Practice' ? 1 : Math.min(session.participant_limit, Math.max(1, state.wizard.participantCount || 2)),
+        participantCount: 1,
         step: 2,
         // Reset instruments on session change to guarantee filter compliance
         instruments: {},
@@ -144,9 +146,7 @@ export const useStore = create<AppState>((set, get) => ({
       wizard: {
         ...state.wizard,
         practiceMode,
-        participantCount: practiceMode.toLowerCase() === 'solo practice'
-          ? 1
-          : Math.min(state.wizard.selectedSession?.participant_limit || 8, Math.max(1, state.wizard.participantCount || 2)),
+        participantCount: 1,
         // Reset instruments when mode changes
         instruments: {},
         acousticPreview: null,

@@ -148,12 +148,24 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       return;
     }
 
-    // Validate that slot is not already reserved by another band
+    // Validate that slot is not already reserved by another session or full
     const selectedSlot = slots.find((s) => s.start_time === wizard.startTime);
     if (selectedSlot && !selectedSlot.is_available) {
       Alert.alert(
-        'Slot Already Reserved',
-        `The ${selectedSlot.label} slot has already been reserved by another band. Please select an available option.`
+        'Slot Unavailable',
+        `The ${selectedSlot.label} slot is ${selectedSlot.status}. Please select an available slot.`
+      );
+      return;
+    }
+
+    const sNameUpper = (wizard.selectedSession.name || '').toUpperCase();
+    const isMeeting = sNameUpper.includes('MEETING');
+    const isSolo = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
+
+    if (isSolo && selectedSlot && (selectedSlot.current_participants || 0) > 0) {
+      Alert.alert(
+        'Solo Practice Notice',
+        'Solo practice requires an empty room with no other musicians. This slot already has active musicians playing collaborative practice. Please select an empty slot or choose Collaborative Practice.'
       );
       return;
     }
@@ -167,20 +179,16 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       quantity: qty,
     }));
 
-    // Derive people playing (participants) automatically from selected instruments
-    const sNameUpper = (wizard.selectedSession.name || '').toUpperCase();
-    const isMeeting = sNameUpper.includes('MEETING');
-    const isFullBand = sNameUpper.includes('SESSION A') && wizard.practiceMode.toUpperCase() === 'FULL BAND REHEARSAL';
-    const isSolo = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
+    if (!isMeeting && selectedInstrumentsList.length === 0) {
+      Alert.alert(
+        'Instrument Selection Required',
+        'Please select your instrument before confirming reservation.'
+      );
+      return;
+    }
 
-    const totalInstrumentsCount = Object.values(wizard.instruments).reduce((sum, qty) => sum + qty, 0);
-
-    const peoplePlaying = (() => {
-      if (isSolo) return 1;
-      if (isFullBand) return 5;
-      if (isMeeting) return 2;
-      return Math.max(1, totalInstrumentsCount);
-    })();
+    // Each user booking represents 1 participant playing their selected instrument
+    const peoplePlaying = isMeeting ? 2 : 1;
 
     if (peoplePlaying > wizard.selectedSession.participant_limit) {
       Alert.alert(
@@ -348,29 +356,26 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
         const isSoloPractice = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
         const participantLimit = wizard.selectedSession.participant_limit;
 
-        // Jam Session: Solo Practice and Full Band Rehearsal removed, Collaborative Jam only
+        // Jam Session & Session B: Collaborative Practice only
+        // Session A: Solo Practice or Collaborative Practice
         const practiceModes = (() => {
           if (isMeetingSession) return [];
-          if (isJamSession) {
-            return ['Collaborative Jam'];
+          if (isSessionB) {
+            return ['Collaborative Practice'];
           }
-          if (isSessionB || sessionNameUpper.includes('RECORDING')) {
-            return ['Solo Practice', 'Collaborative Jam'];
+          if (isSessionA) {
+            return ['Solo Practice', 'Collaborative Practice'];
           }
-          return ['Solo Practice', 'Collaborative Jam', 'Full Band Rehearsal'];
+          return ['Collaborative Practice'];
         })();
 
-        // Automatically calculate people playing from selected instruments
-        const totalInstruments = Object.values(wizard.instruments).reduce((sum, qty) => sum + qty, 0);
-        const autoPeoplePlaying = (() => {
-          if (isSoloPractice) return 1;
-          if (isFullBandA) return 5;
-          if (isMeetingSession) return 2;
-          return Math.max(1, totalInstruments);
-        })();
+        // Each user booking represents 1 participant playing their selected instrument
+        const autoPeoplePlaying = isMeetingSession ? 2 : 1;
 
-        // Primary instruments allowed for Solo Practice
-        const soloInstruments = instruments.filter((inst) => {
+        // Primary instruments allowed for this session:
+        // Session A: ONLY Electric Guitar or Drums ("For session A only, remove the display of other instruments except electric guitar and drums in this section.")
+        // Session B: Session B instruments only (no Drums, no Electric Guitar)
+        const allowedInstruments = instruments.filter((inst) => {
           const n = inst.name.toLowerCase();
           const isDrumsOrEG = n.includes('drum') || n.includes('electric guitar');
           if (isSessionA) return isDrumsOrEG;
@@ -422,7 +427,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               </View>
             )}
 
-            {/* Step 2C: Filtered Instrument Selection or Policy Banners */}
+            {/* Step 2C: Filtered Instrument Selection (Single-select per user) */}
             {isMeetingSession ? (
               <View style={styles.policyCard}>
                 <Text style={styles.policyTitle}>📋 MEETING SESSION</Text>
@@ -430,38 +435,42 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                   Standard reservation for music club meetings and planning. No musical instruments required.
                 </Text>
               </View>
-            ) : isFullBandA ? (
-              <View style={styles.policyCard}>
-                <Text style={styles.policyTitle}>🥁 ALL INSTRUMENTS INCLUDED</Text>
-                <Text style={styles.policyText}>
-                  Single Band Booking Covers All Members. All Instruments Included.
-                </Text>
-              </View>
-            ) : isSoloPractice ? (
+            ) : (
               <View style={styles.formGroup}>
-                <Text style={styles.fieldLabel}>PRIMARY INSTRUMENT (SINGLE-SELECT):</Text>
+                <Text style={styles.fieldLabel}>
+                  {isSoloPractice ? 'YOUR INSTRUMENT (SOLO PRACTICE - PRIVATE ROOM):' : 'YOUR INSTRUMENT (COLLABORATIVE PRACTICE):'}
+                </Text>
+
+                {isSessionA && isSoloPractice && (
+                  <View style={styles.policyCard}>
+                    <Text style={styles.policyTitle}>🎸 SESSION A SOLO PRACTICE</Text>
+                    <Text style={styles.policyText}>
+                      Solo practice: practice drums or electric guitar with no one else in the room. The slot is reserved exclusively for you.
+                    </Text>
+                  </View>
+                )}
+
+                {isSessionA && !isSoloPractice && (
+                  <View style={styles.policyCard}>
+                    <Text style={styles.policyTitle}>⚡ SESSION A COLLABORATIVE PRACTICE</Text>
+                    <Text style={styles.policyText}>
+                      Collaborative practice: practice with other electric guitarists or drummers in Session A (max {participantLimit} in slot).
+                    </Text>
+                  </View>
+                )}
 
                 {isSessionB && (
                   <View style={styles.policyCard}>
-                    <Text style={styles.policyTitle}>⚠️ SESSION B ACOUSTIC POLICY</Text>
+                    <Text style={styles.policyTitle}>🎻 SESSION B COLLABORATIVE PRACTICE</Text>
                     <Text style={styles.policyText}>
-                      Session B Acoustic Policy: Full band rehearsals, drums, and electric guitar are not permitted. Select your solo acoustic instrument below.
+                      Collaborative practice: play with other Session B musicians (max {participantLimit} in slot). Solo practice removed as it can be done in hostel rooms. Drums and electric guitar are prohibited.
                     </Text>
                   </View>
                 )}
 
-                {isSessionA && (
-                  <View style={styles.policyCard}>
-                    <Text style={styles.policyTitle}>🎸 SESSION A SOLO POLICY</Text>
-                    <Text style={styles.policyText}>
-                      Solo practice requires selecting only ONE instrument: Drums or Electric Guitar.
-                    </Text>
-                  </View>
-                )}
-
-                {/* Single-select dropdown/picker without quantity steppers or multi-select grid */}
+                {/* Single-select per user */}
                 <View style={styles.soloPickerContainer}>
-                  {soloInstruments.map((inst) => {
+                  {allowedInstruments.map((inst) => {
                     const isSelected = (wizard.instruments[inst.id] || 0) === 1;
                     return (
                       <TouchableOpacity
@@ -469,8 +478,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                         style={[styles.soloInstrumentCard, isSelected && styles.soloInstrumentCardSelected]}
                         activeOpacity={0.8}
                         onPress={() => {
-                          // Select exactly this ONE instrument with qty 1
-                          soloInstruments.forEach((other) => {
+                          // Select exactly this ONE instrument for this user
+                          allowedInstruments.forEach((other) => {
                             setInstrumentQuantity(other.id, other.id === inst.id ? 1 : 0);
                           });
                         }}
@@ -497,17 +506,6 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                     );
                   })}
                 </View>
-              </View>
-            ) : (
-              <View style={styles.formGroup}>
-                <Text style={styles.fieldLabel}>INSTRUMENTS SETUP (COLLABORATIVE JAM):</Text>
-                <InstrumentGrid
-                  instruments={instruments}
-                  sessionName={wizard.selectedSession.name}
-                  practiceMode={wizard.practiceMode}
-                  selectedQuantities={wizard.instruments}
-                  onQuantityChange={setInstrumentQuantity}
-                />
               </View>
             )}
 
@@ -572,12 +570,12 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                         </View>
                         <Text style={styles.autoPeopleSub}>
                           {isSoloPractice
-                            ? '1 Solo Musician / Performer'
-                            : isFullBandA
-                            ? 'Full Band (All Members Included)'
-                            : isMeetingSession
-                            ? 'Meeting Attendees'
-                            : `${totalInstruments} Instrument${totalInstruments === 1 ? '' : 's'} Selected`} • Max: {participantLimit}
+                            ? 'Solo Musician (Private Room)'
+                            : isSessionA
+                            ? '1 Musician (Max 8 in slot)'
+                            : isSessionB
+                            ? '1 Musician (Max 6 in slot)'
+                            : '1 Musician'}
                         </Text>
                       </View>
                     </View>
@@ -648,6 +646,18 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                             </View>
                           </TouchableOpacity>
 
+                          {/* Active Slot Callout: Displays currently playing musicians/instruments */}
+                          {selectedSlot && selectedSlot.instruments_summary && selectedSlot.instruments_summary.length > 0 && (
+                            <View style={styles.activeSlotCallout}>
+                              <Text style={styles.activeSlotCalloutTitle}>
+                                👥 CURRENTLY PLAYING IN THIS SLOT ({selectedSlot.current_participants}/{selectedSlot.max_participants || participantLimit}):
+                              </Text>
+                              <Text style={styles.activeSlotCalloutText}>
+                                {selectedSlot.instruments_summary.join(' • ')}
+                              </Text>
+                            </View>
+                          )}
+
                           {isSlotDropdownOpen && (
                             <View style={styles.dropdownMenu}>
                               <ScrollView
@@ -664,7 +674,20 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                 ) : (
                                   slots.map((slot) => {
                                     const isSelected = wizard.startTime === slot.start_time;
-                                    const isReserved = !slot.is_available;
+                                    const isSlotSoloBlocked = isSoloPractice && (slot.current_participants || 0) > 0;
+                                    const isBlocked = !slot.is_available || isSlotSoloBlocked;
+
+                                    const badgeText = (() => {
+                                      if (isSlotSoloBlocked) return 'COLLAB ACTIVE (NO SOLO)';
+                                      if (!slot.is_available) {
+                                        if (slot.status?.includes('Reserved')) return 'RESERVED';
+                                        if (slot.status?.includes('Full')) return 'FULL';
+                                        return slot.status?.toUpperCase() || 'RESERVED';
+                                      }
+                                      if (isSelected) return '✓ SELECTED';
+                                      if ((slot.current_participants || 0) > 0) return `${slot.current_participants}/${slot.max_participants || participantLimit} JOINABLE`;
+                                      return 'AVAILABLE';
+                                    })();
 
                                     return (
                                       <TouchableOpacity
@@ -672,14 +695,21 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                         style={[
                                           styles.dropdownItem,
                                           isSelected && styles.dropdownItemSelected,
-                                          isReserved && styles.dropdownItemReserved,
+                                          isBlocked && styles.dropdownItemReserved,
                                         ]}
-                                        activeOpacity={isReserved ? 0.9 : 0.6}
+                                        activeOpacity={isBlocked ? 0.9 : 0.6}
                                         onPress={() => {
-                                          if (isReserved) {
+                                          if (isSlotSoloBlocked) {
                                             Alert.alert(
-                                              'Slot Already Reserved',
-                                              `The ${slot.label} slot has already been reserved by another band. Please select an available slot.`
+                                              'Solo Practice Exclusivity',
+                                              'Solo practice requires an empty room. This slot already has collaborative musicians.'
+                                            );
+                                            return;
+                                          }
+                                          if (!slot.is_available) {
+                                            Alert.alert(
+                                              'Slot Unavailable',
+                                              `The ${slot.label} slot is ${slot.status}. Please select an available slot.`
                                             );
                                             return;
                                           }
@@ -687,20 +717,27 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                           setIsSlotDropdownOpen(false);
                                         }}
                                       >
-                                        <Text
-                                          style={[
-                                            styles.dropdownItemText,
-                                            isSelected && styles.dropdownItemTextSelected,
-                                            isReserved && styles.dropdownItemTextReserved,
-                                          ]}
-                                        >
-                                          {slot.label}
-                                        </Text>
+                                        <View style={styles.dropdownItemLeft}>
+                                          <Text
+                                            style={[
+                                              styles.dropdownItemText,
+                                              isSelected && styles.dropdownItemTextSelected,
+                                              isBlocked && styles.dropdownItemTextReserved,
+                                            ]}
+                                          >
+                                            {slot.label}
+                                          </Text>
+                                          {slot.instruments_summary && slot.instruments_summary.length > 0 && (
+                                            <Text style={styles.dropdownSlotInstruments}>
+                                              🎷 {slot.instruments_summary.join(', ')} ({slot.current_participants}/{slot.max_participants || participantLimit})
+                                            </Text>
+                                          )}
+                                        </View>
 
                                         <View
                                           style={[
                                             styles.dropdownBadge,
-                                            isReserved
+                                            isBlocked
                                               ? styles.dropdownBadgeReserved
                                               : isSelected
                                               ? styles.dropdownBadgeSelected
@@ -710,14 +747,14 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                           <Text
                                             style={[
                                               styles.dropdownBadgeText,
-                                              isReserved
+                                              isBlocked
                                                 ? styles.dropdownBadgeTextReserved
                                                 : isSelected
                                                 ? styles.dropdownBadgeTextSelected
                                                 : styles.dropdownBadgeTextAvailable,
                                             ]}
                                           >
-                                            {isReserved ? 'RESERVED' : isSelected ? '✓ SELECTED' : 'AVAILABLE'}
+                                            {badgeText}
                                           </Text>
                                         </View>
                                       </TouchableOpacity>
@@ -1419,6 +1456,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#1f1f1f',
   },
+  dropdownItemLeft: {
+    flex: 1,
+    marginRight: 8,
+  },
   dropdownItemSelected: {
     backgroundColor: '#241e13',
   },
@@ -1490,5 +1531,31 @@ const styles = StyleSheet.create({
     marginTop: 6,
     letterSpacing: 0.4,
     lineHeight: 14,
+  },
+  activeSlotCallout: {
+    backgroundColor: '#1b1710',
+    borderWidth: 1,
+    borderColor: '#3d321b',
+    borderRadius: 6,
+    padding: 10,
+    marginTop: 8,
+  },
+  activeSlotCalloutTitle: {
+    color: '#e8c872',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+  },
+  activeSlotCalloutText: {
+    color: '#cccccc',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  dropdownSlotInstruments: {
+    color: '#e8c872',
+    fontSize: 9,
+    marginTop: 3,
+    fontWeight: '700',
   },
 });

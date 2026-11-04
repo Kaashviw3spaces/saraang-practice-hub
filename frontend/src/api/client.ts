@@ -104,7 +104,13 @@ export interface SlotAvailability {
   end_time: string;
   label: string;
   is_available: boolean;
-  status: 'Available' | 'Reserved';
+  status: string;
+  current_participants?: number;
+  max_participants?: number;
+  instruments_summary?: string[];
+  collaborative_open?: boolean;
+  has_solo?: boolean;
+  booked_session_name?: string | null;
 }
 
 export interface SessionSlotsResponse {

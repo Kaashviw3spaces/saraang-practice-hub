@@ -73,17 +73,10 @@ CREATE TABLE IF NOT EXISTS bookings (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
     -- Constraint: End time must strictly follow start time
-    CONSTRAINT check_booking_times CHECK (end_time > start_time),
+    CONSTRAINT check_booking_times CHECK (end_time > start_time)
     
-    -- CRITICAL: Prevents overlapping active bookings for the same room.
-    -- Solves:
-    -- 1. Exact start_time clashes
-    -- 2. Partial/interval overlaps (e.g., 10:00-12:00 vs 11:00-13:00)
-    -- 3. Allows re-booking slots that were 'Cancelled'
-    CONSTRAINT no_overlapping_active_bookings EXCLUDE USING gist (
-        room_id WITH =,
-        booking_tsrange(booking_date, start_time, end_time) WITH &&
-    ) WHERE (status != 'Cancelled')
+    -- Note: Slot concurrency, multi-user Collaborative Practice capacity,
+    -- and Session A vs Session B collision prevention are strictly enforced at the Session Slot level.
 );
 
 -- 9. Booking Instruments (Junction Table)

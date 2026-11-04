@@ -29,14 +29,14 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
         const nameLower = inst.name.toLowerCase();
         const isDrumsOrElectricGuitar = nameLower.includes('drum') || nameLower.includes('electric guitar');
 
+        // Session A: ONLY Drums or Electric Guitar (Solo or Collaborative Practice)
+        if (sName.includes('SESSION A')) {
+          return isDrumsOrElectricGuitar;
+        }
+
         // Session B Acoustic Policy: MUST NOT contain Acoustic Drums or Electric Guitar
         if (sName.includes('SESSION B')) {
           return !isDrumsOrElectricGuitar;
-        }
-
-        // Session A (Solo Practice): ONLY Acoustic Drums or Electric Guitar
-        if (sName.includes('SESSION A') && pMode === 'SOLO PRACTICE') {
-          return isDrumsOrElectricGuitar;
         }
 
         // Recording Session: moderate decibel instruments only
@@ -44,7 +44,6 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
           return inst.base_decibels <= 90;
         }
 
-        // Session A (Collaborative Jam) or Jam Session: all instruments
         return true;
       })
       .filter((inst) => {
@@ -63,13 +62,12 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
     const pMode = practiceMode.toUpperCase();
 
     if (sName.includes('SESSION B')) {
-      return '⚠️ Session B Acoustic Policy: Full band rehearsals, drums, and electric guitar are not permitted.';
+      return '⚠️ Session B Acoustic Policy: Collaborative Practice only. Drums and electric guitar are prohibited.';
     }
-    if (sName.includes('SESSION A') && pMode === 'SOLO PRACTICE') {
-      return '🎸 Session A Solo Policy: Primary instrument must be Drums or Electric Guitar.';
-    }
-    if (sName.includes('SESSION A') && pMode === 'COLLABORATIVE JAM') {
-      return '⚡ Session A Jam: All rehearsal instruments available.';
+    if (sName.includes('SESSION A')) {
+      return pMode === 'SOLO PRACTICE'
+        ? '🎸 Session A Solo Policy: Practice drums or guitar alone in the room.'
+        : '⚡ Session A Collaborative: Practice with other electric guitarists and drummers.';
     }
     if (sName.includes('RECORDING')) {
       return '🎙️ Acoustic Filter: Low-bleed instruments for rehearsal recording.';
