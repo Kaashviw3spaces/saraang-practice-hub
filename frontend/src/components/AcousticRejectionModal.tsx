@@ -52,7 +52,7 @@ export const AcousticRejectionModal: React.FC<AcousticRejectionModalProps> = ({
                 <Text style={styles.telemetryDanger}>{details.effective_decibels.toFixed(1)} dB</Text>
               </View>
               <View style={styles.telemetryRow}>
-                <Text style={styles.telemetryLabel}>ROOM THRESHOLD:</Text>
+                <Text style={styles.telemetryLabel}>ACOUSTIC CEILING:</Text>
                 <Text style={styles.telemetrySafe}>{details.max_allowed_decibels.toFixed(1)} dB</Text>
               </View>
             </View>

@@ -10,7 +10,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { api, SessionType, Instrument, LiveRoom } from '../api/client';
+import { api, SessionType, Instrument } from '../api/client';
 import { useStore } from '../store/useStore';
 import { SessionCard } from '../components/SessionCard';
 import { InstrumentGrid } from '../components/InstrumentGrid';
@@ -25,7 +25,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     wizard,
     setWizardStep,
     selectSession,
-    selectRoom,
+    setPracticeMode,
     setBookingDateTime,
     setParticipantCount,
     setInstrumentQuantity,
@@ -35,8 +35,6 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     closeRejectionModal,
     resetWizard,
     currentUser,
-    liveRooms,
-    setLiveRooms,
     showNotification,
   } = useStore();
 
@@ -51,14 +49,12 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     const loadData = async () => {
       try {
         setLoading(true);
-        const [st, inst, rooms] = await Promise.all([
+        const [st, inst] = await Promise.all([
           api.getSessionTypes(),
           api.getInstruments(),
-          api.getLiveRooms(),
         ]);
         setSessionTypes(st);
         setInstruments(inst);
-        setLiveRooms(rooms);
       } catch (err) {
         console.error('Failed to load booking catalogues:', err);
       } finally {
@@ -70,7 +66,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
   // Debounced Acoustic AI Check during Step 2B
   const runAcousticCheck = useCallback(async () => {
-    if (!wizard.selectedSession || !wizard.selectedRoomId) return;
+    if (!wizard.selectedSession) return;
 
     const selectedInstrumentsList = Object.entries(wizard.instruments).map(([id, qty]) => ({
       instrument_id: parseInt(id, 10),
@@ -80,8 +76,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     try {
       setIsCheckingAcoustics(true);
       const res = await api.checkAcoustics({
-        room_id: wizard.selectedRoomId,
         session_type_id: wizard.selectedSession.id,
+        practice_mode: wizard.practiceMode,
         instruments: selectedInstrumentsList,
       });
       setAcousticPreview(res);
@@ -90,7 +86,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     } finally {
       setIsCheckingAcoustics(false);
     }
-  }, [wizard.selectedSession, wizard.selectedRoomId, wizard.instruments]);
+  }, [wizard.selectedSession, wizard.instruments, wizard.practiceMode]);
 
   useEffect(() => {
     if (wizard.step === 2) {
@@ -99,11 +95,11 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       }, 400);
       return () => clearTimeout(timer);
     }
-  }, [wizard.step, wizard.instruments, wizard.selectedRoomId, runAcousticCheck]);
+  }, [wizard.step, wizard.instruments, wizard.practiceMode, runAcousticCheck]);
 
-  // Step 2C: Submission & AI Rejection Handling
+  // Step 2D: Submission & Auto-Room Assignment Handling
   const handleConfirmReservation = async () => {
-    if (!wizard.selectedSession || !wizard.selectedRoomId) return;
+    if (!wizard.selectedSession) return;
 
     // Calculate end time based on duration
     const startHour = parseInt(wizard.startTime.split(':')[0], 10);
@@ -116,14 +112,29 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       quantity: qty,
     }));
 
+    // People playing: not derived from instruments; accounts for all musicians, instrumentalists & vocalists
+    const isSolo = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
+    const peoplePlaying = isSolo
+      ? 1
+      : Math.max(1, Math.min(wizard.participantCount || 1, wizard.selectedSession.participant_limit));
+
+    if (peoplePlaying > wizard.selectedSession.participant_limit) {
+      Alert.alert(
+        'Participant Limit Exceeded',
+        `The number of people playing (${peoplePlaying}) exceeds the participant limit of ${wizard.selectedSession.participant_limit} for ${wizard.selectedSession.name}.`
+      );
+      return;
+    }
+
+    // Auto-Room Assignment: room_id is omitted so backend dynamically assigns the optimal available room
     const payload = {
       user_id: currentUser.id,
-      room_id: wizard.selectedRoomId,
       session_type_id: wizard.selectedSession.id,
       booking_date: wizard.bookingDate,
       start_time: wizard.startTime,
       end_time: formattedEndTime,
-      participant_count: wizard.participantCount,
+      practice_mode: wizard.practiceMode,
+      participant_count: peoplePlaying,
       instruments: selectedInstrumentsList,
     };
 
@@ -132,8 +143,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       const res = await api.createBooking(payload);
       setSuccessBooking(res);
       showNotification({
-        title: 'RESERVATION CONFIRMED',
-        message: `Your booking #${res.id} for ${res.room_name} (${res.start_time}-${res.end_time}) has been confirmed!`,
+        title: 'BOOKING CONFIRMED',
+        message: `Booking Confirmed! Your ${res.session_name} rehearsal slot is locked in (${res.start_time}-${res.end_time}).`,
         type: 'success',
       });
     } catch (err: any) {
@@ -141,14 +152,16 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       const detail = err.response?.data?.detail;
 
       if (status === 400 && detail) {
-        // Step 2C Requirement: Check for Acoustic AI Rejection
-        if (typeof detail === 'object' && detail.ai_acoustics) {
+        // Step 2D Requirement: Parse ai_acoustics.reason and display clear rejection modal
+        if (typeof detail === 'object' && detail.ai_acoustics?.reason) {
           openRejectionModal(detail.ai_acoustics.reason, detail.ai_acoustics);
+        } else if (typeof detail === 'object' && detail.message) {
+          openRejectionModal(detail.message, detail);
         } else if (typeof detail === 'string') {
           // Concurrency overlap or Daily Limit 3/day violation
-          Alert.alert('Booking Error', detail);
+          Alert.alert('Booking Notice', detail);
         } else {
-          Alert.alert('Booking Error', detail.message || 'Booking request failed.');
+          Alert.alert('Booking Error', detail.message || 'Booking request could not be confirmed.');
         }
       } else {
         Alert.alert('Error', err.response?.data?.detail || 'An unexpected error occurred.');
@@ -157,8 +170,6 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       setIsSubmitting(false);
     }
   };
-
-  const selectedRoom = liveRooms.find((r) => r.id === wizard.selectedRoomId) || liveRooms[0];
 
   if (loading) {
     return (
@@ -178,13 +189,21 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             <Text style={styles.ticketBadgeText}>RESERVATION CONFIRMED</Text>
           </View>
           <Text style={styles.ticketTitle}>PASS #{successBooking.id}</Text>
-          <Text style={styles.ticketRoom}>{successBooking.room_name}</Text>
+          <Text style={styles.ticketSession}>
+            Booking Confirmed! Your {successBooking.session_name} rehearsal slot is locked in.
+          </Text>
 
           <View style={styles.ticketGrid}>
             <View style={styles.ticketField}>
               <Text style={styles.ticketLabel}>SESSION:</Text>
               <Text style={styles.ticketVal}>{successBooking.session_name}</Text>
             </View>
+            {successBooking.practice_mode ? (
+              <View style={styles.ticketField}>
+                <Text style={styles.ticketLabel}>PRACTICE MODE:</Text>
+                <Text style={styles.ticketVal}>{successBooking.practice_mode}</Text>
+              </View>
+            ) : null}
             <View style={styles.ticketField}>
               <Text style={styles.ticketLabel}>DATE:</Text>
               <Text style={styles.ticketVal}>{successBooking.booking_date}</Text>
@@ -194,8 +213,10 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               <Text style={styles.ticketVal}>{successBooking.start_time} - {successBooking.end_time}</Text>
             </View>
             <View style={styles.ticketField}>
-              <Text style={styles.ticketLabel}>PARTICIPANTS:</Text>
-              <Text style={styles.ticketVal}>{successBooking.participant_count}</Text>
+              <Text style={styles.ticketLabel}>PEOPLE PLAYING:</Text>
+              <Text style={styles.ticketVal}>
+                {successBooking.participant_count} {successBooking.participant_count === 1 ? 'PERSON' : 'PEOPLE'}
+              </Text>
             </View>
           </View>
 
@@ -251,99 +272,180 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       )}
 
       {/* ========================================================= */}
-      {/* STEP 2B: INSTRUMENT SELECTION & TIME CONFIGURATION         */}
+      {/* STEP 2B & 2C: CONFIGURATION & STRICT INSTRUMENT FILTERING */}
       {/* ========================================================= */}
-      {wizard.step === 2 && wizard.selectedSession && (
-        <View>
-          {/* Selected Session Pill */}
-          <View style={styles.selectedSessionPill}>
-            <View>
-              <Text style={styles.pillLabel}>SELECTED SESSION:</Text>
-              <Text style={styles.pillValue}>{wizard.selectedSession.name}</Text>
-            </View>
-            <TouchableOpacity style={styles.changeBtn} onPress={() => setWizardStep(1)}>
-              <Text style={styles.changeBtnText}>CHANGE</Text>
-            </TouchableOpacity>
-          </View>
+      {wizard.step === 2 && wizard.selectedSession && (() => {
+        const sessionNameUpper = (wizard.selectedSession?.name || '').toUpperCase();
+        const isMeetingSession = sessionNameUpper.includes('MEETING');
+        const isSessionA = sessionNameUpper.includes('SESSION A');
+        const isSessionB = sessionNameUpper.includes('SESSION B');
+        const isJamSession = sessionNameUpper.includes('JAM');
+        const isFullBandA = isSessionA && wizard.practiceMode.toUpperCase() === 'FULL BAND REHEARSAL';
+        const isSoloPractice = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
+        const participantLimit = wizard.selectedSession.participant_limit;
 
-          {/* Room Selector */}
-          <View style={styles.formGroup}>
-            <Text style={styles.fieldLabel}>ROOM SELECTION:</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.roomScroller}>
-              {liveRooms.map((room) => {
-                const isSelected = wizard.selectedRoomId === room.id;
-                return (
-                  <TouchableOpacity
-                    key={room.id}
-                    style={[styles.roomPill, isSelected && styles.roomPillSelected]}
-                    onPress={() => selectRoom(room.id)}
-                  >
-                    <Text style={[styles.roomPillName, isSelected && styles.roomPillTextSelected]}>
-                      {room.name}
-                    </Text>
-                    <Text style={styles.roomPillMeta}>
-                      MAX {room.max_decibel_threshold} dB • ECHO {room.echo_factor}x
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
+        // Jam Session: Solo Practice and Full Band Rehearsal removed, Collaborative Jam only
+        const practiceModes = (() => {
+          if (isMeetingSession) return [];
+          if (isJamSession) {
+            return ['Collaborative Jam'];
+          }
+          if (isSessionB || sessionNameUpper.includes('RECORDING')) {
+            return ['Solo Practice', 'Collaborative Jam'];
+          }
+          return ['Solo Practice', 'Collaborative Jam', 'Full Band Rehearsal'];
+        })();
 
-          {/* Live Acoustic AI Preview Bar */}
-          <View style={styles.aiPreviewBox}>
-            <View style={styles.previewHeader}>
-              <Text style={styles.previewTitle}>⚡ ACOUSTIC AI REAL-TIME PREVIEW</Text>
-              {wizard.isCheckingAcoustics && <ActivityIndicator size="small" color="#e8c872" />}
-            </View>
+        // Primary instruments allowed for Solo Practice
+        const soloInstruments = instruments.filter((inst) => {
+          const n = inst.name.toLowerCase();
+          const isDrumsOrEG = n.includes('drum') || n.includes('electric guitar');
+          if (isSessionA) return isDrumsOrEG;
+          if (isSessionB) return !isDrumsOrEG;
+          return true;
+        });
 
-            {wizard.acousticPreview ? (
+        return (
+          <View>
+            {/* Selected Session Pill */}
+            <View style={styles.selectedSessionPill}>
               <View>
-                <View style={styles.previewStats}>
-                  <Text style={styles.statItem}>
-                    LEVEL:{' '}
-                    <Text
-                      style={[
-                        styles.statVal,
-                        wizard.acousticPreview.compatible ? styles.statSafe : styles.statDanger,
-                      ]}
-                    >
-                      {wizard.acousticPreview.effective_decibels.toFixed(1)} dB
-                    </Text>
-                  </Text>
-                  <Text style={styles.statItem}>
-                    ROOM CEILING: <Text style={styles.statVal}>{wizard.acousticPreview.max_allowed_decibels} dB</Text>
-                  </Text>
-                </View>
+                <Text style={styles.pillLabel}>SELECTED SESSION:</Text>
+                <Text style={styles.pillValue}>{wizard.selectedSession.name}</Text>
+              </View>
+              <TouchableOpacity style={styles.changeBtn} onPress={() => setWizardStep(1)}>
+                <Text style={styles.changeBtnText}>CHANGE</Text>
+              </TouchableOpacity>
+            </View>
 
-                {wizard.acousticPreview.warnings.length > 0 && (
-                  <Text style={styles.previewWarn}>
-                    ⚠️ {wizard.acousticPreview.warnings[0]}
-                  </Text>
+            {/* Automated Acoustic Calibration Banner */}
+            <View style={styles.autoAssignBanner}>
+              <Text style={styles.autoAssignTitle}>⚡ AUTOMATED ACOUSTIC CALIBRATION</Text>
+              <Text style={styles.autoAssignText}>
+                Your rehearsal session is dynamically acoustic-calibrated and scheduled based on your session mode and instrumentation.
+              </Text>
+            </View>
+
+            {/* Step 2B: Practice Mode Selection */}
+            {practiceModes.length > 0 && (
+              <View style={styles.formGroup}>
+                <Text style={styles.fieldLabel}>PRACTICE MODE (STEP 2B):</Text>
+                <View style={styles.modeRow}>
+                  {practiceModes.map((mode) => {
+                    const isSelected = wizard.practiceMode.toLowerCase() === mode.toLowerCase();
+                    return (
+                      <TouchableOpacity
+                        key={mode}
+                        style={[styles.modeBtn, isSelected && styles.modeBtnSelected]}
+                        onPress={() => setPracticeMode(mode)}
+                      >
+                        <Text style={[styles.modeBtnText, isSelected && styles.modeBtnTextSelected]}>
+                          {mode.toUpperCase()}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* Step 2C: Filtered Instrument Selection or Policy Banners */}
+            {isMeetingSession ? (
+              <View style={styles.policyCard}>
+                <Text style={styles.policyTitle}>📋 MEETING SESSION</Text>
+                <Text style={styles.policyText}>
+                  Standard reservation for music club meetings and planning. No musical instruments required.
+                </Text>
+              </View>
+            ) : isFullBandA ? (
+              <View style={styles.policyCard}>
+                <Text style={styles.policyTitle}>🥁 ALL INSTRUMENTS INCLUDED</Text>
+                <Text style={styles.policyText}>
+                  Single Band Booking Covers All Members. All Instruments Included.
+                </Text>
+              </View>
+            ) : isSoloPractice ? (
+              <View style={styles.formGroup}>
+                <Text style={styles.fieldLabel}>PRIMARY INSTRUMENT (SINGLE-SELECT):</Text>
+
+                {isSessionB && (
+                  <View style={styles.policyCard}>
+                    <Text style={styles.policyTitle}>⚠️ SESSION B ACOUSTIC POLICY</Text>
+                    <Text style={styles.policyText}>
+                      Session B Acoustic Policy: Full band rehearsals, drums, and electric guitar are not permitted. Select your solo acoustic instrument below.
+                    </Text>
+                  </View>
                 )}
-                {!wizard.acousticPreview.compatible && (
-                  <Text style={styles.previewFail}>
-                    ❌ Rejection predicted: {wizard.acousticPreview.rejection_reasons[0]}
-                  </Text>
+
+                {isSessionA && (
+                  <View style={styles.policyCard}>
+                    <Text style={styles.policyTitle}>🎸 SESSION A SOLO POLICY</Text>
+                    <Text style={styles.policyText}>
+                      Solo practice requires selecting only ONE instrument: Acoustic Drums or Electric Guitar.
+                    </Text>
+                  </View>
                 )}
+
+                {/* Single-select dropdown/picker without quantity steppers or multi-select grid */}
+                <View style={styles.soloPickerContainer}>
+                  {soloInstruments.map((inst) => {
+                    const isSelected = (wizard.instruments[inst.id] || 0) === 1;
+                    return (
+                      <TouchableOpacity
+                        key={inst.id}
+                        style={[styles.soloInstrumentCard, isSelected && styles.soloInstrumentCardSelected]}
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          // Select exactly this ONE instrument with qty 1
+                          soloInstruments.forEach((other) => {
+                            setInstrumentQuantity(other.id, other.id === inst.id ? 1 : 0);
+                          });
+                        }}
+                      >
+                        <View style={styles.soloRadioRow}>
+                          <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
+                            {isSelected && <View style={styles.radioDot} />}
+                          </View>
+                          <View style={styles.soloTextCol}>
+                            <Text style={[styles.soloInstrumentName, isSelected && styles.soloInstrumentNameSelected]}>
+                              {inst.name}
+                            </Text>
+                            <Text style={styles.soloInstrumentCategory}>
+                              {inst.category || 'Instrument'} • Band: {inst.frequency_band || 'Mid'}
+                            </Text>
+                          </View>
+                        </View>
+                        {isSelected && (
+                          <View style={styles.selectedBadge}>
+                            <Text style={styles.selectedBadgeText}>SELECTED</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
             ) : (
-              <Text style={styles.previewPlaceholder}>Add instruments below to calculate projected acoustic noise.</Text>
+              <View style={styles.formGroup}>
+                <Text style={styles.fieldLabel}>INSTRUMENTS SETUP (COLLABORATIVE JAM):</Text>
+                <InstrumentGrid
+                  instruments={instruments}
+                  sessionName={wizard.selectedSession.name}
+                  practiceMode={wizard.practiceMode}
+                  selectedQuantities={wizard.instruments}
+                  onQuantityChange={setInstrumentQuantity}
+                />
+              </View>
             )}
-          </View>
 
-          {/* Step 2B: Searchable pre-filtered Instrument Grid */}
-          <View style={styles.formGroup}>
-            <Text style={styles.fieldLabel}>INSTRUMENTS SETUP (PRE-FILTERED):</Text>
-            <InstrumentGrid
-              instruments={instruments}
-              sessionName={wizard.selectedSession.name}
-              selectedQuantities={wizard.instruments}
-              onQuantityChange={setInstrumentQuantity}
-            />
-          </View>
+            {/* Minimalist Acoustic Warning (No Decibel Meter) */}
+            {wizard.acousticPreview?.warnings && wizard.acousticPreview.warnings.length > 0 && (
+              <View style={styles.warningBox}>
+                <Text style={styles.warningText}>⚠️ {wizard.acousticPreview.warnings[0]}</Text>
+              </View>
+            )}
 
-          {/* Date, Time & Participants Form */}
+            {/* Date, Time & Participants Form */}
           <View style={styles.formRow}>
             <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
               <Text style={styles.fieldLabel}>DATE (YYYY-MM-DD):</Text>
@@ -393,14 +495,69 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
             <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
               <Text style={styles.fieldLabel}>
-                PARTICIPANTS (MAX {wizard.selectedSession.participant_limit}):
+                PEOPLE PLAYING (PARTICIPANTS):
               </Text>
-              <TextInput
-                style={styles.textInput}
-                value={String(wizard.participantCount)}
-                keyboardType="numeric"
-                onChangeText={(val) => setParticipantCount(parseInt(val, 10) || 1)}
-              />
+              {isSoloPractice ? (
+                <View style={styles.soloPeopleBox}>
+                  <Text style={styles.soloPeopleVal}>1 SOLO PERFORMER</Text>
+                  <Text style={styles.soloPeopleSub}>Solo practice session</Text>
+                </View>
+              ) : (
+                <View style={styles.peopleContainer}>
+                  <View style={styles.peopleStepperRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.peopleStepperBtn,
+                        (wizard.participantCount || 1) <= 1 && styles.peopleStepperBtnDisabled,
+                      ]}
+                      onPress={() => setParticipantCount(Math.max(1, (wizard.participantCount || 1) - 1))}
+                      disabled={(wizard.participantCount || 1) <= 1}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.peopleStepperBtnText}>-</Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.peopleValueBox}>
+                      <TextInput
+                        style={styles.peopleInput}
+                        keyboardType="numeric"
+                        value={String(wizard.participantCount || 1)}
+                        onChangeText={(val) => {
+                          const num = parseInt(val, 10);
+                          if (isNaN(num) || num < 1) {
+                            setParticipantCount(1);
+                          } else {
+                            setParticipantCount(Math.min(num, participantLimit));
+                          }
+                        }}
+                      />
+                      <Text style={styles.peopleUnitText}>
+                        {(wizard.participantCount || 1) === 1 ? 'PERSON' : 'PEOPLE'}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.peopleStepperBtn,
+                        (wizard.participantCount || 1) >= participantLimit &&
+                          styles.peopleStepperBtnDisabled,
+                      ]}
+                      onPress={() =>
+                        setParticipantCount(
+                          Math.min(participantLimit, (wizard.participantCount || 1) + 1)
+                        )
+                      }
+                      disabled={(wizard.participantCount || 1) >= participantLimit}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.peopleStepperBtnText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.peopleSubtext}>
+                    Max: {participantLimit} • Instrumentalists & vocalists
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -418,7 +575,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             )}
           </TouchableOpacity>
         </View>
-      )}
+        );
+      })()}
 
       {/* Acoustic Rejection Modal (Step 2C) */}
       <AcousticRejectionModal
@@ -528,35 +686,99 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 8,
   },
-  roomScroller: {
+  modeRow: {
     flexDirection: 'row',
-  },
-  roomPill: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#282828',
-    borderRadius: 6,
-    padding: 12,
-    marginRight: 10,
-    minWidth: 140,
-  },
-  roomPillSelected: {
-    borderColor: '#e8c872',
-    backgroundColor: '#1c1913',
-  },
-  roomPillName: {
-    color: '#cccccc',
-    fontSize: 12,
-    fontWeight: '800',
+    flexWrap: 'wrap',
     marginBottom: 4,
   },
-  roomPillTextSelected: {
+  modeBtn: {
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: '#2e2e2e',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  modeBtnSelected: {
+    borderColor: '#e8c872',
+    backgroundColor: '#1f1b13',
+  },
+  modeBtnText: {
+    color: '#888888',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  modeBtnTextSelected: {
     color: '#e8c872',
   },
-  roomPillMeta: {
-    color: '#777777',
-    fontSize: 9,
-    fontWeight: '600',
+  policyCard: {
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: '#2d2d2d',
+    borderRadius: 6,
+    padding: 14,
+    marginBottom: 16,
+  },
+  policyTitle: {
+    color: '#e8c872',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  policyText: {
+    color: '#cccccc',
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  soloPickerRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  soloPill: {
+    flex: 1,
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: '#2e2e2e',
+    borderRadius: 6,
+    padding: 14,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  soloPillSelected: {
+    borderColor: '#e8c872',
+    backgroundColor: '#1f1b13',
+  },
+  soloPillText: {
+    color: '#cccccc',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  soloPillTextSelected: {
+    color: '#e8c872',
+  },
+  soloPillSub: {
+    color: '#666666',
+    fontSize: 10,
+  },
+  warningBox: {
+    backgroundColor: '#1f1a10',
+    borderWidth: 1,
+    borderColor: '#3d321b',
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 16,
+  },
+  warningText: {
+    color: '#e8c872',
+    fontSize: 11,
+    lineHeight: 16,
   },
   aiPreviewBox: {
     backgroundColor: '#161512',
@@ -628,6 +850,92 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
+  peopleContainer: {
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: '#2e2e2e',
+    borderRadius: 6,
+    padding: 6,
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  peopleStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  peopleStepperBtn: {
+    width: 28,
+    height: 28,
+    backgroundColor: '#262626',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#3a3a3a',
+  },
+  peopleStepperBtnDisabled: {
+    backgroundColor: '#181818',
+    borderColor: '#222222',
+    opacity: 0.4,
+  },
+  peopleStepperBtnText: {
+    color: '#e8c872',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  peopleValueBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  peopleInput: {
+    color: '#e8c872',
+    fontSize: 13,
+    fontWeight: '900',
+    textAlign: 'center',
+    minWidth: 24,
+    paddingVertical: 0,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  peopleUnitText: {
+    color: '#f4ede4',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    marginLeft: 3,
+  },
+  peopleSubtext: {
+    color: '#777777',
+    fontSize: 8.5,
+    marginTop: 3,
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  soloPeopleBox: {
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: '#2e2e2e',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  soloPeopleVal: {
+    color: '#e8c872',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  soloPeopleSub: {
+    color: '#777777',
+    fontSize: 9,
+    marginTop: 2,
+    fontWeight: '600',
+  },
   durationRow: {
     flexDirection: 'row',
   },
@@ -692,6 +1000,99 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginBottom: 12,
   },
+  autoAssignBanner: {
+    backgroundColor: '#161512',
+    borderWidth: 1,
+    borderColor: '#3d321b',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 16,
+  },
+  autoAssignTitle: {
+    color: '#e8c872',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  autoAssignText: {
+    color: '#888888',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  soloPickerContainer: {
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  soloInstrumentCard: {
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: '#282828',
+    borderRadius: 6,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  soloInstrumentCardSelected: {
+    borderColor: '#e8c872',
+    backgroundColor: '#1c1913',
+  },
+  soloRadioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  radioCircle: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: '#555555',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  radioCircleSelected: {
+    borderColor: '#e8c872',
+  },
+  radioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#e8c872',
+  },
+  soloTextCol: {
+    flex: 1,
+  },
+  soloInstrumentName: {
+    color: '#cccccc',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  soloInstrumentNameSelected: {
+    color: '#e8c872',
+  },
+  soloInstrumentCategory: {
+    color: '#777777',
+    fontSize: 10,
+    marginTop: 2,
+  },
+  selectedBadge: {
+    backgroundColor: '#2b2313',
+    borderWidth: 1,
+    borderColor: '#e8c872',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  selectedBadgeText: {
+    color: '#e8c872',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1,
+  },
   ticketBadgeText: {
     color: '#52b79a',
     fontSize: 10,
@@ -705,11 +1106,12 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: 4,
   },
-  ticketRoom: {
+  ticketSession: {
     color: '#e8c872',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     marginBottom: 20,
+    textAlign: 'center',
   },
   ticketGrid: {
     width: '100%',

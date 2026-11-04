@@ -1,23 +1,23 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
-import { api, LiveRoom } from '../api/client';
+import { api, LiveSession } from '../api/client';
 import { useStore } from '../store/useStore';
-import { RoomCard } from '../components/RoomCard';
+import { LiveSessionCard } from '../components/LiveSessionCard';
 
 interface DashboardScreenProps {
-  onNavigateToBooking: (roomId?: number) => void;
+  onNavigateToBooking: () => void;
 }
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBooking }) => {
-  const { liveRooms, setLiveRooms, currentUser, selectRoom, setWizardStep } = useStore();
+  const { liveSessions, setLiveSessions, currentUser, selectSession } = useStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [todayBookingsCount, setTodayBookingsCount] = useState(0);
 
-  const fetchRooms = useCallback(async () => {
+  const fetchSessions = useCallback(async () => {
     try {
-      const rooms = await api.getLiveRooms();
-      setLiveRooms(rooms);
+      const sessions = await api.getLiveSessions();
+      setLiveSessions(sessions);
 
       // Fetch user's bookings today to display quota
       const bookings = await api.getUserBookings(currentUser.id);
@@ -25,37 +25,42 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
       const count = bookings.filter((b) => b.booking_date === todayStr && b.status !== 'Cancelled').length;
       setTodayBookingsCount(count);
     } catch (err) {
-      console.error('Failed to poll live rooms:', err);
+      console.error('Failed to poll live sessions:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [currentUser.id, setLiveRooms]);
+  }, [currentUser.id, setLiveSessions]);
 
   useEffect(() => {
-    fetchRooms();
+    fetchSessions();
 
-    // Step 1 Requirement: Poll GET /api/rooms/live every 30 seconds
+    // Step 1: Poll GET /api/sessions/live every 30 seconds
     const interval = setInterval(() => {
-      fetchRooms();
+      fetchSessions();
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [fetchRooms]);
+  }, [fetchSessions]);
 
-  const handleBookRoom = (room: LiveRoom) => {
-    selectRoom(room.id);
-    onNavigateToBooking(room.id);
+  const handleBookSession = (session: LiveSession) => {
+    selectSession({
+      id: session.id,
+      name: session.name,
+      participant_limit: session.participant_limit,
+      is_strict_lockdown: session.is_strict_lockdown,
+    });
+    onNavigateToBooking();
   };
 
-  const occupiedCount = liveRooms.filter((r) => r.is_occupied).length;
+  const activeCount = liveSessions.filter((s) => s.is_occupied).length;
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchRooms(); }} tintColor="#e8c872" />
+        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchSessions(); }} tintColor="#e8c872" />
       }
     >
       {/* Top Banner with Rock Stencil Aesthetic */}
@@ -64,16 +69,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
           <Text style={styles.liveIndicator}>((•)) LIVE NOW PLAYING</Text>
           <Text style={styles.pollTag}>POLLING: 30S</Text>
         </View>
-        <Text style={styles.heroTitle}>STAGE TELEMETRY</Text>
+        <Text style={styles.heroTitle}>REHEARSAL TELEMETRY</Text>
         <Text style={styles.heroSubtitle}>
-          REAL-TIME ACOUSTIC MONITORING AND ROOM OCCUPANCY DASHBOARD.
+          REAL-TIME SESSION TELEMETRY & CATEGORY STATUS.
         </Text>
 
         {/* Status Quota Bar */}
         <View style={styles.quotaBar}>
           <View style={styles.quotaItem}>
             <Text style={styles.quotaLabel}>ACTIVE SESSIONS</Text>
-            <Text style={styles.quotaValue}>{occupiedCount} / {liveRooms.length} ROOMS</Text>
+            <Text style={styles.quotaValue}>{activeCount} / {liveSessions.length} SESSIONS</Text>
           </View>
           <View style={styles.quotaDivider} />
           <View style={styles.quotaItem}>
@@ -83,13 +88,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
             </Text>
           </View>
         </View>
+
+        {/* Primary Booking Action */}
+        <TouchableOpacity
+          style={styles.heroBookBtn}
+          activeOpacity={0.8}
+          onPress={onNavigateToBooking}
+        >
+          <Text style={styles.heroBookBtnText}>⚡ BOOK REHEARSAL SLOT →</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Room Cards List */}
-      <View style={styles.roomsList}>
+      {/* Session Categories List */}
+      <View style={styles.sessionsList}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>ROOMS & ACOUSTIC CEILINGS</Text>
-          <TouchableOpacity onPress={() => onNavigateToBooking()}>
+          <Text style={styles.sectionTitle}>REHEARSAL SESSION CATEGORIES</Text>
+          <TouchableOpacity onPress={onNavigateToBooking}>
             <Text style={styles.newBookingLink}>+ BOOK NEW SLOT</Text>
           </TouchableOpacity>
         </View>
@@ -97,14 +111,14 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         {loading && !refreshing ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#e8c872" />
-            <Text style={styles.loadingText}>CALIBRATING ACOUSTIC SENSORS...</Text>
+            <Text style={styles.loadingText}>CALIBRATING SESSION TELEMETRY...</Text>
           </View>
         ) : (
-          liveRooms.map((room) => (
-            <RoomCard
-              key={room.id}
-              room={room}
-              onBookNow={handleBookRoom}
+          liveSessions.map((session) => (
+            <LiveSessionCard
+              key={session.id}
+              session={session}
+              onBookSession={handleBookSession}
             />
           ))
         )}
@@ -199,7 +213,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#2a2a2a',
     marginHorizontal: 12,
   },
-  roomsList: {
+  heroBookBtn: {
+    backgroundColor: '#f7f4ea',
+    borderRadius: 6,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  heroBookBtnText: {
+    color: '#111111',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  sessionsList: {
     marginTop: 4,
   },
   sectionHeader: {

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { LiveRoom, SessionType, Instrument, BookingResponse, AcousticCheckResponse } from '../api/client';
+import { LiveSession, SessionType, Instrument, BookingResponse, AcousticCheckResponse } from '../api/client';
 
 export interface InAppNotification {
   id: string;
@@ -12,7 +12,7 @@ export interface InAppNotification {
 export interface BookingWizardState {
   step: 1 | 2 | 3;
   selectedSession: SessionType | null;
-  selectedRoomId: number | null;
+  practiceMode: string;
   bookingDate: string; // YYYY-MM-DD
   startTime: string;   // HH:MM:00
   durationMinutes: number; // 60 or 120
@@ -36,11 +36,11 @@ interface AppState {
   };
   setCurrentUser: (user: { id: number; name: string; email: string }) => void;
 
-  // Live Telemetry
-  liveRooms: LiveRoom[];
-  setLiveRooms: (rooms: LiveRoom[]) => void;
-  isLoadingLiveRooms: boolean;
-  setIsLoadingLiveRooms: (loading: boolean) => void;
+  // Live Telemetry (Categorised strictly by Sessions)
+  liveSessions: LiveSession[];
+  setLiveSessions: (sessions: LiveSession[]) => void;
+  isLoadingLiveSessions: boolean;
+  setIsLoadingLiveSessions: (loading: boolean) => void;
 
   // Catalogues
   sessionTypes: SessionType[];
@@ -58,7 +58,7 @@ interface AppState {
   wizard: BookingWizardState;
   setWizardStep: (step: 1 | 2 | 3) => void;
   selectSession: (session: SessionType) => void;
-  selectRoom: (roomId: number) => void;
+  setPracticeMode: (mode: string) => void;
   setBookingDateTime: (date: string, time: string, duration: number) => void;
   setParticipantCount: (count: number) => void;
   setInstrumentQuantity: (instrumentId: number, qty: number) => void;
@@ -82,10 +82,10 @@ export const useStore = create<AppState>((set, get) => ({
   },
   setCurrentUser: (user) => set({ currentUser: user }),
 
-  liveRooms: [],
-  setLiveRooms: (rooms) => set({ liveRooms: rooms }),
-  isLoadingLiveRooms: false,
-  setIsLoadingLiveRooms: (loading) => set({ isLoadingLiveRooms: loading }),
+  liveSessions: [],
+  setLiveSessions: (sessions) => set({ liveSessions: sessions }),
+  isLoadingLiveSessions: false,
+  setIsLoadingLiveSessions: (loading) => set({ isLoadingLiveSessions: loading }),
 
   sessionTypes: [],
   setSessionTypes: (sessionTypes) => set({ sessionTypes }),
@@ -100,7 +100,7 @@ export const useStore = create<AppState>((set, get) => ({
   wizard: {
     step: 1,
     selectedSession: null,
-    selectedRoomId: 1, // Defaults to Studio A
+    practiceMode: 'Solo Practice',
     bookingDate: new Date().toISOString().split('T')[0],
     startTime: '16:00:00',
     durationMinutes: 60,
@@ -117,20 +117,41 @@ export const useStore = create<AppState>((set, get) => ({
   setWizardStep: (step) =>
     set((state) => ({ wizard: { ...state.wizard, step } })),
 
-  selectSession: (session) =>
+  selectSession: (session) => {
+    const sName = (session.name || '').toLowerCase();
+    const defaultMode = sName.includes('jam')
+      ? 'Collaborative Jam'
+      : sName.includes('meeting')
+      ? 'Meeting'
+      : 'Solo Practice';
+
     set((state) => ({
       wizard: {
         ...state.wizard,
         selectedSession: session,
+        practiceMode: defaultMode,
+        participantCount: defaultMode === 'Solo Practice' ? 1 : Math.min(session.participant_limit, Math.max(1, state.wizard.participantCount || 2)),
         step: 2,
         // Reset instruments on session change to guarantee filter compliance
         instruments: {},
         acousticPreview: null,
       },
-    })),
+    }));
+  },
 
-  selectRoom: (roomId) =>
-    set((state) => ({ wizard: { ...state.wizard, selectedRoomId: roomId } })),
+  setPracticeMode: (practiceMode) =>
+    set((state) => ({
+      wizard: {
+        ...state.wizard,
+        practiceMode,
+        participantCount: practiceMode.toLowerCase() === 'solo practice'
+          ? 1
+          : Math.min(state.wizard.selectedSession?.participant_limit || 8, Math.max(1, state.wizard.participantCount || 2)),
+        // Reset instruments when mode changes
+        instruments: {},
+        acousticPreview: null,
+      },
+    })),
 
   setBookingDateTime: (date, time, duration) =>
     set((state) => ({
@@ -185,7 +206,7 @@ export const useStore = create<AppState>((set, get) => ({
       wizard: {
         step: 1,
         selectedSession: null,
-        selectedRoomId: 1,
+        practiceMode: 'Solo Practice',
         bookingDate: new Date().toISOString().split('T')[0],
         startTime: '16:00:00',
         durationMinutes: 60,

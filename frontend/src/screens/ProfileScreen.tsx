@@ -91,8 +91,8 @@ export const ProfileScreen: React.FC = () => {
         <Text style={styles.policyTitle}>CLUB BOOKING RULES</Text>
         <Text style={styles.policyItem}>• Rule 1: Maximum 3 active reservations per member per day.</Text>
         <Text style={styles.policyItem}>• Rule 2: Participant count strictly capped by Session limit.</Text>
-        <Text style={styles.policyItem}>• Rule 3: AI Acoustic Engine enforces room dB ceilings & frequency clash limits.</Text>
-        <Text style={styles.policyItem}>• PostgreSQL EXCLUDE constraint prevents concurrent room overlaps.</Text>
+        <Text style={styles.policyItem}>• Rule 3: AI Acoustic Engine enforces session dB ceilings & frequency clash limits.</Text>
+        <Text style={styles.policyItem}>• Automated PostgreSQL scheduling protects against concurrent rehearsal overlaps.</Text>
       </View>
     </ScrollView>
   );

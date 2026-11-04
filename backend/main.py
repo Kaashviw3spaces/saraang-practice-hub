@@ -157,18 +157,20 @@ class BookingInstrumentItem(BaseModel):
 
 class BookingCreate(BaseModel):
     user_id: int
-    room_id: int
+    room_id: Optional[int] = None
     session_type_id: int
     booking_date: date
     start_time: time
     end_time: time
+    practice_mode: Optional[str] = "Solo Practice"
     participant_count: int = Field(default=1, gt=0)
     instruments: List[BookingInstrumentItem] = Field(default_factory=list)
 
 
 class AcousticCheckRequest(BaseModel):
-    room_id: int
+    room_id: Optional[int] = None
     session_type_id: int
+    practice_mode: Optional[str] = "Solo Practice"
     instruments: List[BookingInstrumentItem] = Field(default_factory=list)
 
 
@@ -177,12 +179,14 @@ class BookingOut(BaseModel):
     user_id: int
     user_name: Optional[str] = None
     room_id: int
+    assigned_room_id: Optional[int] = None
     room_name: Optional[str] = None
     session_type_id: int
     session_name: Optional[str] = None
     booking_date: date
     start_time: time
     end_time: time
+    practice_mode: Optional[str] = "Solo Practice"
     participant_count: int
     status: str
     created_at: datetime
@@ -267,13 +271,224 @@ async def register_push_token(req: PushTokenRequest, conn=Depends(get_db)):
 
 
 # ---------------------------------------------------------
+# Session Policy Validation (Session A, Session B, Meeting Session)
+# ---------------------------------------------------------
+
+def validate_session_policy(
+    session_name: str,
+    practice_mode: Optional[str],
+    instrument_rows: List[Dict[str, Any]],
+) -> None:
+    """
+    Validates practice mode and instrument constraints based on session type:
+    - Session A:
+        Modes: Solo Practice, Collaborative Jam, Full Band Rehearsal.
+        Solo Practice: Instruments array must contain only ONE instrument: Acoustic Drums or Electric Guitar.
+        Full Band Rehearsal: Bypasses individual instrument checks ("All Instruments Included").
+    - Session B:
+        Modes: Solo Practice, Collaborative Jam (Full Band Rehearsal not allowed).
+        Solo Practice: Instruments array must contain only ONE instrument.
+        Acoustic Policy: Instruments must NOT contain Acoustic Drums or Electric Guitar.
+    - Meeting Session:
+        Bypasses instrument validation completely.
+    """
+    s_name = (session_name or "").strip().lower()
+    mode = (practice_mode or "Solo Practice").strip()
+    mode_lower = mode.lower()
+
+    # 1. Meeting Session: Bypass completely
+    if s_name == "meeting session":
+        return
+
+    def is_drums(name: str) -> bool:
+        return "drum" in name.lower()
+
+    def is_electric_guitar(name: str) -> bool:
+        return "electric guitar" in name.lower()
+
+    total_qty = sum(inst.get("quantity", 1) for inst in instrument_rows)
+
+    # 2. Session A
+    if s_name == "session a":
+        valid_modes = ["solo practice", "collaborative jam", "full band rehearsal"]
+        if mode_lower not in valid_modes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": f"Invalid practice mode '{mode}' for Session A.",
+                    "ai_acoustics": {
+                        "compatible": False,
+                        "reason": "Session A only supports Solo Practice, Collaborative Jam, or Full Band Rehearsal.",
+                    },
+                },
+            )
+
+        if mode_lower == "full band rehearsal":
+            # Bypasses individual instrument checks ("All Instruments Included")
+            return
+
+        if mode_lower == "solo practice":
+            if len(instrument_rows) != 1 or total_qty != 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "message": "Session A Solo Policy Violation: Solo practice requires selecting only ONE instrument.",
+                        "ai_acoustics": {
+                            "compatible": False,
+                            "reason": "Session A Solo Policy: Solo practice requires selecting only ONE instrument (Acoustic Drums or Electric Guitar).",
+                        },
+                    },
+                )
+            inst_name = instrument_rows[0].get("name", "")
+            if not (is_drums(inst_name) or is_electric_guitar(inst_name)):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "message": f"Session A Solo Policy Violation: '{inst_name}' is not permitted.",
+                        "ai_acoustics": {
+                            "compatible": False,
+                            "reason": f"Session A Solo Policy: Solo practice requires Acoustic Drums or Electric Guitar only. Selected: {inst_name}",
+                        },
+                    },
+                )
+        return
+
+    # 3. Session B
+    if s_name == "session b":
+        valid_modes = ["solo practice", "collaborative jam"]
+        if mode_lower == "full band rehearsal":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "Session B does not permit Full Band Rehearsal.",
+                    "ai_acoustics": {
+                        "compatible": False,
+                        "reason": "Session B Acoustic Policy: Full band rehearsals, drums, and electric guitar are not permitted in Session B.",
+                    },
+                },
+            )
+        if mode_lower not in valid_modes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": f"Invalid practice mode '{mode}' for Session B.",
+                    "ai_acoustics": {
+                        "compatible": False,
+                        "reason": "Session B only supports Solo Practice or Collaborative Jam.",
+                    },
+                },
+            )
+
+        if mode_lower == "solo practice":
+            if len(instrument_rows) != 1 or total_qty != 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "message": "Session B Solo Policy Violation: Solo practice requires selecting only ONE instrument.",
+                        "ai_acoustics": {
+                            "compatible": False,
+                            "reason": "Session B Solo Policy: Solo practice requires selecting only ONE instrument.",
+                        },
+                    },
+                )
+
+        for inst in instrument_rows:
+            inst_name = inst.get("name", "")
+            if is_drums(inst_name) or is_electric_guitar(inst_name):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "message": f"Session B Acoustic Policy Violation: '{inst_name}' is not permitted.",
+                        "ai_acoustics": {
+                            "compatible": False,
+                            "reason": f"Session B Acoustic Policy: Full band rehearsals, drums, and electric guitar are not permitted. Prohibited: {inst_name}",
+                        },
+                    },
+                )
+        return
+
+    # 4. Jam Session: Solo Practice and Full Band Rehearsal removed; Collaborative Jam only
+    if s_name == "jam session":
+        if mode_lower in ["solo practice", "full band rehearsal"] or mode_lower != "collaborative jam":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": f"Jam Session does not permit '{mode}'. Only Collaborative Jam is permitted.",
+                    "ai_acoustics": {
+                        "compatible": False,
+                        "reason": "Jam Session Policy: Solo Practice and Full Band Rehearsal are not permitted in Jam Session. Only Collaborative Jam is supported.",
+                    },
+                },
+            )
+        return
+
+
+# ---------------------------------------------------------
 # Rooms, Session Types & Instruments Endpoints
 # ---------------------------------------------------------
+
+@app.get("/api/sessions/live", tags=["Catalogue", "Dashboard"])
+async def get_live_sessions_status(conn=Depends(get_db)):
+    """
+    Returns real-time rehearsal occupancy and telemetry categorised strictly by SESSION,
+    polling-compatible for the mobile app home screen (every 30s).
+    """
+    sessions = await conn.fetch(
+        "SELECT id, name, participant_limit, is_strict_lockdown FROM session_types ORDER BY id ASC"
+    )
+
+    current_time_bookings = await conn.fetch(
+        """
+        SELECT 
+            b.id AS booking_id, b.session_type_id, b.participant_count,
+            b.start_time, b.end_time, b.practice_mode,
+            u.name AS user_name, s.name AS session_name
+        FROM bookings b
+        JOIN users u ON b.user_id = u.id
+        JOIN session_types s ON b.session_type_id = s.id
+        WHERE b.booking_date = CURRENT_DATE
+          AND b.status = 'Confirmed'
+          AND CURRENT_TIME BETWEEN b.start_time AND b.end_time
+        """
+    )
+    active_by_session = {b["session_type_id"]: dict(b) for b in current_time_bookings}
+
+    result = []
+    for s in sessions:
+        s_dict = dict(s)
+        session_id = s["id"]
+        active_db = active_by_session.get(session_id)
+        is_occupied = active_db is not None
+        current_session = None
+
+        if active_db:
+            current_session = {
+                "booking_id": active_db["booking_id"],
+                "session_type": active_db["session_name"],
+                "practice_mode": active_db.get("practice_mode", "Solo Practice"),
+                "user_name": active_db["user_name"],
+                "start_time": str(active_db["start_time"]),
+                "end_time": str(active_db["end_time"]),
+                "participant_count": active_db["participant_count"],
+            }
+
+        s_dict["status"] = "On Air" if is_occupied else "Available"
+        s_dict["is_occupied"] = is_occupied
+        s_dict["current_session"] = current_session
+        result.append(s_dict)
+
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "total_sessions": len(sessions),
+        "occupied_count": sum(1 for s in result if s["is_occupied"]),
+        "sessions": result,
+    }
+
 
 @app.get("/api/rooms/live", tags=["Catalogue", "Dashboard"])
 async def get_live_rooms_status(conn=Depends(get_db)):
     """
-    Returns real-time occupancy and acoustic states for all rooms,
+    Returns real-time occupancy status for all rooms in a clean, minimalistic format,
     polling-compatible for the mobile app home screen (every 30s).
     """
     rooms = await conn.fetch("SELECT id, name, base_capacity, max_decibel_threshold, echo_factor FROM rooms ORDER BY id ASC")
@@ -282,7 +497,7 @@ async def get_live_rooms_status(conn=Depends(get_db)):
         """
         SELECT 
             b.id AS booking_id, b.room_id, b.participant_count,
-            b.start_time, b.end_time,
+            b.start_time, b.end_time, b.practice_mode,
             u.name AS user_name, s.name AS session_name
         FROM bookings b
         JOIN users u ON b.user_id = u.id
@@ -305,36 +520,30 @@ async def get_live_rooms_status(conn=Depends(get_db)):
         
         is_occupied = redis_state is not None or active_db is not None
         current_session = None
-        current_db = 35.0  # Ambient baseline
         
         if redis_state:
             current_session = {
                 "booking_id": redis_state.get("booking_id"),
                 "session_type": redis_state.get("session_type"),
+                "practice_mode": redis_state.get("practice_mode", "Solo Practice"),
                 "user_name": redis_state.get("user_name"),
                 "start_time": redis_state.get("start_time"),
                 "end_time": redis_state.get("end_time"),
                 "participant_count": redis_state.get("participant_count"),
-                "effective_decibels": redis_state.get("effective_decibels", 75.0),
-                "instruments": redis_state.get("instruments", []),
             }
-            current_db = redis_state.get("effective_decibels", 75.0)
         elif active_db:
             current_session = {
                 "booking_id": active_db["booking_id"],
                 "session_type": active_db["session_name"],
+                "practice_mode": active_db.get("practice_mode", "Solo Practice"),
                 "user_name": active_db["user_name"],
                 "start_time": str(active_db["start_time"]),
                 "end_time": str(active_db["end_time"]),
                 "participant_count": active_db["participant_count"],
-                "effective_decibels": 70.0,
-                "instruments": [],
             }
-            current_db = 70.0
             
         r_dict["status"] = "Occupied" if is_occupied else "Available"
         r_dict["is_occupied"] = is_occupied
-        r_dict["current_decibels"] = current_db
         r_dict["current_session"] = current_session
         result.append(r_dict)
         
@@ -409,18 +618,9 @@ async def check_acoustic_compatibility(
 ):
     """
     Evaluates the acoustic and frequency compatibility of a planned booking
-    without creating a database record.
+    without creating a database record. Supports automatic candidate room evaluation.
     """
-    # 1. Fetch Room
-    room_row = await conn.fetchrow(
-        "SELECT id, name, max_decibel_threshold, echo_factor FROM rooms WHERE id = $1",
-        req.room_id,
-    )
-    if not room_row:
-        raise HTTPException(status_code=404, detail="Room not found")
-    room_profile = RoomAcousticProfile(**dict(room_row))
-
-    # 2. Fetch Session Type
+    # 1. Fetch Session Type
     st_row = await conn.fetchrow(
         "SELECT id, name, participant_limit, is_strict_lockdown FROM session_types WHERE id = $1",
         req.session_type_id,
@@ -429,8 +629,9 @@ async def check_acoustic_compatibility(
         raise HTTPException(status_code=404, detail="Session type not found")
     session_rules = SessionTypeRules(**dict(st_row))
 
-    # 3. Fetch Instruments Profiles
+    # 2. Fetch Instruments Profiles
     instrument_profiles: List[InstrumentAcousticProfile] = []
+    inst_rows: List[Dict[str, Any]] = []
     if req.instruments:
         inst_ids = [item.instrument_id for item in req.instruments]
         qty_map = {item.instrument_id: item.quantity for item in req.instruments}
@@ -439,6 +640,7 @@ async def check_acoustic_compatibility(
             "SELECT id, name, category, base_decibels, frequency_band FROM instruments WHERE id = ANY($1::int[])",
             inst_ids,
         )
+        inst_rows = [dict(r, quantity=qty_map.get(r["id"], 1)) for r in rows]
         for r in rows:
             instrument_profiles.append(
                 InstrumentAcousticProfile(
@@ -451,13 +653,62 @@ async def check_acoustic_compatibility(
                 )
             )
 
-    # 4. Execute AI Evaluation
-    evaluation = evaluate_acoustic_compatibility(
-        room=room_profile,
-        instruments=instrument_profiles,
-        session_type=session_rules,
+    # 3. Session & Practice Mode Policy Check
+    validate_session_policy(session_rules.name, req.practice_mode, inst_rows)
+
+    # 4. Fetch Candidate Rooms (Automatic room evaluation only - manual selection removed)
+    p_mode_lower = (req.practice_mode or "Solo Practice").strip().lower()
+    all_rooms_rows = await conn.fetch(
+        "SELECT id, name, base_capacity, max_decibel_threshold, echo_factor FROM rooms ORDER BY id ASC"
     )
-    return evaluation
+    all_rooms = [dict(r) for r in all_rooms_rows]
+    if p_mode_lower == "solo practice":
+        candidate_rooms = [r for r in all_rooms if "jam pod" not in r["name"].lower()]
+    else:
+        candidate_rooms = all_rooms
+
+    s_name_lower = session_rules.name.lower()
+    is_bypassed = s_name_lower == "meeting session" or (s_name_lower == "session a" and p_mode_lower == "full band rehearsal")
+
+    first_room = candidate_rooms[0] if candidate_rooms else {"max_decibel_threshold": 115, "echo_factor": 1.0}
+    if is_bypassed:
+        return AcousticEvaluation(
+            compatible=True,
+            total_decibels=35.0,
+            effective_decibels=35.0,
+            max_allowed_decibels=float(first_room["max_decibel_threshold"]),
+            echo_factor=first_room["echo_factor"],
+            is_strict_lockdown=session_rules.is_strict_lockdown,
+            frequency_band_distribution={},
+            frequency_collisions=[],
+            warnings=[],
+            rejection_reasons=[],
+        )
+
+    last_eval = None
+    for r in candidate_rooms:
+        r_profile = RoomAcousticProfile(**r)
+        eval_res = evaluate_acoustic_compatibility(
+            room=r_profile,
+            instruments=instrument_profiles,
+            session_type=session_rules,
+        )
+        if eval_res.compatible:
+            return eval_res
+        last_eval = eval_res
+
+    return last_eval or AcousticEvaluation(
+        compatible=False,
+        total_decibels=0.0,
+        effective_decibels=0.0,
+        max_allowed_decibels=0.0,
+        echo_factor=1.0,
+        is_strict_lockdown=session_rules.is_strict_lockdown,
+        frequency_band_distribution={},
+        frequency_collisions=[],
+        warnings=[],
+        rejection_reasons=["No candidate rooms can handle the acoustic load of the selected instruments."],
+    )
 
 
 # ---------------------------------------------------------
@@ -468,10 +719,11 @@ async def check_acoustic_compatibility(
 async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
     """
     Creates a new room booking while strictly validating:
-    1. Daily Booking Limit: Maximum 1 active booking per user per day.
-    2. Capacity Enforcement: Participant count <= session type limit and room capacity.
-    3. AI Acoustic Engine Compatibility: Decibel threshold and frequency clash clearance.
-    4. Room Availability: PostgreSQL Exclusion constraint protects against any double bookings.
+    1. Daily Booking Limit: Maximum 3 active bookings per user per day.
+    2. Capacity Enforcement: Participant count <= session type limit.
+    3. Session Mode & Instrument Policies: Strict single-instrument Solo Practice, Session B acoustic limits.
+    4. Auto-Room Assignment: Automatic room selection with Jam Pod exclusion for Solo Practice and AI acoustic clearance.
+    5. Room Availability: PostgreSQL Exclusion constraint protects against double bookings.
     """
     if booking.end_time <= booking.start_time:
         raise HTTPException(
@@ -500,18 +752,11 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
         )
 
     # ---------------------------------------------------------
-    # RULE 2: Capacity Enforcement
+    # RULE 2: User & Session Type Validation
     # ---------------------------------------------------------
     user_row = await conn.fetchrow("SELECT id, name, email FROM users WHERE id = $1", booking.user_id)
     if not user_row:
         raise HTTPException(status_code=404, detail="User not found")
-
-    room_row = await conn.fetchrow(
-        "SELECT id, name, base_capacity, max_decibel_threshold, echo_factor FROM rooms WHERE id = $1",
-        booking.room_id,
-    )
-    if not room_row:
-        raise HTTPException(status_code=404, detail="Room not found")
 
     session_row = await conn.fetchrow(
         "SELECT id, name, participant_limit, is_strict_lockdown FROM session_types WHERE id = $1",
@@ -526,25 +771,21 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
             detail=f"Participant count ({booking.participant_count}) exceeds limit ({session_row['participant_limit']}) for session '{session_row['name']}'.",
         )
 
-    if booking.participant_count > room_row["base_capacity"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Participant count ({booking.participant_count}) exceeds physical capacity ({room_row['base_capacity']}) of room '{room_row['name']}'.",
-        )
-
     # ---------------------------------------------------------
-    # RULE 3: AI Acoustic Compatibility Check
+    # RULE 3: Session Policy Validation
     # ---------------------------------------------------------
     instrument_profiles: List[InstrumentAcousticProfile] = []
+    inst_rows: List[Dict[str, Any]] = []
     qty_map = {item.instrument_id: item.quantity for item in booking.instruments}
 
     if booking.instruments:
         inst_ids = list(qty_map.keys())
-        inst_rows = await conn.fetch(
+        rows = await conn.fetch(
             "SELECT id, name, category, base_decibels, frequency_band FROM instruments WHERE id = ANY($1::int[])",
             inst_ids,
         )
-        for r in inst_rows:
+        inst_rows = [dict(r, quantity=qty_map.get(r["id"], 1)) for r in rows]
+        for r in rows:
             instrument_profiles.append(
                 InstrumentAcousticProfile(
                     id=r["id"],
@@ -556,17 +797,98 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
                 )
             )
 
-    room_profile = RoomAcousticProfile(**dict(room_row))
+    # Enforce Session A / Session B / Meeting Session mode & instrument constraints
+    validate_session_policy(session_row["name"], booking.practice_mode, inst_rows)
+
+    # ---------------------------------------------------------
+    # Auto-Room Assignment & Acoustic Validation (CRITICAL)
+    # ---------------------------------------------------------
+    all_rooms_rows = await conn.fetch(
+        "SELECT id, name, base_capacity, max_decibel_threshold, echo_factor FROM rooms ORDER BY id ASC"
+    )
+    all_rooms = [dict(r) for r in all_rooms_rows]
+
+    # Find rooms already booked for the requested date and time slot
+    busy_rows = await conn.fetch(
+        """
+        SELECT room_id FROM bookings
+        WHERE booking_date = $1
+          AND status != 'Cancelled'
+          AND (start_time < $3 AND end_time > $2)
+        """,
+        booking.booking_date,
+        booking.start_time,
+        booking.end_time,
+    )
+    busy_room_ids = {r["room_id"] for r in busy_rows}
+    available_rooms = [r for r in all_rooms if r["id"] not in busy_room_ids]
+
+    p_mode_lower = (booking.practice_mode or "Solo Practice").strip().lower()
+
+    # Auto-assignment (Manual room selection removed altogether):
+    # Jam Pod Constraint: If Solo Practice, filter out "Jam Pod" rooms from available pool
+    if p_mode_lower == "solo practice":
+        candidate_rooms = [r for r in available_rooms if "jam pod" not in r["name"].lower()]
+    else:
+        candidate_rooms = list(available_rooms)
+
+    # Capacity check: room must be able to accommodate requested participants
+    candidate_rooms = [r for r in candidate_rooms if r["base_capacity"] >= booking.participant_count]
+
+    if not candidate_rooms:
+        if not available_rooms:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No rooms are available for the requested time slot.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No available rooms can accommodate {booking.participant_count} participants for this session mode.",
+        )
+
+    s_name_lower = session_row["name"].lower()
+    is_bypassed = s_name_lower == "meeting session" or (s_name_lower == "session a" and p_mode_lower == "full band rehearsal")
     session_rules = SessionTypeRules(**dict(session_row))
 
-    evaluation = evaluate_acoustic_compatibility(
-        room=room_profile,
-        instruments=instrument_profiles,
-        session_type=session_rules,
-    )
+    assigned_room = None
+    chosen_evaluation = None
+    last_eval = None
 
-    if not evaluation.compatible:
-        primary_reason = evaluation.rejection_reasons[0] if evaluation.rejection_reasons else "Acoustic noise ceiling exceeded."
+    for room_cand in candidate_rooms:
+        room_profile = RoomAcousticProfile(**room_cand)
+        if is_bypassed:
+            assigned_room = room_cand
+            chosen_evaluation = AcousticEvaluation(
+                compatible=True,
+                total_decibels=35.0,
+                effective_decibels=35.0,
+                max_allowed_decibels=float(room_profile.max_decibel_threshold),
+                echo_factor=room_profile.echo_factor,
+                is_strict_lockdown=session_rules.is_strict_lockdown,
+                frequency_band_distribution={},
+                frequency_collisions=[],
+                warnings=[],
+                rejection_reasons=[],
+            )
+            break
+        else:
+            eval_result = evaluate_acoustic_compatibility(
+                room=room_profile,
+                instruments=instrument_profiles,
+                session_type=session_rules,
+            )
+            if eval_result.compatible:
+                assigned_room = room_cand
+                chosen_evaluation = eval_result
+                break
+            else:
+                last_eval = eval_result
+
+    if not assigned_room:
+        primary_reason = "No available rooms can handle the acoustic load of your selected instruments at this time."
+        rejection_reasons = (
+            last_eval.rejection_reasons if last_eval and last_eval.rejection_reasons else [primary_reason]
+        )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
@@ -574,11 +896,11 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
                 "ai_acoustics": {
                     "compatible": False,
                     "reason": primary_reason,
-                    "rejection_reasons": evaluation.rejection_reasons,
-                    "effective_decibels": evaluation.effective_decibels,
-                    "max_allowed_decibels": evaluation.max_allowed_decibels,
-                    "frequency_collisions": evaluation.frequency_collisions,
-                    "warnings": evaluation.warnings,
+                    "rejection_reasons": rejection_reasons,
+                    "effective_decibels": last_eval.effective_decibels if last_eval else 0.0,
+                    "max_allowed_decibels": last_eval.max_allowed_decibels if last_eval else 0.0,
+                    "frequency_collisions": last_eval.frequency_collisions if last_eval else [],
+                    "warnings": last_eval.warnings if last_eval else [],
                 },
             },
         )
@@ -593,24 +915,25 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
                 INSERT INTO bookings (
                     user_id, room_id, session_type_id, 
                     booking_date, start_time, end_time, 
-                    participant_count, status
+                    participant_count, status, practice_mode
                 )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, 'Confirmed')
-                RETURNING id, user_id, room_id, session_type_id, booking_date, start_time, end_time, participant_count, status, created_at
+                VALUES ($1, $2, $3, $4, $5, $6, $7, 'Confirmed', $8)
+                RETURNING id, user_id, room_id, session_type_id, booking_date, start_time, end_time, participant_count, status, practice_mode, created_at
                 """,
                 booking.user_id,
-                booking.room_id,
+                assigned_room["id"],
                 booking.session_type_id,
                 booking.booking_date,
                 booking.start_time,
                 booking.end_time,
                 booking.participant_count,
+                booking.practice_mode or "Solo Practice",
             )
         except (asyncpg.ExclusionViolationError, asyncpg.UniqueViolationError) as e:
             logger.warning("Room booking collision: %s", e)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Room '{room_row['name']}' is already booked during this time range on {booking.booking_date}.",
+                detail=f"Room '{assigned_room['name']}' is already booked during this time range on {booking.booking_date}.",
             )
 
         booking_id = booking_row["id"]
@@ -632,35 +955,34 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
     # ---------------------------------------------------------
     # Redis Real-Time State Update & Celery Dispatch
     # ---------------------------------------------------------
-    # If booking is scheduled for today, update the Redis "Now Playing" live dashboard state
     if booking.booking_date == date.today():
         await NowPlayingCache.set_room_active(
-            room_id=booking.room_id,
+            room_id=assigned_room["id"],
             state_data={
                 "booking_id": booking_id,
-                "room_id": booking.room_id,
-                "room_name": room_row["name"],
+                "room_id": assigned_room["id"],
+                "room_name": assigned_room["name"],
                 "session_type": session_row["name"],
+                "practice_mode": booking.practice_mode or "Solo Practice",
                 "user_name": user_row["name"],
                 "start_time": str(booking.start_time),
                 "end_time": str(booking.end_time),
                 "participant_count": booking.participant_count,
-                "effective_decibels": evaluation.effective_decibels,
-                "instruments": [p.model_dump() for p in instrument_profiles],
             },
         )
 
     # Trigger async notification task
+    evaluation_effective_db = chosen_evaluation.effective_decibels if chosen_evaluation else 35.0
     try:
         notifier.send_booking_confirmation.delay(
             booking_id=booking_id,
             user_name=user_row["name"],
             user_email=user_row["email"],
-            room_name=room_row["name"],
+            room_name=assigned_room["name"],
             booking_date=str(booking.booking_date),
             start_time=str(booking.start_time),
             end_time=str(booking.end_time),
-            effective_decibels=evaluation.effective_decibels,
+            effective_decibels=evaluation_effective_db,
         )
     except Exception as e:
         logger.warning("Celery dispatch unavailable (running synchronous notification mock): %s", e)
@@ -668,24 +990,26 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
             booking_id=booking_id,
             user_name=user_row["name"],
             user_email=user_row["email"],
-            room_name=room_row["name"],
+            room_name=assigned_room["name"],
             booking_date=str(booking.booking_date),
             start_time=str(booking.start_time),
             end_time=str(booking.end_time),
-            effective_decibels=evaluation.effective_decibels,
+            effective_decibels=evaluation_effective_db,
         )
 
     return BookingOut(
         id=booking_id,
         user_id=booking_row["user_id"],
         user_name=user_row["name"],
-        room_id=booking_row["room_id"],
-        room_name=room_row["name"],
+        room_id=assigned_room["id"],
+        assigned_room_id=assigned_room["id"],
+        room_name=assigned_room["name"],
         session_type_id=booking_row["session_type_id"],
         session_name=session_row["name"],
         booking_date=booking_row["booking_date"],
         start_time=booking_row["start_time"],
         end_time=booking_row["end_time"],
+        practice_mode=booking_row["practice_mode"],
         participant_count=booking_row["participant_count"],
         status=booking_row["status"],
         created_at=booking_row["created_at"],
@@ -707,7 +1031,8 @@ async def list_bookings(
             b.room_id, r.name AS room_name,
             b.session_type_id, s.name AS session_name,
             b.booking_date, b.start_time, b.end_time,
-            b.participant_count, b.status, b.created_at
+            b.participant_count, b.status, b.created_at,
+            b.practice_mode
         FROM bookings b
         JOIN users u ON b.user_id = u.id
         JOIN rooms r ON b.room_id = r.id
@@ -718,7 +1043,7 @@ async def list_bookings(
         ORDER BY b.booking_date DESC, b.start_time DESC
     """
     rows = await conn.fetch(query, booking_date, user_id, room_id)
-    return [BookingOut(**dict(r), instruments=[]) for r in rows]
+    return [BookingOut(**dict(r), assigned_room_id=r["room_id"], instruments=[]) for r in rows]
 
 
 @app.post("/api/bookings/{booking_id}/cancel", tags=["Bookings"])

@@ -1,33 +1,43 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { LiveRoom } from '../api/client';
+import { LiveSession } from '../api/client';
 
-interface RoomCardProps {
-  room: LiveRoom;
-  onBookNow: (room: LiveRoom) => void;
+interface LiveSessionCardProps {
+  session: LiveSession;
+  onBookSession: (session: LiveSession) => void;
 }
 
-export const RoomCard: React.FC<RoomCardProps> = ({ room, onBookNow }) => {
-  const isOccupied = room.is_occupied;
-  const dbPercentage = Math.min(100, Math.round((room.current_decibels / room.max_decibel_threshold) * 100));
+export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBookSession }) => {
+  const isOccupied = session.is_occupied;
 
-  // Determine meter color based on acoustic threshold
-  const getMeterColor = (pct: number) => {
-    if (pct >= 90) return '#e05a47'; // Red/Warning
-    if (pct >= 70) return '#e8c872'; // Yellow/Gold
-    return '#3ddc97'; // Safe Teal
+  const getSessionDescription = (name: string): string => {
+    const n = name.toUpperCase();
+    if (n.includes('SESSION A')) {
+      return 'Full band rehearsals, solo drums or electric guitar, collaborative jams.';
+    }
+    if (n.includes('SESSION B')) {
+      return 'Acoustic & low-gain focus. Acoustic guitar, keys, vocals, bass.';
+    }
+    if (n.includes('JAM SESSION')) {
+      return 'Multi-instrument open jams and collaborative live rehearsals.';
+    }
+    if (n.includes('RECORDING')) {
+      return 'Strict lockdown session. Noise isolation & frequency clash prevention.';
+    }
+    if (n.includes('MEETING')) {
+      return 'Band meetings, setlist curation, production planning. No instruments needed.';
+    }
+    return 'Standard rehearsal session.';
   };
-
-  const meterColor = getMeterColor(dbPercentage);
 
   return (
     <View style={[styles.card, isOccupied && styles.occupiedCard]}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.titleContainer}>
-          <Text style={styles.roomName}>{room.name}</Text>
+          <Text style={styles.sessionName}>{session.name.toUpperCase()}</Text>
           <Text style={styles.subText}>
-            CAP: {room.base_capacity} • ECHO FACTOR: {room.echo_factor.toFixed(2)}x
+            CAPACITY: UP TO {session.participant_limit} MUSICIANS
           </Text>
         </View>
 
@@ -39,54 +49,45 @@ export const RoomCard: React.FC<RoomCardProps> = ({ room, onBookNow }) => {
         </View>
       </View>
 
-      {/* Live Decibel Meter Gauge */}
-      <View style={styles.meterContainer}>
-        <View style={styles.meterLabels}>
-          <Text style={styles.meterTitle}>LIVE NOISE LEVEL</Text>
-          <Text style={[styles.meterValue, { color: meterColor }]}>
-            {room.current_decibels.toFixed(1)} dB{' '}
-            <Text style={styles.meterThreshold}>/ {room.max_decibel_threshold} dB MAX</Text>
-          </Text>
-        </View>
+      {/* Description / Rules */}
+      <Text style={styles.descText}>{getSessionDescription(session.name)}</Text>
 
-        <View style={styles.meterTrack}>
-          <View style={[styles.meterFill, { width: `${dbPercentage}%`, backgroundColor: meterColor }]} />
-        </View>
-      </View>
-
-      {/* Current Session Info or Availability Banner */}
-      {isOccupied && room.current_session ? (
+      {/* Current Active Session Info or Availability Banner */}
+      {isOccupied && session.current_session ? (
         <View style={styles.sessionBox}>
           <View style={styles.sessionRow}>
-            <Text style={styles.sessionLabel}>SESSION:</Text>
-            <Text style={styles.sessionVal}>{room.current_session.session_type}</Text>
+            <Text style={styles.sessionLabel}>CURRENT REHEARSAL:</Text>
+            <Text style={styles.sessionVal}>{session.current_session.practice_mode || 'Rehearsal'}</Text>
           </View>
           <View style={styles.sessionRow}>
             <Text style={styles.sessionLabel}>HOST:</Text>
-            <Text style={styles.sessionVal}>{room.current_session.user_name}</Text>
+            <Text style={styles.sessionVal}>{session.current_session.user_name}</Text>
           </View>
           <View style={styles.sessionRow}>
             <Text style={styles.sessionLabel}>WINDOW:</Text>
             <Text style={styles.sessionVal}>
-              {room.current_session.start_time} - {room.current_session.end_time}
+              {session.current_session.start_time} - {session.current_session.end_time}
             </Text>
+          </View>
+          <View style={styles.sessionRow}>
+            <Text style={styles.sessionLabel}>MEMBERS:</Text>
+            <Text style={styles.sessionVal}>{session.current_session.participant_count} Musicians</Text>
           </View>
         </View>
       ) : (
         <View style={styles.vacantBox}>
-          <Text style={styles.vacantText}>⚡ Studio is currently silent and calibrated for new sessions.</Text>
+          <Text style={styles.vacantText}>⚡ Session is open and available for immediate reservation.</Text>
         </View>
       )}
 
-      {/* Action Button */}
+      {/* Action Button: Book this Session */}
       <TouchableOpacity
-        style={[styles.actionBtn, isOccupied && styles.disabledBtn]}
+        style={styles.actionBtn}
         activeOpacity={0.8}
-        onPress={() => onBookNow(room)}
-        disabled={isOccupied}
+        onPress={() => onBookSession(session)}
       >
-        <Text style={[styles.actionBtnText, isOccupied && styles.disabledBtnText]}>
-          {isOccupied ? 'OCCUPIED' : 'BOOK ROOM →'}
+        <Text style={styles.actionBtnText}>
+          BOOK {session.name.toUpperCase()} →
         </Text>
       </TouchableOpacity>
     </View>
@@ -114,23 +115,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 14,
+    marginBottom: 10,
   },
   titleContainer: {
     flex: 1,
     paddingRight: 10,
   },
-  roomName: {
+  sessionName: {
     color: '#f4ede4',
     fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    fontWeight: '900',
+    letterSpacing: 1.2,
     marginBottom: 4,
   },
   subText: {
-    color: '#777777',
-    fontSize: 11,
+    color: '#888888',
+    fontSize: 10,
     letterSpacing: 1,
+    fontWeight: '700',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   statusBadge: {
@@ -160,39 +162,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 1,
   },
-  meterContainer: {
+  descText: {
+    color: '#bbbbbb',
+    fontSize: 12,
+    lineHeight: 17,
     marginBottom: 14,
-  },
-  meterLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 6,
-  },
-  meterTitle: {
-    color: '#888888',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  meterValue: {
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  meterThreshold: {
-    color: '#666666',
-    fontSize: 10,
-    fontWeight: '500',
-  },
-  meterTrack: {
-    height: 6,
-    backgroundColor: '#262626',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  meterFill: {
-    height: '100%',
-    borderRadius: 3,
   },
   sessionBox: {
     backgroundColor: '#1d1514',
@@ -205,7 +179,7 @@ const styles = StyleSheet.create({
   sessionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 3,
+    marginBottom: 4,
   },
   sessionLabel: {
     color: '#888888',
@@ -233,7 +207,7 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     backgroundColor: '#f7f4ea',
-    paddingVertical: 10,
+    paddingVertical: 11,
     borderRadius: 4,
     alignItems: 'center',
   },
@@ -241,12 +215,6 @@ const styles = StyleSheet.create({
     color: '#111111',
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 1,
-  },
-  disabledBtn: {
-    backgroundColor: '#222222',
-  },
-  disabledBtnText: {
-    color: '#555555',
+    letterSpacing: 1.1,
   },
 });

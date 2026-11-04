@@ -42,6 +42,14 @@ export const SessionCard: React.FC<SessionCardProps> = ({
           capacity: '8',
           titleColor: '#f4ede4',
         };
+      case 'MEETING SESSION':
+        return {
+          title: 'MEETING SESSION',
+          description: 'Standard reservation for music club meetings, planning, and discussions.',
+          tagline: 'QUIET MEETING - NO INSTRUMENTS REQUIRED.',
+          capacity: '10',
+          titleColor: '#52b79a',
+        };
       case 'RECORDING SESSION':
       default:
         return {

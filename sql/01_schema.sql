@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     start_time TIME NOT NULL,
     end_time TIME NOT NULL, 
     
+    practice_mode VARCHAR(50) DEFAULT 'Solo Practice',
     participant_count INT NOT NULL DEFAULT 1 CHECK (participant_count > 0),
     status VARCHAR(20) NOT NULL DEFAULT 'Confirmed' CHECK (status IN ('Confirmed', 'Cancelled', 'Completed')),
     

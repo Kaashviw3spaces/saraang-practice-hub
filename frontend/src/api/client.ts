@@ -3,8 +3,9 @@ import { Platform } from 'react-native';
 
 // Fallback host URL: on Android emulator, 10.0.2.2 is localhost; on iOS simulator or Web, localhost works
 const getBaseUrl = () => {
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
+  const customUrl = (process.env as any)?.EXPO_PUBLIC_API_URL;
+  if (customUrl) {
+    return customUrl;
   }
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:8001';
@@ -22,6 +23,24 @@ export const apiClient = axios.create({
   },
 });
 
+export interface LiveSession {
+  id: number;
+  name: string;
+  participant_limit: number;
+  is_strict_lockdown: boolean;
+  status: 'Available' | 'On Air';
+  is_occupied: boolean;
+  current_session: {
+    booking_id?: number;
+    session_type: string;
+    practice_mode?: string;
+    user_name: string;
+    start_time: string;
+    end_time: string;
+    participant_count: number;
+  } | null;
+}
+
 export interface LiveRoom {
   id: number;
   name: string;
@@ -30,15 +49,16 @@ export interface LiveRoom {
   echo_factor: number;
   status: 'Available' | 'Occupied';
   is_occupied: boolean;
-  current_decibels: number;
+  current_decibels?: number;
   current_session: {
     booking_id?: number;
     session_type: string;
+    practice_mode?: string;
     user_name: string;
     start_time: string;
     end_time: string;
     participant_count: number;
-    effective_decibels: number;
+    effective_decibels?: number;
     instruments?: Array<{ id: number; name: string; quantity: number }>;
   } | null;
 }
@@ -61,8 +81,8 @@ export interface Instrument {
 }
 
 export interface AcousticCheckRequest {
-  room_id: number;
   session_type_id: number;
+  practice_mode?: string;
   instruments: Array<{ instrument_id: number; quantity: number }>;
 }
 
@@ -81,11 +101,11 @@ export interface AcousticCheckResponse {
 
 export interface CreateBookingRequest {
   user_id: number;
-  room_id: number;
   session_type_id: number;
   booking_date: string; // YYYY-MM-DD
   start_time: string;   // HH:MM:SS
   end_time: string;     // HH:MM:SS
+  practice_mode?: string;
   participant_count: number;
   instruments: Array<{ instrument_id: number; quantity: number }>;
 }
@@ -95,12 +115,14 @@ export interface BookingResponse {
   user_id: number;
   user_name: string;
   room_id: number;
+  assigned_room_id?: number;
   room_name: string;
   session_type_id: number;
   session_name: string;
   booking_date: string;
   start_time: string;
   end_time: string;
+  practice_mode?: string;
   participant_count: number;
   status: 'Confirmed' | 'Cancelled' | 'Completed';
   created_at: string;
@@ -108,6 +130,11 @@ export interface BookingResponse {
 }
 
 export const api = {
+  getLiveSessions: async () => {
+    const res = await apiClient.get<{ sessions: LiveSession[]; timestamp: string }>('/api/sessions/live');
+    return res.data.sessions;
+  },
+
   getLiveRooms: async () => {
     const res = await apiClient.get<{ rooms: LiveRoom[]; timestamp: string }>('/api/rooms/live');
     return res.data.rooms;

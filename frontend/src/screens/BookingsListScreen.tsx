@@ -42,7 +42,7 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
   const handleCancelBooking = (booking: BookingResponse) => {
     Alert.alert(
       'Cancel Reservation',
-      `Are you sure you want to cancel booking #${booking.id} for ${booking.room_name}? This slot will immediately become available to other club members.`,
+      `Are you sure you want to cancel booking #${booking.id} (${booking.session_name})? This slot will immediately become available to other club members.`,
       [
         { text: 'Keep Reservation', style: 'cancel' },
         {
@@ -128,7 +128,7 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
         <View style={styles.emptyBox}>
           <Text style={styles.emptyTitle}>NO ACTIVE RESERVATIONS</Text>
           <Text style={styles.emptyText}>
-            You have not booked any studio sessions. Browse stage openings and lock in your window.
+            You have not booked any rehearsal sessions. Browse available sessions and lock in your window.
           </Text>
           <TouchableOpacity style={styles.bookEmptyBtn} onPress={onNavigateToWizard}>
             <Text style={styles.bookEmptyBtnText}>+ BOOK REHEARSAL SLOT</Text>
@@ -144,7 +144,7 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
               <View style={styles.cardHeader}>
                 <View>
                   <Text style={styles.bookingId}>PASS #{b.id}</Text>
-                  <Text style={styles.bookingRoom}>{b.room_name}</Text>
+                  <Text style={styles.bookingSessionTitle}>{b.session_name}</Text>
                 </View>
 
                 <View
@@ -171,6 +171,12 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
                   <Text style={styles.detailLabel}>SESSION:</Text>
                   <Text style={styles.detailVal}>{b.session_name}</Text>
                 </View>
+                {b.practice_mode ? (
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>MODE:</Text>
+                    <Text style={styles.detailVal}>{b.practice_mode}</Text>
+                  </View>
+                ) : null}
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>DATE:</Text>
                   <Text style={styles.detailVal}>{b.booking_date}</Text>
@@ -182,8 +188,10 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
                   </Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>PARTICIPANTS:</Text>
-                  <Text style={styles.detailVal}>{b.participant_count}</Text>
+                  <Text style={styles.detailLabel}>PEOPLE PLAYING:</Text>
+                  <Text style={styles.detailVal}>
+                    {b.participant_count} {b.participant_count === 1 ? 'Person' : 'People'}
+                  </Text>
                 </View>
               </View>
 
@@ -346,7 +354,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     marginBottom: 2,
   },
-  bookingRoom: {
+  bookingSessionTitle: {
     color: '#f4ede4',
     fontSize: 16,
     fontWeight: '800',

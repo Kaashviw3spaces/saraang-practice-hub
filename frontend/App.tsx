@@ -157,7 +157,7 @@ export default function App() {
       <View style={styles.screenContainer}>
         {activeTab === 'dashboard' && (
           <DashboardScreen
-            onNavigateToBooking={(roomId) => {
+            onNavigateToBooking={() => {
               setActiveTab('booking');
             }}
           />

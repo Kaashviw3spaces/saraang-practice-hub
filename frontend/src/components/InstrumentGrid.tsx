@@ -5,6 +5,7 @@ import { Instrument } from '../api/client';
 interface InstrumentGridProps {
   instruments: Instrument[];
   sessionName: string;
+  practiceMode?: string;
   selectedQuantities: Record<number, number>;
   onQuantityChange: (instrumentId: number, qty: number) => void;
 }
@@ -12,29 +13,39 @@ interface InstrumentGridProps {
 export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
   instruments,
   sessionName,
+  practiceMode = 'Solo Practice',
   selectedQuantities,
   onQuantityChange,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Strict Pre-Filtering based on Session Type as required by Step 2B
+  // Strict Pre-Filtering based on Session Type and Practice Mode as required by Step 2C
   const filteredInstruments = useMemo(() => {
     const sName = sessionName.toUpperCase();
-    const isLoudSession = sName.includes('SESSION A') || sName.includes('JAM');
+    const pMode = practiceMode.toUpperCase();
 
     return instruments
       .filter((inst) => {
-        // Step 2B Rule:
-        // Loud sessions show Drums, Electric Guitar, Amplifiers/Percussion
-        // Quiet/Recording sessions strictly restrict to low-decibel/acoustic instruments
-        if (isLoudSession) {
-          // Exclude exclusively soft recording mics if needed, or allow all loud instruments
-          return true;
-        } else {
-          // Session B or Recording Session: low-decibel / acoustic instruments ONLY
-          // Instruments > 105 dB (like acoustic drums) are strictly hidden from selection
-          return inst.base_decibels <= 100;
+        const nameLower = inst.name.toLowerCase();
+        const isDrumsOrElectricGuitar = nameLower.includes('drum') || nameLower.includes('electric guitar');
+
+        // Session B Acoustic Policy: MUST NOT contain Acoustic Drums or Electric Guitar
+        if (sName.includes('SESSION B')) {
+          return !isDrumsOrElectricGuitar;
         }
+
+        // Session A (Solo Practice): ONLY Acoustic Drums or Electric Guitar
+        if (sName.includes('SESSION A') && pMode === 'SOLO PRACTICE') {
+          return isDrumsOrElectricGuitar;
+        }
+
+        // Recording Session: moderate decibel instruments only
+        if (sName.includes('RECORDING')) {
+          return inst.base_decibels <= 90;
+        }
+
+        // Session A (Collaborative Jam) or Jam Session: all instruments
+        return true;
       })
       .filter((inst) => {
         if (!searchQuery.trim()) return true;
@@ -45,23 +56,38 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
           inst.frequency_band?.toLowerCase().includes(q)
         );
       });
-  }, [instruments, sessionName, searchQuery]);
+  }, [instruments, sessionName, practiceMode, searchQuery]);
+
+  const getFilterBannerText = () => {
+    const sName = sessionName.toUpperCase();
+    const pMode = practiceMode.toUpperCase();
+
+    if (sName.includes('SESSION B')) {
+      return '⚠️ Session B Acoustic Policy: Full band rehearsals, drums, and electric guitar are not permitted.';
+    }
+    if (sName.includes('SESSION A') && pMode === 'SOLO PRACTICE') {
+      return '🎸 Session A Solo Policy: Primary instrument must be Acoustic Drums or Electric Guitar.';
+    }
+    if (sName.includes('SESSION A') && pMode === 'COLLABORATIVE JAM') {
+      return '⚡ Session A Jam: All rehearsal instruments available.';
+    }
+    if (sName.includes('RECORDING')) {
+      return '🎙️ Acoustic Filter: Low-bleed instruments for rehearsal recording.';
+    }
+    return '⚡ Rehearsal Space: Select gear for instrumentalists (vocalists do not require instruments).';
+  };
 
   return (
     <View style={styles.container}>
       {/* Session Filter Badge */}
       <View style={styles.filterBanner}>
-        <Text style={styles.filterTitle}>
-          {sessionName.toUpperCase().includes('RECORDING') || sessionName.toUpperCase().includes('SESSION B')
-            ? '🎙️ ACOUSTIC FILTER ACTIVE (ACOUSTIC & MODERATE DECIBEL ONLY)'
-            : '⚡ FULL ISOLATION ACTIVE (LOUD INSTRUMENTS ALLOWED)'}
-        </Text>
+        <Text style={styles.filterTitle}>{getFilterBannerText()}</Text>
       </View>
 
       {/* Search Input */}
       <TextInput
         style={styles.searchInput}
-        placeholder="SEARCH INSTRUMENTS / BANDS..."
+        placeholder="SEARCH INSTRUMENTS..."
         placeholderTextColor="#666666"
         value={searchQuery}
         onChangeText={setSearchQuery}
@@ -77,7 +103,6 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
             <View key={inst.id} style={[styles.chip, isSelected && styles.selectedChip]}>
               <View style={styles.chipHeader}>
                 <Text style={styles.instName}>{inst.name}</Text>
-                <Text style={styles.instDb}>{inst.base_decibels} dB</Text>
               </View>
 
               <View style={styles.chipMeta}>
