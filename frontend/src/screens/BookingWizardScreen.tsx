@@ -112,10 +112,17 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             const returnedSlots = data.slots || [];
             setSlots(returnedSlots);
 
-            // Auto-select first available slot if current slot is empty or reserved
+            const isSolo = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
+            const isSlotValid = (s: SlotAvailability) => {
+              if (!s.is_available) return false;
+              if (isSolo && (s.current_participants || 0) > 0) return false;
+              return (s.current_participants || 0) < (s.max_participants || 8);
+            };
+
+            // Auto-select first valid available slot if current slot is empty or invalid
             const currentSlot = returnedSlots.find((s) => s.start_time === wizard.startTime);
-            if (!currentSlot || !currentSlot.is_available) {
-              const firstAvail = returnedSlots.find((s) => s.is_available);
+            if (!currentSlot || !isSlotValid(currentSlot)) {
+              const firstAvail = returnedSlots.find(isSlotValid);
               if (firstAvail) {
                 setBookingDateTime(wizard.bookingDate, firstAvail.start_time, 60);
               }
@@ -132,7 +139,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
         isMounted = false;
       };
     }
-  }, [wizard.step, wizard.selectedSession?.id, wizard.bookingDate]);
+  }, [wizard.step, wizard.selectedSession?.id, wizard.bookingDate, wizard.practiceMode]);
 
   // Step 2D: Submission & Auto-Room Assignment Handling
   const handleConfirmReservation = async () => {
@@ -516,68 +523,50 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               </View>
             )}
 
-            {/* Date & Auto-Derived People Playing */}
+            {/* Date, Time Slot & Dynamic Participants in Slot */}
             {(() => {
               const todayStr = new Date().toISOString().split('T')[0];
               const tomorrowDate = new Date();
               tomorrowDate.setDate(tomorrowDate.getDate() + 1);
               const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
 
+              const selectedSlot = slots.find((s) => s.start_time === wizard.startTime);
+              const maxCapacity = selectedSlot?.max_participants || participantLimit;
+              const existingParticipants = selectedSlot?.current_participants || 0;
+              const isSlotFull = existingParticipants >= maxCapacity;
+              const isSlotSoloBlocked = isSoloPractice && existingParticipants > 0;
+              const isReserved = !selectedSlot?.is_available || isSlotFull || isSlotSoloBlocked;
+              const nextTotalParticipants = Math.min(maxCapacity, existingParticipants + 1);
+
               return (
                 <View>
-                  <View style={styles.formRow}>
-                    <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-                      <Text style={styles.fieldLabel}>DATE (YYYY-MM-DD):</Text>
-                      <TextInput
-                        style={styles.textInput}
-                        value={wizard.bookingDate}
-                        onChangeText={(val) => setBookingDateTime(val, wizard.startTime, 60)}
-                        placeholder="2026-11-04"
-                        placeholderTextColor="#666666"
-                      />
-                      <View style={styles.quickDateRow}>
-                        <TouchableOpacity
-                          style={[styles.quickDateBtn, wizard.bookingDate === todayStr && styles.quickDateBtnSelected]}
-                          onPress={() => setBookingDateTime(todayStr, wizard.startTime, 60)}
-                        >
-                          <Text style={[styles.quickDateBtnText, wizard.bookingDate === todayStr && styles.quickDateBtnTextSelected]}>
-                            TODAY
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.quickDateBtn, wizard.bookingDate === tomorrowStr && styles.quickDateBtnSelected]}
-                          onPress={() => setBookingDateTime(tomorrowStr, wizard.startTime, 60)}
-                        >
-                          <Text style={[styles.quickDateBtnText, wizard.bookingDate === tomorrowStr && styles.quickDateBtnTextSelected]}>
-                            TOMORROW
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-                      <Text style={styles.fieldLabel}>
-                        PEOPLE PLAYING (PARTICIPANTS):
-                      </Text>
-                      <View style={styles.autoPeopleBox}>
-                        <View style={styles.autoPeopleRow}>
-                          <Text style={styles.autoPeopleVal}>
-                            {autoPeoplePlaying} {autoPeoplePlaying === 1 ? 'PERSON' : 'PEOPLE'}
-                          </Text>
-                          <View style={styles.autoTag}>
-                            <Text style={styles.autoTagText}>AUTO</Text>
-                          </View>
-                        </View>
-                        <Text style={styles.autoPeopleSub}>
-                          {isSoloPractice
-                            ? 'Solo Musician (Private Room)'
-                            : isSessionA
-                            ? '1 Musician (Max 8 in slot)'
-                            : isSessionB
-                            ? '1 Musician (Max 6 in slot)'
-                            : '1 Musician'}
+                  {/* Date Input */}
+                  <View style={styles.formGroup}>
+                    <Text style={styles.fieldLabel}>DATE (YYYY-MM-DD):</Text>
+                    <TextInput
+                      style={styles.textInput}
+                      value={wizard.bookingDate}
+                      onChangeText={(val) => setBookingDateTime(val, wizard.startTime, 60)}
+                      placeholder="2026-11-04"
+                      placeholderTextColor="#666666"
+                    />
+                    <View style={styles.quickDateRow}>
+                      <TouchableOpacity
+                        style={[styles.quickDateBtn, wizard.bookingDate === todayStr && styles.quickDateBtnSelected]}
+                        onPress={() => setBookingDateTime(todayStr, wizard.startTime, 60)}
+                      >
+                        <Text style={[styles.quickDateBtnText, wizard.bookingDate === todayStr && styles.quickDateBtnTextSelected]}>
+                          TODAY
                         </Text>
-                      </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.quickDateBtn, wizard.bookingDate === tomorrowStr && styles.quickDateBtnSelected]}
+                        onPress={() => setBookingDateTime(tomorrowStr, wizard.startTime, 60)}
+                      >
+                        <Text style={[styles.quickDateBtnText, wizard.bookingDate === tomorrowStr && styles.quickDateBtnTextSelected]}>
+                          TOMORROW
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
 
@@ -771,6 +760,48 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                     <Text style={styles.timeSlotHelper}>
                       Operating hours: 6:00 AM – 11:00 PM daily • 1-hour sessions (re-book to extend or vacate immediately)
                     </Text>
+                  </View>
+
+                  {/* Dynamic People Playing (Participants in Slot) */}
+                  <View style={styles.formGroup}>
+                    <Text style={styles.fieldLabel}>PEOPLE PLAYING (PARTICIPANTS IN SLOT):</Text>
+                    <View style={[styles.autoPeopleBox, isReserved && styles.autoPeopleBoxReserved]}>
+                      <View style={styles.autoPeopleRow}>
+                        <Text style={[styles.autoPeopleVal, isReserved && styles.autoPeopleValReserved]}>
+                          {isMeetingSession
+                            ? '2 PEOPLE'
+                            : isSoloPractice
+                            ? '1 PERSON (SOLO)'
+                            : isReserved
+                            ? `${existingParticipants}/${maxCapacity} FULL (RESERVED)`
+                            : existingParticipants === 0
+                            ? `0 IN SLOT (+1 YOU → 1/${maxCapacity})`
+                            : `${existingParticipants} IN SLOT (+1 YOU → ${nextTotalParticipants}/${maxCapacity})`}
+                        </Text>
+                        <View style={[styles.autoTag, isReserved && styles.autoTagReserved]}>
+                          <Text style={[styles.autoTagText, isReserved && styles.autoTagTextReserved]}>
+                            {isReserved
+                              ? 'RESERVED'
+                              : isSoloPractice
+                              ? 'SOLO'
+                              : `${existingParticipants}/${maxCapacity} ACTIVE`}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.autoPeopleSub}>
+                        {isMeetingSession
+                          ? 'Meeting Attendees • Standard reservation'
+                          : isSoloPractice
+                          ? (isSlotSoloBlocked
+                              ? '⚠️ Slot already has active musicians. Solo practice requires an empty room.'
+                              : '0 existing musicians in slot • Private room for you alone (no other players allowed)')
+                          : isReserved
+                          ? `Maximum capacity reached (${existingParticipants}/${maxCapacity}). This slot is reserved.`
+                          : existingParticipants === 0
+                          ? `No musicians currently in this slot. You will be participant 1 of ${maxCapacity}.`
+                          : `${existingParticipants} existing ${existingParticipants === 1 ? 'musician' : 'musicians'} (${selectedSlot?.instruments_summary?.join(', ') || 'playing'}) • Adding your booking makes it ${nextTotalParticipants}/${maxCapacity}`}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               );
@@ -1106,6 +1137,20 @@ const styles = StyleSheet.create({
     fontSize: 9,
     marginTop: 2,
     fontWeight: '600',
+  },
+  autoPeopleBoxReserved: {
+    backgroundColor: '#1b1212',
+    borderColor: '#4d2020',
+  },
+  autoPeopleValReserved: {
+    color: '#e05a47',
+  },
+  autoTagReserved: {
+    backgroundColor: '#2b1212',
+    borderColor: '#4d2020',
+  },
+  autoTagTextReserved: {
+    color: '#e05a47',
   },
   durationRow: {
     flexDirection: 'row',
