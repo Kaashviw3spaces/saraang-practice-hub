@@ -460,6 +460,19 @@ def validate_session_policy(
                     },
                 },
             )
+
+        total_qty = sum(inst.get("quantity", 1) for inst in instrument_rows)
+        if total_qty > 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": f"Constraint For Jam Session Max: 8. Total instruments selected ({total_qty}) exceeds the maximum constraint of 8.",
+                    "ai_acoustics": {
+                        "compatible": False,
+                        "reason": f"Jam Session constraint violation: Maximum 8 instruments permitted for jam session. Selected: {total_qty}",
+                    },
+                },
+            )
         return
 
 
@@ -790,6 +803,26 @@ async def get_session_slots_availability(
                 inst_counts[inst["name"]] = inst_counts.get(inst["name"], 0) + inst["qty"]
         instruments_summary = [f"{name} ({qty})" for name, qty in inst_counts.items()]
 
+        if current_session_name.lower() == "jam session":
+            # For Jam Session: One user selects all the instruments being used and books everything for everyone.
+            # If a Jam session is going on in a slot by User A, User B cannot select that slot; they need to select a different one.
+            slots.append(
+                SlotAvailability(
+                    start_time=str(start_t),
+                    end_time=str(end_t),
+                    label=label,
+                    is_available=False,
+                    status="Reserved (Jam Session)",
+                    current_participants=current_p,
+                    max_participants=session_limit,
+                    instruments_summary=instruments_summary,
+                    collaborative_open=False,
+                    has_solo=False,
+                    booked_session_name=current_session_name,
+                )
+            )
+            continue
+
         if has_solo:
             # Solo Practice: room exclusively locked
             slots.append(
@@ -1102,6 +1135,11 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is already booked for {other_name}. Jam Session cannot book a slot reserved by {other_name}.",
                 )
+            # If a Jam session is going on in a slot by User A, User B cannot select that slot they need to select a different one.
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is already booked by another user. In Jam Session, one user books everything for everyone. If a Jam session is going on in a slot by User A, User B cannot select that slot they need to select a different one.",
+            )
 
         different_sessions = [b for b in existing_slot_bookings if b["session_type_id"] != booking.session_type_id]
         if different_sessions:

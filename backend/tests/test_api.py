@@ -255,7 +255,7 @@ async def test_concurrency_exclusion_and_rebooking(client):
     user_b = u2_resp.json()["id"]
     test_date = get_unique_test_date()
 
-    # 1. User A books 14:00 to 16:00 (auto-assigned Room 1)
+    # 1. User A books 14:00 to 15:00
     b_a = await client.post(
         "/api/bookings",
         json={
@@ -264,7 +264,7 @@ async def test_concurrency_exclusion_and_rebooking(client):
             "practice_mode": "Collaborative Jam",
             "booking_date": test_date,
             "start_time": "14:00:00",
-            "end_time": "16:00:00",
+            "end_time": "15:00:00",
             "participant_count": 2,
             "instruments": [],
         },
@@ -272,29 +272,7 @@ async def test_concurrency_exclusion_and_rebooking(client):
     assert b_a.status_code == 201
     booking_a_id = b_a.json()["id"]
 
-    # Fill remaining 3 rooms during 14:00 - 16:00
-    other_users = []
-    for i in range(3):
-        u_temp = await client.post(
-            "/api/users",
-            json={"name": f"Other User {i}", "email": f"other_{i}_{uuid.uuid4().hex[:8]}@test.com"},
-        )
-        b_temp = await client.post(
-            "/api/bookings",
-            json={
-                "user_id": u_temp.json()["id"],
-                "session_type_id": 3,
-                "practice_mode": "Collaborative Jam",
-                "booking_date": test_date,
-                "start_time": "14:00:00",
-                "end_time": "16:00:00",
-                "participant_count": 2,
-                "instruments": [],
-            },
-        )
-        assert b_temp.status_code == 201
-
-    # 2. User B attempts overlapping slot 15:00 to 17:00 (MUST FAIL WITH 400 - all rooms busy)
+    # 2. User B attempts the same slot 14:00 to 15:00 (MUST FAIL WITH 400 - slot already booked by User A)
     b_b = await client.post(
         "/api/bookings",
         json={
@@ -302,14 +280,14 @@ async def test_concurrency_exclusion_and_rebooking(client):
             "session_type_id": 3,
             "practice_mode": "Collaborative Jam",
             "booking_date": test_date,
-            "start_time": "15:00:00",
-            "end_time": "17:00:00",
+            "start_time": "14:00:00",
+            "end_time": "15:00:00",
             "participant_count": 2,
             "instruments": [],
         },
     )
     assert b_b.status_code == 400
-    assert "No rooms are available" in b_b.json()["detail"] or "Slot capacity reached" in b_b.json()["detail"]
+    assert "Collision Violation" in b_b.json()["detail"] or "already booked" in b_b.json()["detail"]
 
     # 3. User A cancels booking
     cancel_resp = await client.post(f"/api/bookings/{booking_a_id}/cancel")
@@ -324,7 +302,7 @@ async def test_concurrency_exclusion_and_rebooking(client):
             "practice_mode": "Collaborative Jam",
             "booking_date": test_date,
             "start_time": "14:00:00",
-            "end_time": "16:00:00",
+            "end_time": "15:00:00",
             "participant_count": 2,
             "instruments": [],
         },
@@ -1405,6 +1383,123 @@ async def test_jam_session_slot_exclusivity_against_session_a_and_b(client):
     )
     assert resp_jam_on_a_fail.status_code == 400
     assert "Jam Session cannot book a slot reserved by Session A" in resp_jam_on_a_fail.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_jam_session_one_user_books_all_instruments_and_blocks_user_b(client):
+    """
+    CRITICAL: Validates Jam Session booking policy:
+    1. One user selects all the instruments being used for the jam session and books everything for everyone.
+    2. Constraint For Jam Session Max: 8.
+    3. If a Jam session is going on in a slot by User A, User B cannot select that slot; they need to select a different one.
+    4. Trying to book more than 8 instruments fails with 400.
+    """
+    u_a = await client.post("/api/users", json={"name": "Jam User A", "email": f"jam_a_{uuid.uuid4().hex[:8]}@test.com"})
+    u_b = await client.post("/api/users", json={"name": "Jam User B", "email": f"jam_b_{uuid.uuid4().hex[:8]}@test.com"})
+    user_a = u_a.json()["id"]
+    user_b = u_b.json()["id"]
+    test_date = get_unique_test_date()
+
+    # 1. User A books Jam Session at 10:00:00 - 11:00:00 with 6 instruments:
+    # Drums (1), Electric Guitar (2), Electric Bass (1), Vocals (2)
+    b_user_a = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_a,
+            "session_type_id": 3,  # Jam Session
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 6,
+            "instruments": [
+                {"instrument_id": 1, "quantity": 1},  # Drums
+                {"instrument_id": 3, "quantity": 2},  # Electric Guitar
+                {"instrument_id": 2, "quantity": 1},  # Electric Bass
+                {"instrument_id": 5, "quantity": 2},  # Vocals
+            ],
+        },
+    )
+    assert b_user_a.status_code == 201
+    booking_a = b_user_a.json()
+    assert booking_a["participant_count"] == 6
+    assert len(booking_a["instruments"]) == 4
+
+    # 2. Check Jam Session slot availability at 10:00 - 11:00:
+    # Must show is_available: false, status: Reserved (Jam Session)
+    slots_resp = await client.get(f"/api/sessions/3/slots?date={test_date}")
+    assert slots_resp.status_code == 200
+    slot_10am = next(s for s in slots_resp.json()["slots"] if s["start_time"] == "10:00:00")
+    assert slot_10am["is_available"] is False
+    assert "Reserved" in slot_10am["status"]
+    assert slot_10am["current_participants"] == 6
+    assert any("Drums" in inst for inst in slot_10am["instruments_summary"])
+    assert any("Electric Guitar" in inst for inst in slot_10am["instruments_summary"])
+
+    # 3. User B tries to select/book that same slot 10:00 - 11:00 for Jam Session -> MUST FAIL (400)
+    b_user_b_fail = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_b,
+            "session_type_id": 3,  # Jam Session
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 2,
+            "instruments": [
+                {"instrument_id": 4, "quantity": 1},  # Acoustic Guitar
+                {"instrument_id": 6, "quantity": 1},  # Synth
+            ],
+        },
+    )
+    assert b_user_b_fail.status_code == 400
+    err_b = b_user_b_fail.json()["detail"]
+    assert "Collision Violation" in err_b
+    assert "User B cannot select that slot" in err_b or "already booked" in err_b
+
+    # 4. User B selects a DIFFERENT slot (11:00 - 12:00) -> SUCCEEDS
+    b_user_b_ok = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_b,
+            "session_type_id": 3,  # Jam Session
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "11:00:00",
+            "end_time": "12:00:00",
+            "participant_count": 3,
+            "instruments": [
+                {"instrument_id": 4, "quantity": 1},  # Acoustic Guitar
+                {"instrument_id": 6, "quantity": 1},  # Synth
+                {"instrument_id": 5, "quantity": 1},  # Vocals
+            ],
+        },
+    )
+    assert b_user_b_ok.status_code == 201
+
+    # 5. User tries to book Jam Session with 9 instruments (> Constraint Max 8) -> MUST FAIL (400)
+    b_over_limit = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_a,
+            "session_type_id": 3,  # Jam Session
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "13:00:00",
+            "end_time": "14:00:00",
+            "participant_count": 8,
+            "instruments": [
+                {"instrument_id": 1, "quantity": 2},  # Drums (2)
+                {"instrument_id": 3, "quantity": 3},  # Electric Guitar (3)
+                {"instrument_id": 2, "quantity": 2},  # Electric Bass (2)
+                {"instrument_id": 5, "quantity": 2},  # Vocals (2) -> Total 9
+            ],
+        },
+    )
+    assert b_over_limit.status_code == 400
+    assert "Constraint For Jam Session Max: 8" in b_over_limit.json()["detail"]["message"]
+
 
 
 

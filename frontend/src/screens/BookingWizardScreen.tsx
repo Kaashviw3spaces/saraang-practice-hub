@@ -167,6 +167,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
     const sNameUpper = (wizard.selectedSession.name || '').toUpperCase();
     const isMeeting = sNameUpper.includes('MEETING');
+    const isJamSession = sNameUpper.includes('JAM');
     const isSolo = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
 
     if (isSolo && selectedSlot && (selectedSlot.current_participants || 0) > 0) {
@@ -181,21 +182,36 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     const endHour = startHour + 1;
     const formattedEndTime = `${String(endHour).padStart(2, '0')}:00:00`;
 
-    const selectedInstrumentsList = Object.entries(wizard.instruments).map(([id, qty]) => ({
-      instrument_id: parseInt(id, 10),
-      quantity: qty,
-    }));
+    const selectedInstrumentsList = Object.entries(wizard.instruments)
+      .filter(([_, qty]) => qty > 0)
+      .map(([id, qty]) => ({
+        instrument_id: parseInt(id, 10),
+        quantity: qty,
+      }));
+
+    const totalInstrumentsSelected = Object.values(wizard.instruments).reduce((sum, q) => sum + q, 0);
 
     if (!isMeeting && selectedInstrumentsList.length === 0) {
       Alert.alert(
         'Instrument Selection Required',
-        'Please select your instrument before confirming reservation.'
+        isJamSession
+          ? 'Please select the instruments being used for your jam session.'
+          : 'Please select your instrument before confirming reservation.'
       );
       return;
     }
 
-    // Each user booking represents 1 participant playing their selected instrument
-    const peoplePlaying = isMeeting ? 2 : 1;
+    if (isJamSession && totalInstrumentsSelected > 8) {
+      Alert.alert(
+        'Constraint Exceeded',
+        `Constraint For Jam Session Max: 8. You have selected ${totalInstrumentsSelected} instruments. Please reduce to 8 or fewer.`
+      );
+      return;
+    }
+
+    // For Jam Session: One user selects all instruments and books for everyone; peoplePlaying equals total instruments selected (up to 8).
+    // For Meeting: 2. For Session A / B: 1 per booking.
+    const peoplePlaying = isMeeting ? 2 : isJamSession ? Math.min(8, Math.max(1, totalInstrumentsSelected)) : 1;
 
     if (peoplePlaying > wizard.selectedSession.participant_limit) {
       Alert.alert(
@@ -376,12 +392,20 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
           return ['Collaborative Practice'];
         })();
 
-        // Each user booking represents 1 participant playing their selected instrument
-        const autoPeoplePlaying = isMeetingSession ? 2 : 1;
+        const totalJamInstruments = Object.values(wizard.instruments).reduce((sum, q) => sum + q, 0);
+
+        // Each user booking represents 1 participant playing their selected instrument in Session A / B.
+        // For Jam Session: One user selects all instruments being used for the jam session and books everything for everyone (Constraint Max: 8).
+        const autoPeoplePlaying = isMeetingSession
+          ? 2
+          : isJamSession
+          ? Math.min(8, Math.max(1, totalJamInstruments))
+          : 1;
 
         // Primary instruments allowed for this session:
         // Session A: ONLY Electric Guitar or Drums ("For session A only, remove the display of other instruments except electric guitar and drums in this section.")
         // Session B: Session B instruments only (no Drums, no Electric Guitar)
+        // Jam Session: Display ALL instruments ("Display all the instruments here.")
         const allowedInstruments = instruments.filter((inst) => {
           const n = inst.name.toLowerCase();
           const isDrumsOrEG = n.includes('drum') || n.includes('electric guitar');
@@ -434,13 +458,100 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               </View>
             )}
 
-            {/* Step 2C: Filtered Instrument Selection (Single-select per user) */}
+            {/* Step 2C: Filtered Instrument Selection */}
             {isMeetingSession ? (
               <View style={styles.policyCard}>
                 <Text style={styles.policyTitle}>📋 MEETING SESSION</Text>
                 <Text style={styles.policyText}>
                   Standard reservation for music club meetings and planning. No musical instruments required.
                 </Text>
+              </View>
+            ) : isJamSession ? (
+              <View style={styles.formGroup}>
+                <Text style={styles.fieldLabel}>
+                  ALL INSTRUMENTS FOR JAM SESSION (ONE USER BOOKS FOR ALL):
+                </Text>
+
+                <View style={styles.policyCard}>
+                  <Text style={styles.policyTitle}>🥁 JAM SESSION RESERVATION</Text>
+                  <Text style={styles.policyText}>
+                    One user selects all the instruments being used for the jam session, and books everything for everyone. Constraint: Maximum 8 musicians. Once booked, this slot is reserved exclusively for your session.
+                  </Text>
+                </View>
+
+                {/* Jam Session Total Instruments Counter Banner */}
+                <View style={styles.jamCounterBanner}>
+                  <View style={styles.jamCounterLeft}>
+                    <Text style={styles.jamCounterLabel}>PEOPLE PLAYING / INSTRUMENTS:</Text>
+                    <Text style={styles.jamCounterValue}>
+                      {totalJamInstruments} / 8 MAX
+                    </Text>
+                  </View>
+                  <View style={[styles.jamCounterBadge, totalJamInstruments === 8 && styles.jamCounterBadgeFull]}>
+                    <Text style={styles.jamCounterBadgeText}>
+                      {totalJamInstruments === 0
+                        ? 'SELECT INSTRUMENTS'
+                        : totalJamInstruments === 8
+                        ? 'MAX 8 REACHED'
+                        : `${8 - totalJamInstruments} SPOTS REMAINING`}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Display all instruments with quantity steppers */}
+                <View style={styles.jamListContainer}>
+                  {allowedInstruments.map((inst) => {
+                    const qty = wizard.instruments[inst.id] || 0;
+                    const isSelected = qty > 0;
+                    const canAdd = totalJamInstruments < 8;
+
+                    return (
+                      <View
+                        key={inst.id}
+                        style={[styles.jamInstrumentCard, isSelected && styles.jamInstrumentCardSelected]}
+                      >
+                        <View style={styles.jamInstrumentInfo}>
+                          <Text style={[styles.jamInstrumentName, isSelected && styles.jamInstrumentNameSelected]}>
+                            {inst.name}
+                          </Text>
+                          <Text style={styles.jamInstrumentCategory}>
+                            {inst.category || 'Instrument'} • Band: {inst.frequency_band || 'Mid'}
+                          </Text>
+                        </View>
+
+                        <View style={styles.jamStepperRow}>
+                          <TouchableOpacity
+                            style={[styles.jamStepBtn, qty === 0 && styles.jamStepBtnDisabled]}
+                            disabled={qty === 0}
+                            onPress={() => setInstrumentQuantity(inst.id, Math.max(0, qty - 1))}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.jamStepBtnText, qty === 0 && styles.jamStepBtnTextDisabled]}>−</Text>
+                          </TouchableOpacity>
+
+                          <View style={[styles.jamQtyBox, isSelected && styles.jamQtyBoxSelected]}>
+                            <Text style={[styles.jamQtyText, isSelected && styles.jamQtyTextSelected]}>{qty}</Text>
+                          </View>
+
+                          <TouchableOpacity
+                            style={[styles.jamStepBtn, !canAdd && styles.jamStepBtnDisabled]}
+                            disabled={!canAdd}
+                            onPress={() => {
+                              if (canAdd) {
+                                setInstrumentQuantity(inst.id, qty + 1);
+                              } else {
+                                Alert.alert('Constraint Limit', 'Constraint For Jam Session Max: 8 musicians/instruments.');
+                              }
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.jamStepBtnText, !canAdd && styles.jamStepBtnTextDisabled]}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
               </View>
             ) : (
               <View style={styles.formGroup}>
@@ -535,7 +646,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               const existingParticipants = selectedSlot?.current_participants || 0;
               const isSlotFull = existingParticipants >= maxCapacity;
               const isSlotSoloBlocked = isSoloPractice && existingParticipants > 0;
-              const isReserved = !selectedSlot?.is_available || isSlotFull || isSlotSoloBlocked;
+              const isJamOccupied = isJamSession && (existingParticipants > 0 || !selectedSlot?.is_available);
+              const isReserved = !selectedSlot?.is_available || isSlotFull || isSlotSoloBlocked || isJamOccupied;
               const nextTotalParticipants = Math.min(maxCapacity, existingParticipants + 1);
 
               return (
@@ -664,10 +776,12 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                   slots.map((slot) => {
                                     const isSelected = wizard.startTime === slot.start_time;
                                     const isSlotSoloBlocked = isSoloPractice && (slot.current_participants || 0) > 0;
-                                    const isBlocked = !slot.is_available || isSlotSoloBlocked;
+                                    const isSlotJamOccupied = isJamSession && ((slot.current_participants || 0) > 0 || !slot.is_available);
+                                    const isBlocked = !slot.is_available || isSlotSoloBlocked || isSlotJamOccupied;
 
                                     const badgeText = (() => {
                                       if (isSlotSoloBlocked) return 'COLLAB ACTIVE (NO SOLO)';
+                                      if (isSlotJamOccupied) return 'RESERVED (JAM)';
                                       if (!slot.is_available) {
                                         if (slot.status?.toUpperCase().includes('JAM')) return 'RESERVED (JAM)';
                                         if (slot.status?.includes('Reserved')) return slot.status.toUpperCase();
@@ -675,6 +789,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                         return slot.status?.toUpperCase() || 'RESERVED';
                                       }
                                       if (isSelected) return '✓ SELECTED';
+                                      if (isJamSession) return 'AVAILABLE';
                                       if ((slot.current_participants || 0) > 0) return `${slot.current_participants}/${slot.max_participants || participantLimit} JOINABLE`;
                                       return 'AVAILABLE';
                                     })();
@@ -693,6 +808,13 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                             Alert.alert(
                                               'Solo Practice Exclusivity',
                                               'Solo practice requires an empty room. This slot already has collaborative musicians.'
+                                            );
+                                            return;
+                                          }
+                                          if (isSlotJamOccupied || (isJamSession && !slot.is_available)) {
+                                            Alert.alert(
+                                              'Jam Session Reserved',
+                                              'If a Jam session is going on in a slot by User A, User B cannot select that slot; they need to select a different one.'
                                             );
                                             return;
                                           }
@@ -780,6 +902,10 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                             ? '2 PEOPLE'
                             : isSoloPractice
                             ? '1 PERSON (SOLO)'
+                            : isJamSession
+                            ? (isReserved
+                                ? 'RESERVED (JAM SESSION ALREADY BOOKED)'
+                                : `${totalJamInstruments} MUSICIANS (${totalJamInstruments}/8 INSTRUMENTS)`)
                             : isReserved
                             ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
                                 ? 'RESERVED (JAM SESSION)'
@@ -791,11 +917,13 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                         <View style={[styles.autoTag, isReserved && styles.autoTagReserved]}>
                           <Text style={[styles.autoTagText, isReserved && styles.autoTagTextReserved]}>
                             {isReserved
-                              ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
+                              ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM') || isJamSession
                                   ? 'JAM RESERVED'
                                   : 'RESERVED')
                               : isSoloPractice
                               ? 'SOLO'
+                              : isJamSession
+                              ? `${totalJamInstruments}/8 JAM PLAYERS`
                               : `${existingParticipants}/${maxCapacity} ACTIVE`}
                           </Text>
                         </View>
@@ -807,6 +935,10 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                           ? (isSlotSoloBlocked
                               ? '⚠️ Slot already has active musicians. Solo practice requires an empty room.'
                               : '0 existing musicians in slot • Private room for you alone (no other players allowed)')
+                          : isJamSession
+                          ? (isReserved
+                              ? '⚠️ A Jam session is already booked in this slot by another user. User B cannot select this slot; please select a different one.'
+                              : `One user booking for all ${totalJamInstruments} musician(s) in this Jam Session (Constraint Max: 8). This slot will be reserved exclusively for your session.`)
                           : isReserved
                           ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
                               ? '⚠️ This slot is reserved by a Jam Session and only belongs to it. Not available for Session A or B collaborative practice.'
@@ -1616,5 +1748,134 @@ const styles = StyleSheet.create({
     fontSize: 9,
     marginTop: 3,
     fontWeight: '700',
+  },
+  jamCounterBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#181510',
+    borderWidth: 1,
+    borderColor: '#3d3319',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 12,
+  },
+  jamCounterLeft: {
+    flex: 1,
+  },
+  jamCounterLabel: {
+    color: '#888888',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  jamCounterValue: {
+    color: '#e8c872',
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 2,
+  },
+  jamCounterBadge: {
+    backgroundColor: '#262013',
+    borderWidth: 1,
+    borderColor: '#5e4e20',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+  },
+  jamCounterBadgeFull: {
+    backgroundColor: '#3d1f1f',
+    borderColor: '#803333',
+  },
+  jamCounterBadgeText: {
+    color: '#e8c872',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  jamListContainer: {
+    marginBottom: 14,
+  },
+  jamInstrumentCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#141414',
+    borderWidth: 1,
+    borderColor: '#222222',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 8,
+  },
+  jamInstrumentCardSelected: {
+    borderColor: '#e8c872',
+    backgroundColor: '#1a1811',
+  },
+  jamInstrumentInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
+  jamInstrumentName: {
+    color: '#cccccc',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  jamInstrumentNameSelected: {
+    color: '#ffffff',
+  },
+  jamInstrumentCategory: {
+    color: '#777777',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  jamStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  jamStepBtn: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#222222',
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333333',
+  },
+  jamStepBtnDisabled: {
+    opacity: 0.35,
+    borderColor: '#1f1f1f',
+    backgroundColor: '#181818',
+  },
+  jamStepBtnText: {
+    color: '#e8c872',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  jamStepBtnTextDisabled: {
+    color: '#555555',
+  },
+  jamQtyBox: {
+    minWidth: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 6,
+    paddingHorizontal: 4,
+  },
+  jamQtyBoxSelected: {
+    backgroundColor: '#2a2312',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e8c872',
+  },
+  jamQtyText: {
+    color: '#777777',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  jamQtyTextSelected: {
+    color: '#e8c872',
+    fontWeight: '800',
   },
 });
