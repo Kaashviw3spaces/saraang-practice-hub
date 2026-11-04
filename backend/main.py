@@ -205,6 +205,7 @@ class SlotAvailability(BaseModel):
     collaborative_open: bool = False
     has_solo: bool = False
     booked_session_name: Optional[str] = None
+    active_session_name: Optional[str] = None
 
 
 class SessionSlotsResponse(BaseModel):
@@ -763,6 +764,53 @@ async def get_session_slots_availability(
                     collaborative_open=True,
                     has_solo=False,
                     booked_session_name=None,
+                    active_session_name=None,
+                )
+            )
+            continue
+
+        # Check if this slot is reserved by a Jam Session:
+        # A Jam Session slot strictly belongs to Jam Session and is NEVER joinable by Session A or B.
+        is_jam_in_slot = any(
+            b["session_type_id"] == 3
+            or "jam" in (b["session_name"] or "").lower()
+            or "jam" in (b["practice_mode"] or "").lower()
+            for b in slot_bookings
+        )
+
+        # For Session A: If slot has instruments other than drums or electric guitar (e.g. Bass, Vocals, Synth), it's a Jam Session
+        if current_session_name.lower() == "session a" and not is_jam_in_slot:
+            for b in slot_bookings:
+                for inst in b["instruments"]:
+                    n = inst["name"].lower()
+                    if not ("drum" in n or "electric guitar" in n):
+                        is_jam_in_slot = True
+                        break
+                if is_jam_in_slot:
+                    break
+
+        if is_jam_in_slot and session_type_id != 3:
+            total_slot_p = sum(b["participant_count"] for b in slot_bookings)
+            jam_inst_counts: Dict[str, int] = {}
+            for b in slot_bookings:
+                for inst in b["instruments"]:
+                    jam_inst_counts[inst["name"]] = jam_inst_counts.get(inst["name"], 0) + inst["qty"]
+            jam_inst_summary = [f"{name} ({qty})" for name, qty in jam_inst_counts.items()]
+
+            slots.append(
+                SlotAvailability(
+                    start_time=str(start_t),
+                    end_time=str(end_t),
+                    label=label,
+                    is_available=False,
+                    status="Reserved (Jam Session)",
+                    current_participants=total_slot_p,
+                    max_participants=8,
+                    instruments_summary=jam_inst_summary,
+                    collaborative_open=False,
+                    has_solo=False,
+                    booked_session_name="Jam Session",
+                    active_session_name="Jam Session",
                 )
             )
             continue
@@ -788,6 +836,7 @@ async def get_session_slots_availability(
                     collaborative_open=False,
                     has_solo=any(b["practice_mode"].lower() == "solo practice" for b in different_session_bookings),
                     booked_session_name=booked_s_name,
+                    active_session_name=booked_s_name,
                 )
             )
             continue
@@ -819,6 +868,7 @@ async def get_session_slots_availability(
                     collaborative_open=False,
                     has_solo=False,
                     booked_session_name=current_session_name,
+                    active_session_name=current_session_name,
                 )
             )
             continue
@@ -838,6 +888,7 @@ async def get_session_slots_availability(
                     collaborative_open=False,
                     has_solo=True,
                     booked_session_name=current_session_name,
+                    active_session_name=current_session_name,
                 )
             )
         elif current_p >= session_limit:
@@ -855,6 +906,7 @@ async def get_session_slots_availability(
                     collaborative_open=False,
                     has_solo=False,
                     booked_session_name=current_session_name,
+                    active_session_name=current_session_name,
                 )
             )
         else:
@@ -872,6 +924,7 @@ async def get_session_slots_availability(
                     collaborative_open=True,
                     has_solo=False,
                     booked_session_name=current_session_name,
+                    active_session_name=current_session_name,
                 )
             )
 
@@ -1120,8 +1173,13 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
         # Check 1: Jam Session Exclusivity & Session Collision Prevention
         # If a slot is reserved by Jam Session, it strictly belongs to Jam Session:
         # While in Session A's or Session B's collaborative practice you cannot book a slot reserved by Jam Session.
-        jam_session_bookings = [b for b in existing_slot_bookings if b["session_type_id"] == 3]
-        if jam_session_bookings and booking.session_type_id != 3:
+        is_jam_in_slot = any(
+            b["session_type_id"] == 3
+            or "jam" in (b["session_name"] or "").lower()
+            or "jam" in (b["practice_mode"] or "").lower()
+            for b in existing_slot_bookings
+        )
+        if is_jam_in_slot and booking.session_type_id != 3:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is reserved by a Jam Session. While being in {session_row['name']}'s collaborative practice you cannot book the slot that Jam Session has reserved. If a slot is reserved by a Jam Session, it only belongs to it.",

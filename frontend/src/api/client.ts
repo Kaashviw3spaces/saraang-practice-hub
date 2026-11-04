@@ -111,6 +111,7 @@ export interface SlotAvailability {
   collaborative_open?: boolean;
   has_solo?: boolean;
   booked_session_name?: string | null;
+  active_session_name?: string | null;
 }
 
 export interface SessionSlotsResponse {

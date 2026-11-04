@@ -709,14 +709,23 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                           >
                             <View style={styles.dropdownLeft}>
                               <Text style={styles.dropdownTimeIcon}>🕒</Text>
-                              <Text
-                                style={[
-                                  styles.dropdownValueText,
-                                  !selectedSlot && styles.dropdownPlaceholderText,
-                                ]}
-                              >
-                                {selectedSlot ? selectedSlot.label : 'Select an available 1-hour slot...'}
-                              </Text>
+                              <View style={styles.dropdownTriggerTextCol}>
+                                <Text
+                                  style={[
+                                    styles.dropdownValueText,
+                                    !selectedSlot && styles.dropdownPlaceholderText,
+                                  ]}
+                                >
+                                  {selectedSlot ? selectedSlot.label : 'Select an available 1-hour slot...'}
+                                </Text>
+                                {selectedSlot && (
+                                  <Text style={styles.dropdownActiveSessionSub}>
+                                    {selectedSlot.active_session_name || selectedSlot.booked_session_name
+                                      ? `ACTIVE SESSION: ${(selectedSlot.active_session_name || selectedSlot.booked_session_name)!.toUpperCase()}`
+                                      : 'STATUS: OPEN / AVAILABLE'}
+                                  </Text>
+                                )}
+                              </View>
                             </View>
 
                             <View style={styles.dropdownRight}>
@@ -774,6 +783,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                   </View>
                                 ) : (
                                   slots.map((slot) => {
+                                    const activeSession = slot.active_session_name || slot.booked_session_name;
                                     const isSelected = wizard.startTime === slot.start_time;
                                     const isSlotSoloBlocked = isSoloPractice && (slot.current_participants || 0) > 0;
                                     const isSlotJamOccupied = isJamSession && ((slot.current_participants || 0) > 0 || !slot.is_available);
@@ -783,7 +793,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                       if (isSlotSoloBlocked) return 'COLLAB ACTIVE (NO SOLO)';
                                       if (isSlotJamOccupied) return 'RESERVED (JAM)';
                                       if (!slot.is_available) {
-                                        if (slot.status?.toUpperCase().includes('JAM')) return 'RESERVED (JAM)';
+                                        if (activeSession?.toUpperCase().includes('JAM') || slot.status?.toUpperCase().includes('JAM')) return 'RESERVED (JAM)';
+                                        if (activeSession) return `RESERVED (${activeSession.toUpperCase()})`;
                                         if (slot.status?.includes('Reserved')) return slot.status.toUpperCase();
                                         if (slot.status?.includes('Full')) return 'FULL';
                                         return slot.status?.toUpperCase() || 'RESERVED';
@@ -819,7 +830,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                             return;
                                           }
                                           if (!slot.is_available) {
-                                            if (slot.booked_session_name?.toUpperCase().includes('JAM') || slot.status?.toUpperCase().includes('JAM')) {
+                                            if (activeSession?.toUpperCase().includes('JAM') || slot.status?.toUpperCase().includes('JAM')) {
                                               Alert.alert(
                                                 'Jam Session Reserved',
                                                 `The ${slot.label} slot is reserved by a Jam Session. While in ${wizard.selectedSession?.name || 'this session'}'s collaborative practice, you cannot book a slot that Jam Session has reserved. If a slot is reserved by a Jam Session, it only belongs to it.`
@@ -846,6 +857,21 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                           >
                                             {slot.label}
                                           </Text>
+
+                                          {/* Active Sessions be it any should be displayed on the TIME SLOT (1-HOUR SESSIONS) */}
+                                          <View style={styles.slotActiveSessionRow}>
+                                            <Text
+                                              style={[
+                                                styles.slotActiveSessionText,
+                                                activeSession ? styles.slotActiveSessionTextActive : styles.slotActiveSessionTextOpen,
+                                              ]}
+                                            >
+                                              {activeSession
+                                                ? `● ACTIVE: ${activeSession.toUpperCase()}`
+                                                : '○ AVAILABLE (OPEN)'}
+                                            </Text>
+                                          </View>
+
                                           {slot.instruments_summary && slot.instruments_summary.length > 0 && (
                                             <Text style={styles.dropdownSlotInstruments}>
                                               🎷 {slot.instruments_summary.join(', ')} ({slot.current_participants}/{slot.max_participants || participantLimit})
@@ -1599,6 +1625,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginRight: 8,
   },
+  dropdownTriggerTextCol: {
+    flex: 1,
+  },
+  dropdownActiveSessionSub: {
+    color: '#e8c872',
+    fontSize: 9,
+    fontWeight: '800',
+    marginTop: 2,
+    letterSpacing: 0.8,
+  },
   dropdownValueText: {
     color: '#f4ede4',
     fontSize: 13,
@@ -1748,6 +1784,20 @@ const styles = StyleSheet.create({
     fontSize: 9,
     marginTop: 3,
     fontWeight: '700',
+  },
+  slotActiveSessionRow: {
+    marginTop: 2,
+  },
+  slotActiveSessionText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  slotActiveSessionTextActive: {
+    color: '#e8c872',
+  },
+  slotActiveSessionTextOpen: {
+    color: '#52b79a',
   },
   jamCounterBanner: {
     flexDirection: 'row',

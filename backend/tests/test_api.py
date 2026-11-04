@@ -1501,6 +1501,135 @@ async def test_jam_session_one_user_books_all_instruments_and_blocks_user_b(clie
     assert "Constraint For Jam Session Max: 8" in b_over_limit.json()["detail"]["message"]
 
 
+@pytest.mark.asyncio
+async def test_jam_session_not_joinable_by_session_a_collaborative(client):
+    """
+    CRITICAL: Validates that a 4-5 PM (16:00 - 17:00) Jam Session is strictly NOT joinable
+    by Session A Collaborative Practice.
+    - Slot availability endpoint for Session A shows is_available: false, status: Reserved (Jam Session), active_session_name: Jam Session.
+    - An attempt to book Session A Collaborative Practice into this slot is rejected with HTTP 400.
+    """
+    u_jam = await client.post("/api/users", json={"name": "Jam Host", "email": f"jamhost_{uuid.uuid4().hex[:8]}@test.com"})
+    u_a = await client.post("/api/users", json={"name": "Session A Collab User", "email": f"collab_a_{uuid.uuid4().hex[:8]}@test.com"})
+    jam_id = u_jam.json()["id"]
+    a_id = u_a.json()["id"]
+    test_date = get_unique_test_date()
+
+    # 1. Book a 4-5 PM Jam Session (16:00 - 17:00) with 7 participants
+    b_jam = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": jam_id,
+            "session_type_id": 3,  # Jam Session
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "16:00:00",
+            "end_time": "17:00:00",
+            "participant_count": 7,
+            "instruments": [
+                {"instrument_id": 1, "quantity": 1},  # Drums
+                {"instrument_id": 2, "quantity": 1},  # Bass
+                {"instrument_id": 3, "quantity": 2},  # Electric Guitar
+                {"instrument_id": 5, "quantity": 2},  # Vocals
+                {"instrument_id": 6, "quantity": 1},  # Synth
+            ],
+        },
+    )
+    assert b_jam.status_code == 201
+
+    # 2. Query Session A slots for this date: 16:00 - 17:00 must be NOT AVAILABLE and marked Reserved (Jam Session)
+    slots_resp = await client.get(f"/api/sessions/1/slots?date={test_date}")
+    assert slots_resp.status_code == 200
+    slot_4pm = next(s for s in slots_resp.json()["slots"] if s["start_time"] == "16:00:00")
+    assert slot_4pm["is_available"] is False
+    assert "Reserved (Jam Session)" in slot_4pm["status"]
+    assert slot_4pm["active_session_name"] == "Jam Session"
+    assert slot_4pm["booked_session_name"] == "Jam Session"
+    assert slot_4pm["collaborative_open"] is False
+
+    # 3. Session A user attempts to book Collaborative Practice at 16:00 - 17:00 -> MUST FAIL (400)
+    resp_fail = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": a_id,
+            "session_type_id": 1,  # Session A
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "16:00:00",
+            "end_time": "17:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 3, "quantity": 1}],  # Electric Guitar
+        },
+    )
+    assert resp_fail.status_code == 400
+    detail = resp_fail.json()["detail"]
+    assert "Collision Violation" in detail
+    assert "reserved by a Jam Session" in detail
+
+
+@pytest.mark.asyncio
+async def test_active_sessions_displayed_on_slots(client):
+    """
+    CRITICAL: Validates that active sessions (Session A, Session B, Jam Session)
+    are explicitly returned in slot availability for display in TIME SLOT (1-HOUR SESSIONS).
+    """
+    u = await client.post("/api/users", json={"name": "Slot Inspector", "email": f"inspector_{uuid.uuid4().hex[:8]}@test.com"})
+    uid = u.json()["id"]
+    test_date = get_unique_test_date()
+
+    # 1. Book Session A at 09:00 - 10:00
+    b_a = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": uid,
+            "session_type_id": 1,  # Session A
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "09:00:00",
+            "end_time": "10:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 1, "quantity": 1}],
+        },
+    )
+    assert b_a.status_code == 201
+
+    # 2. Book Jam Session at 12:00 - 13:00
+    b_jam = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": uid,
+            "session_type_id": 3,  # Jam Session
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "12:00:00",
+            "end_time": "13:00:00",
+            "participant_count": 3,
+            "instruments": [{"instrument_id": 4, "quantity": 1}],
+        },
+    )
+    assert b_jam.status_code == 201
+
+    # 3. Query slots for Session A:
+    # 09:00 slot has active Session A
+    # 12:00 slot has active Jam Session
+    # 08:00 slot has NO active session
+    slots_resp = await client.get(f"/api/sessions/1/slots?date={test_date}")
+    assert slots_resp.status_code == 200
+    slots_list = slots_resp.json()["slots"]
+
+    s_8am = next(s for s in slots_list if s["start_time"] == "08:00:00")
+    assert s_8am["active_session_name"] is None
+    assert s_8am["is_available"] is True
+
+    s_9am = next(s for s in slots_list if s["start_time"] == "09:00:00")
+    assert s_9am["active_session_name"] == "Session A"
+
+    s_12pm = next(s for s in slots_list if s["start_time"] == "12:00:00")
+    assert s_12pm["active_session_name"] == "Jam Session"
+    assert s_12pm["is_available"] is False
+
+
+
 
 
 
