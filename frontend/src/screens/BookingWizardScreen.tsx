@@ -112,16 +112,25 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       quantity: qty,
     }));
 
-    // People playing: not derived from instruments; accounts for all musicians, instrumentalists & vocalists
+    // Derive people playing (participants) automatically from selected instruments
+    const sNameUpper = (wizard.selectedSession.name || '').toUpperCase();
+    const isMeeting = sNameUpper.includes('MEETING');
+    const isFullBand = sNameUpper.includes('SESSION A') && wizard.practiceMode.toUpperCase() === 'FULL BAND REHEARSAL';
     const isSolo = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
-    const peoplePlaying = isSolo
-      ? 1
-      : Math.max(1, Math.min(wizard.participantCount || 1, wizard.selectedSession.participant_limit));
+
+    const totalInstrumentsCount = Object.values(wizard.instruments).reduce((sum, qty) => sum + qty, 0);
+
+    const peoplePlaying = (() => {
+      if (isSolo) return 1;
+      if (isFullBand) return 5;
+      if (isMeeting) return 2;
+      return Math.max(1, totalInstrumentsCount);
+    })();
 
     if (peoplePlaying > wizard.selectedSession.participant_limit) {
       Alert.alert(
         'Participant Limit Exceeded',
-        `The number of people playing (${peoplePlaying}) exceeds the participant limit of ${wizard.selectedSession.participant_limit} for ${wizard.selectedSession.name}.`
+        `The number of people playing based on selected instruments (${peoplePlaying}) exceeds the participant limit of ${wizard.selectedSession.participant_limit} for ${wizard.selectedSession.name}. Please remove ${peoplePlaying - wizard.selectedSession.participant_limit} instrument(s).`
       );
       return;
     }
@@ -294,6 +303,15 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             return ['Solo Practice', 'Collaborative Jam'];
           }
           return ['Solo Practice', 'Collaborative Jam', 'Full Band Rehearsal'];
+        })();
+
+        // Automatically calculate people playing from selected instruments
+        const totalInstruments = Object.values(wizard.instruments).reduce((sum, qty) => sum + qty, 0);
+        const autoPeoplePlaying = (() => {
+          if (isSoloPractice) return 1;
+          if (isFullBandA) return 5;
+          if (isMeetingSession) return 2;
+          return Math.max(1, totalInstruments);
         })();
 
         // Primary instruments allowed for Solo Practice
@@ -497,67 +515,25 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               <Text style={styles.fieldLabel}>
                 PEOPLE PLAYING (PARTICIPANTS):
               </Text>
-              {isSoloPractice ? (
-                <View style={styles.soloPeopleBox}>
-                  <Text style={styles.soloPeopleVal}>1 SOLO PERFORMER</Text>
-                  <Text style={styles.soloPeopleSub}>Solo practice session</Text>
-                </View>
-              ) : (
-                <View style={styles.peopleContainer}>
-                  <View style={styles.peopleStepperRow}>
-                    <TouchableOpacity
-                      style={[
-                        styles.peopleStepperBtn,
-                        (wizard.participantCount || 1) <= 1 && styles.peopleStepperBtnDisabled,
-                      ]}
-                      onPress={() => setParticipantCount(Math.max(1, (wizard.participantCount || 1) - 1))}
-                      disabled={(wizard.participantCount || 1) <= 1}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.peopleStepperBtnText}>-</Text>
-                    </TouchableOpacity>
-
-                    <View style={styles.peopleValueBox}>
-                      <TextInput
-                        style={styles.peopleInput}
-                        keyboardType="numeric"
-                        value={String(wizard.participantCount || 1)}
-                        onChangeText={(val) => {
-                          const num = parseInt(val, 10);
-                          if (isNaN(num) || num < 1) {
-                            setParticipantCount(1);
-                          } else {
-                            setParticipantCount(Math.min(num, participantLimit));
-                          }
-                        }}
-                      />
-                      <Text style={styles.peopleUnitText}>
-                        {(wizard.participantCount || 1) === 1 ? 'PERSON' : 'PEOPLE'}
-                      </Text>
-                    </View>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.peopleStepperBtn,
-                        (wizard.participantCount || 1) >= participantLimit &&
-                          styles.peopleStepperBtnDisabled,
-                      ]}
-                      onPress={() =>
-                        setParticipantCount(
-                          Math.min(participantLimit, (wizard.participantCount || 1) + 1)
-                        )
-                      }
-                      disabled={(wizard.participantCount || 1) >= participantLimit}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.peopleStepperBtnText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={styles.peopleSubtext}>
-                    Max: {participantLimit} • Instrumentalists & vocalists
+              <View style={styles.autoPeopleBox}>
+                <View style={styles.autoPeopleRow}>
+                  <Text style={styles.autoPeopleVal}>
+                    {autoPeoplePlaying} {autoPeoplePlaying === 1 ? 'PERSON' : 'PEOPLE'}
                   </Text>
+                  <View style={styles.autoTag}>
+                    <Text style={styles.autoTagText}>AUTO</Text>
+                  </View>
                 </View>
-              )}
+                <Text style={styles.autoPeopleSub}>
+                  {isSoloPractice
+                    ? '1 Solo Musician / Performer'
+                    : isFullBandA
+                    ? 'Full Band (All Members Included)'
+                    : isMeetingSession
+                    ? 'Meeting Attendees'
+                    : `${totalInstruments} Instrument${totalInstruments === 1 ? '' : 's'} Selected`} • Max: {participantLimit}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -850,87 +826,43 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  peopleContainer: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#2e2e2e',
-    borderRadius: 6,
-    padding: 6,
-    justifyContent: 'center',
-    minHeight: 40,
-  },
-  peopleStepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  peopleStepperBtn: {
-    width: 28,
-    height: 28,
-    backgroundColor: '#262626',
-    borderRadius: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#3a3a3a',
-  },
-  peopleStepperBtnDisabled: {
-    backgroundColor: '#181818',
-    borderColor: '#222222',
-    opacity: 0.4,
-  },
-  peopleStepperBtnText: {
-    color: '#e8c872',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  peopleValueBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-  },
-  peopleInput: {
-    color: '#e8c872',
-    fontSize: 13,
-    fontWeight: '900',
-    textAlign: 'center',
-    minWidth: 24,
-    paddingVertical: 0,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  peopleUnitText: {
-    color: '#f4ede4',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    marginLeft: 3,
-  },
-  peopleSubtext: {
-    color: '#777777',
-    fontSize: 8.5,
-    marginTop: 3,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  soloPeopleBox: {
+  autoPeopleBox: {
     backgroundColor: '#161616',
     borderWidth: 1,
     borderColor: '#2e2e2e',
     borderRadius: 6,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     justifyContent: 'center',
     minHeight: 40,
   },
-  soloPeopleVal: {
+  autoPeopleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  autoPeopleVal: {
     color: '#e8c872',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '900',
     letterSpacing: 1,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  soloPeopleSub: {
+  autoTag: {
+    backgroundColor: '#241e12',
+    borderWidth: 1,
+    borderColor: '#e8c872',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  autoTagText: {
+    color: '#e8c872',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  autoPeopleSub: {
     color: '#777777',
     fontSize: 9,
     marginTop: 2,
