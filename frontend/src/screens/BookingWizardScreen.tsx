@@ -669,7 +669,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                     const badgeText = (() => {
                                       if (isSlotSoloBlocked) return 'COLLAB ACTIVE (NO SOLO)';
                                       if (!slot.is_available) {
-                                        if (slot.status?.includes('Reserved')) return 'RESERVED';
+                                        if (slot.status?.toUpperCase().includes('JAM')) return 'RESERVED (JAM)';
+                                        if (slot.status?.includes('Reserved')) return slot.status.toUpperCase();
                                         if (slot.status?.includes('Full')) return 'FULL';
                                         return slot.status?.toUpperCase() || 'RESERVED';
                                       }
@@ -696,6 +697,13 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                             return;
                                           }
                                           if (!slot.is_available) {
+                                            if (slot.booked_session_name?.toUpperCase().includes('JAM') || slot.status?.toUpperCase().includes('JAM')) {
+                                              Alert.alert(
+                                                'Jam Session Reserved',
+                                                `The ${slot.label} slot is reserved by a Jam Session. While in ${wizard.selectedSession?.name || 'this session'}'s collaborative practice, you cannot book a slot that Jam Session has reserved. If a slot is reserved by a Jam Session, it only belongs to it.`
+                                              );
+                                              return;
+                                            }
                                             Alert.alert(
                                               'Slot Unavailable',
                                               `The ${slot.label} slot is ${slot.status}. Please select an available slot.`
@@ -773,7 +781,9 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                             : isSoloPractice
                             ? '1 PERSON (SOLO)'
                             : isReserved
-                            ? `${existingParticipants}/${maxCapacity} FULL (RESERVED)`
+                            ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
+                                ? 'RESERVED (JAM SESSION)'
+                                : `${existingParticipants}/${maxCapacity} FULL (RESERVED)`)
                             : existingParticipants === 0
                             ? `0 IN SLOT (+1 YOU → 1/${maxCapacity})`
                             : `${existingParticipants} IN SLOT (+1 YOU → ${nextTotalParticipants}/${maxCapacity})`}
@@ -781,7 +791,9 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                         <View style={[styles.autoTag, isReserved && styles.autoTagReserved]}>
                           <Text style={[styles.autoTagText, isReserved && styles.autoTagTextReserved]}>
                             {isReserved
-                              ? 'RESERVED'
+                              ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
+                                  ? 'JAM RESERVED'
+                                  : 'RESERVED')
                               : isSoloPractice
                               ? 'SOLO'
                               : `${existingParticipants}/${maxCapacity} ACTIVE`}
@@ -796,7 +808,9 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                               ? '⚠️ Slot already has active musicians. Solo practice requires an empty room.'
                               : '0 existing musicians in slot • Private room for you alone (no other players allowed)')
                           : isReserved
-                          ? `Maximum capacity reached (${existingParticipants}/${maxCapacity}). This slot is reserved.`
+                          ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
+                              ? '⚠️ This slot is reserved by a Jam Session and only belongs to it. Not available for Session A or B collaborative practice.'
+                              : `Maximum capacity reached (${existingParticipants}/${maxCapacity}). This slot is reserved.`)
                           : existingParticipants === 0
                           ? `No musicians currently in this slot. You will be participant 1 of ${maxCapacity}.`
                           : `${existingParticipants} existing ${existingParticipants === 1 ? 'musician' : 'musicians'} (${selectedSlot?.instruments_summary?.join(', ') || 'playing'}) • Adding your booking makes it ${nextTotalParticipants}/${maxCapacity}`}

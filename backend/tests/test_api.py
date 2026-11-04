@@ -1263,5 +1263,150 @@ async def test_solo_practice_room_exclusivity(client):
     assert slot_12pm["has_solo"] is True
 
 
+@pytest.mark.asyncio
+async def test_jam_session_slot_exclusivity_against_session_a_and_b(client):
+    """
+    CRITICAL: Validates Jam Session exclusivity:
+    - While being in Session A's or Session B's collaborative practice, users cannot book a slot
+      that Jam Session has reserved.
+    - If a slot is reserved by a Jam Session, it strictly belongs to Jam Session.
+    - Slot availability endpoint for Session A and Session B shows is_available: false, status: Reserved (Jam Session).
+    - Vice versa: Jam Session cannot book slots reserved by Session A or Session B.
+    """
+    u_jam = await client.post("/api/users", json={"name": "Jam Lead", "email": f"jam_{uuid.uuid4().hex[:8]}@test.com"})
+    u_a = await client.post("/api/users", json={"name": "Session A Collab", "email": f"collab_a_{uuid.uuid4().hex[:8]}@test.com"})
+    u_b = await client.post("/api/users", json={"name": "Session B Collab", "email": f"collab_b_{uuid.uuid4().hex[:8]}@test.com"})
+    test_date = get_unique_test_date()
+
+    jam_user_id = u_jam.json()["id"]
+    a_user_id = u_a.json()["id"]
+    b_user_id = u_b.json()["id"]
+
+    # 1. Book Jam Session at 15:00:00 - 16:00:00
+    b_jam = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": jam_user_id,
+            "session_type_id": 3,  # Jam Session
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "15:00:00",
+            "end_time": "16:00:00",
+            "participant_count": 2,
+            "instruments": [{"instrument_id": 4, "quantity": 1}],
+        },
+    )
+    assert b_jam.status_code == 201
+
+    # 2. Check Session A slots: 15:00 - 16:00 must be marked Reserved (Jam Session)
+    slots_a = await client.get(f"/api/sessions/1/slots?date={test_date}")
+    assert slots_a.status_code == 200
+    slot_15_a = next(s for s in slots_a.json()["slots"] if s["start_time"] == "15:00:00")
+    assert slot_15_a["is_available"] is False
+    assert "Reserved (Jam Session)" in slot_15_a["status"]
+    assert slot_15_a["booked_session_name"] == "Jam Session"
+    assert slot_15_a["collaborative_open"] is False
+
+    # 3. Check Session B slots: 15:00 - 16:00 must be marked Reserved (Jam Session)
+    slots_b = await client.get(f"/api/sessions/2/slots?date={test_date}")
+    assert slots_b.status_code == 200
+    slot_15_b = next(s for s in slots_b.json()["slots"] if s["start_time"] == "15:00:00")
+    assert slot_15_b["is_available"] is False
+    assert "Reserved (Jam Session)" in slot_15_b["status"]
+    assert slot_15_b["booked_session_name"] == "Jam Session"
+    assert slot_15_b["collaborative_open"] is False
+
+    # 4. Session A Collaborative Practice attempt on 15:00 - 16:00 -> MUST FAIL (400)
+    resp_a_fail = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": a_user_id,
+            "session_type_id": 1,  # Session A
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "15:00:00",
+            "end_time": "16:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 1, "quantity": 1}],  # Drums
+        },
+    )
+    assert resp_a_fail.status_code == 400
+    err_msg_a = resp_a_fail.json()["detail"]
+    assert "Collision Violation" in err_msg_a
+    assert "reserved by a Jam Session" in err_msg_a
+    assert "While being in Session A's collaborative practice you cannot book the slot that Jam Session has reserved" in err_msg_a
+    assert "If a slot is reserved by a Jam Session, it only belongs to it" in err_msg_a
+
+    # 5. Session B Collaborative Practice attempt on 15:00 - 16:00 -> MUST FAIL (400)
+    resp_b_fail = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": b_user_id,
+            "session_type_id": 2,  # Session B
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "15:00:00",
+            "end_time": "16:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 4, "quantity": 1}],  # Acoustic Guitar
+        },
+    )
+    assert resp_b_fail.status_code == 400
+    err_msg_b = resp_b_fail.json()["detail"]
+    assert "Collision Violation" in err_msg_b
+    assert "reserved by a Jam Session" in err_msg_b
+    assert "While being in Session B's collaborative practice you cannot book the slot that Jam Session has reserved" in err_msg_b
+    assert "If a slot is reserved by a Jam Session, it only belongs to it" in err_msg_b
+
+    # 6. Session A Solo Practice attempt on 15:00 - 16:00 -> MUST FAIL (400)
+    resp_a_solo_fail = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": a_user_id,
+            "session_type_id": 1,  # Session A
+            "practice_mode": "Solo Practice",
+            "booking_date": test_date,
+            "start_time": "15:00:00",
+            "end_time": "16:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 3, "quantity": 1}],  # Electric Guitar
+        },
+    )
+    assert resp_a_solo_fail.status_code == 400
+
+    # 7. Slot booked by Session A: Jam Session cannot book that slot
+    b_a_ok = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": a_user_id,
+            "session_type_id": 1,  # Session A
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "17:00:00",
+            "end_time": "18:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 1, "quantity": 1}],
+        },
+    )
+    assert b_a_ok.status_code == 201
+
+    resp_jam_on_a_fail = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": jam_user_id,
+            "session_type_id": 3,  # Jam Session
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "17:00:00",
+            "end_time": "18:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 4, "quantity": 1}],
+        },
+    )
+    assert resp_jam_on_a_fail.status_code == 400
+    assert "Jam Session cannot book a slot reserved by Session A" in resp_jam_on_a_fail.json()["detail"]
+
+
+
 
 

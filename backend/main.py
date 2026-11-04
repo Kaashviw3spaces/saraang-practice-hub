@@ -661,6 +661,7 @@ async def get_session_slots_availability(
     Returns hour-by-hour slot availability for a session type between 6:00 AM and 11:00 PM.
     Enforces:
     - Session A vs Session B collision prevention: slots booked by another session type are Reserved.
+    - Jam Session Exclusivity: slots reserved by Jam Session strictly belong to Jam Session and cannot be booked in Session A or Session B Collaborative Practice.
     - Solo Practice exclusivity: slots with Solo Practice are locked/Reserved.
     - Collaborative Practice capacity: slots track current participant count and instrument summary.
     """
@@ -1083,7 +1084,25 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
     chosen_evaluation = None
 
     if existing_slot_bookings:
-        # Check 1: Session Collision Prevention (Session A and Session B cannot collide)
+        # Check 1: Jam Session Exclusivity & Session Collision Prevention
+        # If a slot is reserved by Jam Session, it strictly belongs to Jam Session:
+        # While in Session A's or Session B's collaborative practice you cannot book a slot reserved by Jam Session.
+        jam_session_bookings = [b for b in existing_slot_bookings if b["session_type_id"] == 3]
+        if jam_session_bookings and booking.session_type_id != 3:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is reserved by a Jam Session. While being in {session_row['name']}'s collaborative practice you cannot book the slot that Jam Session has reserved. If a slot is reserved by a Jam Session, it only belongs to it.",
+            )
+
+        if booking.session_type_id == 3:
+            other_sessions = [b for b in existing_slot_bookings if b["session_type_id"] != 3]
+            if other_sessions:
+                other_name = other_sessions[0]["session_name"]
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is already booked for {other_name}. Jam Session cannot book a slot reserved by {other_name}.",
+                )
+
         different_sessions = [b for b in existing_slot_bookings if b["session_type_id"] != booking.session_type_id]
         if different_sessions:
             other_name = different_sessions[0]["session_name"]
