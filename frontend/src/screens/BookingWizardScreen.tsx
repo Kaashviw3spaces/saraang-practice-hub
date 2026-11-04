@@ -45,6 +45,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
   const [successBooking, setSuccessBooking] = useState<any>(null);
   const [slots, setSlots] = useState<SlotAvailability[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
+  const [isSlotDropdownOpen, setIsSlotDropdownOpen] = useState(false);
 
   // Load catalogues
   useEffect(() => {
@@ -582,92 +583,157 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                     </View>
                   </View>
 
-                  {/* Operating Hours Callout & 1-Hour Slot Rule */}
-                  <View style={styles.hoursBanner}>
-                    <View style={styles.hoursBannerHeader}>
-                      <Text style={styles.hoursBannerTitle}>🕒 OPERATING HOURS: 6:00 AM – 11:00 PM</Text>
-                      <View style={styles.hourRuleTag}>
-                        <Text style={styles.hourRuleTagText}>1-HR SLOTS</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.hoursBannerDesc}>
-                      The music room is open strictly from 6:00 AM to 11:00 PM daily. Only available slots can be reserved. Each band must book again to continue playing for another hour or vacate immediately upon slot expiry.
-                    </Text>
-                  </View>
-
-                  {/* Available Hour-Wise Slots Grid */}
-                  <View style={styles.slotsSection}>
-                    <View style={styles.slotsHeaderRow}>
-                      <Text style={styles.fieldLabel}>AVAILABLE REHEARSAL SLOTS (6 AM - 11 PM):</Text>
+                  {/* Minimalist 1-Hour Time Slot Dropdown */}
+                  <View style={styles.formGroup}>
+                    <View style={styles.timeDropdownHeader}>
+                      <Text style={styles.fieldLabel}>TIME SLOT (1-HOUR SESSIONS):</Text>
                       {loadingSlots && (
                         <View style={styles.loadingSlotsRow}>
                           <ActivityIndicator size="small" color="#e8c872" />
-                          <Text style={styles.loadingSlotsText}>REFRESHING SLOTS...</Text>
+                          <Text style={styles.loadingSlotsText}>REFRESHING...</Text>
                         </View>
                       )}
                     </View>
 
-                    <View style={styles.slotsGrid}>
-                      {slots.map((slot) => {
-                        const isSelected = wizard.startTime === slot.start_time;
-                        const isReserved = !slot.is_available;
+                    {(() => {
+                      const selectedSlot = slots.find((s) => s.start_time === wizard.startTime);
 
-                        return (
+                      return (
+                        <View style={styles.dropdownContainer}>
                           <TouchableOpacity
-                            key={slot.start_time}
                             style={[
-                              styles.slotChip,
-                              isReserved && styles.slotChipReserved,
-                              isSelected && styles.slotChipSelected,
+                              styles.dropdownTrigger,
+                              isSlotDropdownOpen && styles.dropdownTriggerOpen,
                             ]}
-                            activeOpacity={isReserved ? 1 : 0.7}
-                            onPress={() => {
-                              if (isReserved) {
-                                Alert.alert(
-                                  'Slot Already Reserved',
-                                  `The ${slot.label} slot has already been reserved by another band. Please select an available slot.`
-                                );
-                                return;
-                              }
-                              setBookingDateTime(wizard.bookingDate, slot.start_time, 60);
-                            }}
+                            activeOpacity={0.8}
+                            onPress={() => setIsSlotDropdownOpen((prev) => !prev)}
                           >
-                            <Text
-                              style={[
-                                styles.slotTimeText,
-                                isReserved && styles.slotTimeTextReserved,
-                                isSelected && styles.slotTimeTextSelected,
-                              ]}
-                            >
-                              {slot.label}
-                            </Text>
-                            <View
-                              style={[
-                                styles.slotBadge,
-                                isReserved
-                                  ? styles.slotBadgeReserved
-                                  : isSelected
-                                  ? styles.slotBadgeSelected
-                                  : styles.slotBadgeAvailable,
-                              ]}
-                            >
+                            <View style={styles.dropdownLeft}>
+                              <Text style={styles.dropdownTimeIcon}>🕒</Text>
                               <Text
                                 style={[
-                                  styles.slotBadgeText,
-                                  isReserved
-                                    ? styles.slotBadgeTextReserved
-                                    : isSelected
-                                    ? styles.slotBadgeTextSelected
-                                    : styles.slotBadgeTextAvailable,
+                                  styles.dropdownValueText,
+                                  !selectedSlot && styles.dropdownPlaceholderText,
                                 ]}
                               >
-                                {isReserved ? 'RESERVED' : isSelected ? '✓ SELECTED' : 'AVAILABLE'}
+                                {selectedSlot ? selectedSlot.label : 'Select an available 1-hour slot...'}
+                              </Text>
+                            </View>
+
+                            <View style={styles.dropdownRight}>
+                              {selectedSlot && (
+                                <View
+                                  style={[
+                                    styles.dropdownBadge,
+                                    !selectedSlot.is_available
+                                      ? styles.dropdownBadgeReserved
+                                      : styles.dropdownBadgeSelected,
+                                  ]}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.dropdownBadgeText,
+                                      !selectedSlot.is_available
+                                        ? styles.dropdownBadgeTextReserved
+                                        : styles.dropdownBadgeTextSelected,
+                                    ]}
+                                  >
+                                    {!selectedSlot.is_available ? 'RESERVED' : '✓ SELECTED'}
+                                  </Text>
+                                </View>
+                              )}
+                              <Text style={styles.dropdownChevron}>
+                                {isSlotDropdownOpen ? '▲' : '▼'}
                               </Text>
                             </View>
                           </TouchableOpacity>
-                        );
-                      })}
-                    </View>
+
+                          {isSlotDropdownOpen && (
+                            <View style={styles.dropdownMenu}>
+                              <ScrollView
+                                style={styles.dropdownScroll}
+                                nestedScrollEnabled={true}
+                                showsVerticalScrollIndicator={true}
+                              >
+                                {slots.length === 0 ? (
+                                  <View style={styles.dropdownEmpty}>
+                                    <Text style={styles.dropdownEmptyText}>
+                                      No slots available for this date.
+                                    </Text>
+                                  </View>
+                                ) : (
+                                  slots.map((slot) => {
+                                    const isSelected = wizard.startTime === slot.start_time;
+                                    const isReserved = !slot.is_available;
+
+                                    return (
+                                      <TouchableOpacity
+                                        key={slot.start_time}
+                                        style={[
+                                          styles.dropdownItem,
+                                          isSelected && styles.dropdownItemSelected,
+                                          isReserved && styles.dropdownItemReserved,
+                                        ]}
+                                        activeOpacity={isReserved ? 0.9 : 0.6}
+                                        onPress={() => {
+                                          if (isReserved) {
+                                            Alert.alert(
+                                              'Slot Already Reserved',
+                                              `The ${slot.label} slot has already been reserved by another band. Please select an available slot.`
+                                            );
+                                            return;
+                                          }
+                                          setBookingDateTime(wizard.bookingDate, slot.start_time, 60);
+                                          setIsSlotDropdownOpen(false);
+                                        }}
+                                      >
+                                        <Text
+                                          style={[
+                                            styles.dropdownItemText,
+                                            isSelected && styles.dropdownItemTextSelected,
+                                            isReserved && styles.dropdownItemTextReserved,
+                                          ]}
+                                        >
+                                          {slot.label}
+                                        </Text>
+
+                                        <View
+                                          style={[
+                                            styles.dropdownBadge,
+                                            isReserved
+                                              ? styles.dropdownBadgeReserved
+                                              : isSelected
+                                              ? styles.dropdownBadgeSelected
+                                              : styles.dropdownBadgeAvailable,
+                                          ]}
+                                        >
+                                          <Text
+                                            style={[
+                                              styles.dropdownBadgeText,
+                                              isReserved
+                                                ? styles.dropdownBadgeTextReserved
+                                                : isSelected
+                                                ? styles.dropdownBadgeTextSelected
+                                                : styles.dropdownBadgeTextAvailable,
+                                            ]}
+                                          >
+                                            {isReserved ? 'RESERVED' : isSelected ? '✓ SELECTED' : 'AVAILABLE'}
+                                          </Text>
+                                        </View>
+                                      </TouchableOpacity>
+                                    );
+                                  })
+                                )}
+                              </ScrollView>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })()}
+
+                    <Text style={styles.timeSlotHelper}>
+                      Operating hours: 6:00 AM – 11:00 PM daily • 1-hour sessions (re-book to extend or vacate immediately)
+                    </Text>
                   </View>
                 </View>
               );
@@ -1257,53 +1323,11 @@ const styles = StyleSheet.create({
   quickDateBtnTextSelected: {
     color: '#e8c872',
   },
-  hoursBanner: {
-    backgroundColor: '#161512',
-    borderWidth: 1,
-    borderColor: '#3d321b',
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 16,
-  },
-  hoursBannerHeader: {
+  timeDropdownHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
-  },
-  hoursBannerTitle: {
-    color: '#e8c872',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  hourRuleTag: {
-    backgroundColor: '#2b2313',
-    borderWidth: 1,
-    borderColor: '#e8c872',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  hourRuleTagText: {
-    color: '#e8c872',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  hoursBannerDesc: {
-    color: '#999999',
-    fontSize: 11,
-    lineHeight: 16,
-  },
-  slotsSection: {
-    marginBottom: 18,
-  },
-  slotsHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   loadingSlotsRow: {
     flexDirection: 'row',
@@ -1316,78 +1340,155 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.8,
   },
-  slotsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+  dropdownContainer: {
+    position: 'relative',
+    zIndex: 10,
   },
-  slotChip: {
-    width: '48.5%',
+  dropdownTrigger: {
     backgroundColor: '#161616',
     borderWidth: 1,
     borderColor: '#2e2e2e',
     borderRadius: 6,
-    padding: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 48,
   },
-  slotChipSelected: {
+  dropdownTriggerOpen: {
     borderColor: '#e8c872',
-    backgroundColor: '#221c12',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
-  slotChipReserved: {
-    borderColor: '#381f1f',
-    backgroundColor: '#181212',
+  dropdownLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  dropdownTimeIcon: {
+    fontSize: 14,
+    marginRight: 8,
+  },
+  dropdownValueText: {
+    color: '#f4ede4',
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  dropdownPlaceholderText: {
+    color: '#666666',
+    fontStyle: 'italic',
+  },
+  dropdownRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dropdownChevron: {
+    color: '#888888',
+    fontSize: 10,
+    marginLeft: 4,
+  },
+  dropdownMenu: {
+    backgroundColor: '#141414',
+    borderWidth: 1,
+    borderColor: '#e8c872',
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
+    maxHeight: 220,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  dropdownScroll: {
+    maxHeight: 220,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1f1f1f',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#241e13',
+  },
+  dropdownItemReserved: {
+    backgroundColor: '#171212',
     opacity: 0.65,
   },
-  slotTimeText: {
-    color: '#f4ede4',
-    fontSize: 11,
-    fontWeight: '800',
+  dropdownItemText: {
+    color: '#cccccc',
+    fontSize: 12,
+    fontWeight: '700',
     letterSpacing: 0.5,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
-  slotTimeTextSelected: {
+  dropdownItemTextSelected: {
     color: '#e8c872',
     fontWeight: '900',
   },
-  slotTimeTextReserved: {
+  dropdownItemTextReserved: {
     color: '#775555',
     textDecorationLine: 'line-through',
   },
-  slotBadge: {
+  dropdownBadge: {
     paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 4,
+    paddingVertical: 2,
+    borderRadius: 3,
   },
-  slotBadgeAvailable: {
+  dropdownBadgeAvailable: {
     backgroundColor: '#0e241b',
     borderWidth: 1,
     borderColor: '#1d4d3a',
   },
-  slotBadgeSelected: {
+  dropdownBadgeSelected: {
     backgroundColor: '#382b14',
     borderWidth: 1,
     borderColor: '#e8c872',
   },
-  slotBadgeReserved: {
+  dropdownBadgeReserved: {
     backgroundColor: '#2b1212',
     borderWidth: 1,
     borderColor: '#4d2020',
   },
-  slotBadgeText: {
+  dropdownBadgeText: {
     fontSize: 8,
     fontWeight: '900',
     letterSpacing: 0.6,
   },
-  slotBadgeTextAvailable: {
+  dropdownBadgeTextAvailable: {
     color: '#52b79a',
   },
-  slotBadgeTextSelected: {
+  dropdownBadgeTextSelected: {
     color: '#e8c872',
   },
-  slotBadgeTextReserved: {
+  dropdownBadgeTextReserved: {
     color: '#e05a47',
+  },
+  dropdownEmpty: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  dropdownEmptyText: {
+    color: '#888888',
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
+  timeSlotHelper: {
+    color: '#777777',
+    fontSize: 10,
+    marginTop: 6,
+    letterSpacing: 0.4,
+    lineHeight: 14,
   },
 });
