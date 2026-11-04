@@ -193,6 +193,22 @@ class BookingOut(BaseModel):
     instruments: List[Dict[str, Any]] = Field(default_factory=list)
 
 
+class SlotAvailability(BaseModel):
+    start_time: str
+    end_time: str
+    label: str
+    is_available: bool
+    status: str
+
+
+class SessionSlotsResponse(BaseModel):
+    session_type_id: int
+    session_name: str
+    date: str
+    operating_hours: str
+    slots: List[SlotAvailability]
+
+
 # ---------------------------------------------------------
 # System & Meta Endpoints
 # ---------------------------------------------------------
@@ -607,6 +623,92 @@ async def list_instruments(conn=Depends(get_db)):
     return [dict(r) for r in rows]
 
 
+@app.get(
+    "/api/sessions/{session_type_id}/slots",
+    response_model=SessionSlotsResponse,
+    tags=["Catalogue", "Bookings"],
+)
+async def get_session_slots_availability(
+    session_type_id: int,
+    query_date: date = Query(default_factory=date.today, alias="date"),
+    conn=Depends(get_db),
+):
+    """
+    Returns hour-by-hour slot availability for a session type between 6:00 AM and 11:00 PM.
+    Slots already reserved by other bookings are marked as is_available: false, status: 'Reserved'.
+    """
+    session_row = await conn.fetchrow(
+        "SELECT id, name, participant_limit, is_strict_lockdown FROM session_types WHERE id = $1",
+        session_type_id,
+    )
+    if not session_row:
+        raise HTTPException(status_code=404, detail="Session type not found")
+
+    # Fetch all confirmed bookings for this date
+    confirmed_bookings = await conn.fetch(
+        """
+        SELECT b.id, b.session_type_id, b.room_id, b.start_time, b.end_time
+        FROM bookings b
+        WHERE b.booking_date = $1
+          AND b.status = 'Confirmed'
+        """,
+        query_date,
+    )
+
+    all_rooms = await conn.fetch("SELECT id FROM rooms")
+    total_rooms = len(all_rooms)
+
+    slots: List[SlotAvailability] = []
+    # Operating hours: strictly 6:00 AM to 11:00 PM (17 1-hour slots: 06:00 to 23:00)
+    for hour in range(6, 23):
+        start_t = time(hour, 0, 0)
+        end_t = time(hour + 1, 0, 0)
+
+        # 12-hour format label e.g. "06:00 AM - 07:00 AM", "12:00 PM - 01:00 PM"
+        start_period = "AM" if hour < 12 else "PM"
+        end_period = "AM" if (hour + 1) < 12 else "PM"
+        start_12 = hour if 1 <= hour <= 12 else (hour - 12 if hour > 12 else 12)
+        end_12 = (hour + 1) if 1 <= (hour + 1) <= 12 else ((hour + 1) - 12 if (hour + 1) > 12 else 12)
+        label = f"{start_12:02d}:00 {start_period} - {end_12:02d}:00 {end_period}"
+
+        # Check if this session type is already booked in this slot
+        session_booked = any(
+            b["session_type_id"] == session_type_id
+            and b["start_time"] < end_t
+            and b["end_time"] > start_t
+            for b in confirmed_bookings
+        )
+
+        # Check if all rooms in facility are occupied during this slot
+        busy_rooms = {
+            b["room_id"]
+            for b in confirmed_bookings
+            if b["start_time"] < end_t and b["end_time"] > start_t
+        }
+        all_rooms_busy = len(busy_rooms) >= total_rooms
+
+        is_available = (not session_booked) and (not all_rooms_busy)
+        status_str = "Available" if is_available else "Reserved"
+
+        slots.append(
+            SlotAvailability(
+                start_time=str(start_t),
+                end_time=str(end_t),
+                label=label,
+                is_available=is_available,
+                status=status_str,
+            )
+        )
+
+    return SessionSlotsResponse(
+        session_type_id=session_type_id,
+        session_name=session_row["name"],
+        date=str(query_date),
+        operating_hours="06:00 - 23:00",
+        slots=slots,
+    )
+
+
 # ---------------------------------------------------------
 # AI Acoustic Compatibility Check (Dry Run)
 # ---------------------------------------------------------
@@ -729,6 +831,18 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="end_time must be strictly greater than start_time.",
+        )
+
+    # ---------------------------------------------------------
+    # OPERATING HOURS ENFORCEMENT: 6:00 AM to 11:00 PM (06:00 to 23:00)
+    # ---------------------------------------------------------
+    OPEN_TIME = time(6, 0, 0)
+    CLOSE_TIME = time(23, 0, 0)
+
+    if booking.start_time < OPEN_TIME or booking.end_time > CLOSE_TIME:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The rehearsal hub is open only from 6:00 AM to 11:00 PM (06:00 to 23:00).",
         )
 
     # ---------------------------------------------------------

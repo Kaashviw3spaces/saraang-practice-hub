@@ -928,4 +928,130 @@ async def test_people_playing_with_vocalists_without_instruments(client):
     assert len(booking["instruments"]) == 2
 
 
+@pytest.mark.asyncio
+async def test_operating_hours_enforcement(client):
+    """
+    Validates that the music room is open strictly from 6:00 AM to 11:00 PM (06:00 to 23:00).
+    Bookings outside these hours must be rejected with 400 Bad Request.
+    """
+    u_resp = await client.post(
+        "/api/users",
+        json={"name": "Hours Tester", "email": f"hours_{uuid.uuid4().hex[:8]}@test.com"},
+    )
+    user_id = u_resp.json()["id"]
+    test_date = get_unique_test_date()
+
+    # 1. Booking before 6:00 AM -> must fail 400
+    early_resp = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_id,
+            "session_type_id": 3,
+            "practice_mode": "Collaborative Jam",
+            "booking_date": test_date,
+            "start_time": "05:00:00",
+            "end_time": "06:00:00",
+            "participant_count": 2,
+            "instruments": [],
+        },
+    )
+    assert early_resp.status_code == 400
+    assert "open only from 6:00 AM to 11:00 PM" in early_resp.json()["detail"]
+
+    # 2. Booking ending after 11:00 PM -> must fail 400
+    late_resp = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_id,
+            "session_type_id": 3,
+            "practice_mode": "Collaborative Jam",
+            "booking_date": test_date,
+            "start_time": "23:00:00",
+            "end_time": "23:59:00",
+            "participant_count": 2,
+            "instruments": [],
+        },
+    )
+    assert late_resp.status_code == 400
+    assert "open only from 6:00 AM to 11:00 PM" in late_resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_slot_availability_endpoint_and_conflict(client):
+    """
+    Validates hour-wise slot availability display from 6AM to 11PM:
+    - Initial slots: all 17 slots available.
+    - Band A books 12:00 PM to 01:00 PM -> slot is marked Reserved.
+    - Band B cannot book 12:00 PM to 01:00 PM (rejected with 400).
+    """
+    u1_resp = await client.post(
+        "/api/users",
+        json={"name": "Band A Member", "email": f"banda_{uuid.uuid4().hex[:8]}@test.com"},
+    )
+    u2_resp = await client.post(
+        "/api/users",
+        json={"name": "Band B Member", "email": f"bandb_{uuid.uuid4().hex[:8]}@test.com"},
+    )
+    user_a = u1_resp.json()["id"]
+    user_b = u2_resp.json()["id"]
+    test_date = get_unique_test_date()
+
+    # 1. Fetch initial slots for Jam Session
+    slots_resp = await client.get(f"/api/sessions/3/slots?date={test_date}")
+    assert slots_resp.status_code == 200
+    data = slots_resp.json()
+    assert len(data["slots"]) == 17  # 6 AM to 11 PM = 17 1-hour slots
+    assert data["slots"][0]["start_time"] == "06:00:00"
+    assert data["slots"][-1]["end_time"] == "23:00:00"
+
+    # Slot 12pm-1pm should initially be available
+    slot_12pm = next(s for s in data["slots"] if s["start_time"] == "12:00:00")
+    assert slot_12pm["is_available"] is True
+    assert slot_12pm["status"] == "Available"
+
+    # 2. Band A books 12:00 PM - 01:00 PM
+    b_resp = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_a,
+            "session_type_id": 3,
+            "practice_mode": "Collaborative Jam",
+            "booking_date": test_date,
+            "start_time": "12:00:00",
+            "end_time": "13:00:00",
+            "participant_count": 4,
+            "instruments": [],
+        },
+    )
+    assert b_resp.status_code == 201
+
+    # 3. Check slots again: 12pm-1pm must now be marked Reserved
+    slots_after = await client.get(f"/api/sessions/3/slots?date={test_date}")
+    assert slots_after.status_code == 200
+    slot_12pm_after = next(s for s in slots_after.json()["slots"] if s["start_time"] == "12:00:00")
+    assert slot_12pm_after["is_available"] is False
+    assert slot_12pm_after["status"] == "Reserved"
+
+    # 4. Band B selects a different available slot (01:00 PM - 02:00 PM) -> succeeds
+    slot_1pm = next(s for s in slots_after.json()["slots"] if s["start_time"] == "13:00:00")
+    assert slot_1pm["is_available"] is True
+    assert slot_1pm["status"] == "Available"
+
+    b2_resp = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_b,
+            "session_type_id": 3,
+            "practice_mode": "Collaborative Jam",
+            "booking_date": test_date,
+            "start_time": "13:00:00",
+            "end_time": "14:00:00",
+            "participant_count": 3,
+            "instruments": [],
+        },
+    )
+    assert b2_resp.status_code == 201
+
+
+
 

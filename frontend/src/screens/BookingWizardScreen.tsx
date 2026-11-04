@@ -10,7 +10,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { api, SessionType, Instrument } from '../api/client';
+import { api, SessionType, Instrument, SlotAvailability } from '../api/client';
 import { useStore } from '../store/useStore';
 import { SessionCard } from '../components/SessionCard';
 import { InstrumentGrid } from '../components/InstrumentGrid';
@@ -43,6 +43,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successBooking, setSuccessBooking] = useState<any>(null);
+  const [slots, setSlots] = useState<SlotAvailability[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
 
   // Load catalogues
   useEffect(() => {
@@ -97,15 +99,67 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     }
   }, [wizard.step, wizard.instruments, wizard.practiceMode, runAcousticCheck]);
 
+  // Fetch live hour-wise slots availability for operating hours (6:00 AM - 11:00 PM)
+  useEffect(() => {
+    if (wizard.step === 2 && wizard.selectedSession) {
+      let isMounted = true;
+      const fetchSlots = async () => {
+        try {
+          setLoadingSlots(true);
+          const data = await api.getSessionSlots(wizard.selectedSession!.id, wizard.bookingDate);
+          if (isMounted) {
+            const returnedSlots = data.slots || [];
+            setSlots(returnedSlots);
+
+            // Auto-select first available slot if current slot is empty or reserved
+            const currentSlot = returnedSlots.find((s) => s.start_time === wizard.startTime);
+            if (!currentSlot || !currentSlot.is_available) {
+              const firstAvail = returnedSlots.find((s) => s.is_available);
+              if (firstAvail) {
+                setBookingDateTime(wizard.bookingDate, firstAvail.start_time, 60);
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load slots availability:', err);
+        } finally {
+          if (isMounted) setLoadingSlots(false);
+        }
+      };
+      fetchSlots();
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [wizard.step, wizard.selectedSession?.id, wizard.bookingDate]);
+
   // Step 2D: Submission & Auto-Room Assignment Handling
   const handleConfirmReservation = async () => {
     if (!wizard.selectedSession) return;
 
-    // Calculate end time based on duration
+    // Validate operating hours (6:00 AM to 11:00 PM)
     const startHour = parseInt(wizard.startTime.split(':')[0], 10);
-    const endHour = startHour + Math.floor(wizard.durationMinutes / 60);
-    const endMinutes = wizard.startTime.split(':')[1] || '00';
-    const formattedEndTime = `${String(endHour).padStart(2, '0')}:${endMinutes}:00`;
+    if (isNaN(startHour) || startHour < 6 || startHour >= 23) {
+      Alert.alert(
+        'Operating Hours Notice',
+        'Rehearsals are only available between 6:00 AM and 11:00 PM (06:00 to 23:00). Please select an available slot.'
+      );
+      return;
+    }
+
+    // Validate that slot is not already reserved by another band
+    const selectedSlot = slots.find((s) => s.start_time === wizard.startTime);
+    if (selectedSlot && !selectedSlot.is_available) {
+      Alert.alert(
+        'Slot Already Reserved',
+        `The ${selectedSlot.label} slot has already been reserved by another band. Please select an available option.`
+      );
+      return;
+    }
+
+    // 1-Hour slot rule: rehearsals are 60 minutes
+    const endHour = startHour + 1;
+    const formattedEndTime = `${String(endHour).padStart(2, '0')}:00:00`;
 
     const selectedInstrumentsList = Object.entries(wizard.instruments).map(([id, qty]) => ({
       instrument_id: parseInt(id, 10),
@@ -463,79 +517,161 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               </View>
             )}
 
-            {/* Date, Time & Participants Form */}
-          <View style={styles.formRow}>
-            <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-              <Text style={styles.fieldLabel}>DATE (YYYY-MM-DD):</Text>
-              <TextInput
-                style={styles.textInput}
-                value={wizard.bookingDate}
-                onChangeText={(val) => setBookingDateTime(val, wizard.startTime, wizard.durationMinutes)}
-                placeholder="2026-11-04"
-                placeholderTextColor="#666666"
-              />
-            </View>
+            {/* Date & Auto-Derived People Playing */}
+            {(() => {
+              const todayStr = new Date().toISOString().split('T')[0];
+              const tomorrowDate = new Date();
+              tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+              const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
 
-            <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-              <Text style={styles.fieldLabel}>START TIME:</Text>
-              <TextInput
-                style={styles.textInput}
-                value={wizard.startTime}
-                onChangeText={(val) => setBookingDateTime(wizard.bookingDate, val, wizard.durationMinutes)}
-                placeholder="16:00:00"
-                placeholderTextColor="#666666"
-              />
-            </View>
-          </View>
+              return (
+                <View>
+                  <View style={styles.formRow}>
+                    <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
+                      <Text style={styles.fieldLabel}>DATE (YYYY-MM-DD):</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        value={wizard.bookingDate}
+                        onChangeText={(val) => setBookingDateTime(val, wizard.startTime, 60)}
+                        placeholder="2026-11-04"
+                        placeholderTextColor="#666666"
+                      />
+                      <View style={styles.quickDateRow}>
+                        <TouchableOpacity
+                          style={[styles.quickDateBtn, wizard.bookingDate === todayStr && styles.quickDateBtnSelected]}
+                          onPress={() => setBookingDateTime(todayStr, wizard.startTime, 60)}
+                        >
+                          <Text style={[styles.quickDateBtnText, wizard.bookingDate === todayStr && styles.quickDateBtnTextSelected]}>
+                            TODAY
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.quickDateBtn, wizard.bookingDate === tomorrowStr && styles.quickDateBtnSelected]}
+                          onPress={() => setBookingDateTime(tomorrowStr, wizard.startTime, 60)}
+                        >
+                          <Text style={[styles.quickDateBtnText, wizard.bookingDate === tomorrowStr && styles.quickDateBtnTextSelected]}>
+                            TOMORROW
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
 
-          <View style={styles.formRow}>
-            <View style={[styles.formGroup, { flex: 1, marginRight: 8 }]}>
-              <Text style={styles.fieldLabel}>DURATION:</Text>
-              <View style={styles.durationRow}>
-                {[60, 120].map((mins) => (
-                  <TouchableOpacity
-                    key={mins}
-                    style={[styles.durationBtn, wizard.durationMinutes === mins && styles.durationBtnSelected]}
-                    onPress={() => setBookingDateTime(wizard.bookingDate, wizard.startTime, mins)}
-                  >
-                    <Text
-                      style={[
-                        styles.durationBtnText,
-                        wizard.durationMinutes === mins && styles.durationBtnTextSelected,
-                      ]}
-                    >
-                      {mins} MINS
+                    <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
+                      <Text style={styles.fieldLabel}>
+                        PEOPLE PLAYING (PARTICIPANTS):
+                      </Text>
+                      <View style={styles.autoPeopleBox}>
+                        <View style={styles.autoPeopleRow}>
+                          <Text style={styles.autoPeopleVal}>
+                            {autoPeoplePlaying} {autoPeoplePlaying === 1 ? 'PERSON' : 'PEOPLE'}
+                          </Text>
+                          <View style={styles.autoTag}>
+                            <Text style={styles.autoTagText}>AUTO</Text>
+                          </View>
+                        </View>
+                        <Text style={styles.autoPeopleSub}>
+                          {isSoloPractice
+                            ? '1 Solo Musician / Performer'
+                            : isFullBandA
+                            ? 'Full Band (All Members Included)'
+                            : isMeetingSession
+                            ? 'Meeting Attendees'
+                            : `${totalInstruments} Instrument${totalInstruments === 1 ? '' : 's'} Selected`} • Max: {participantLimit}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Operating Hours Callout & 1-Hour Slot Rule */}
+                  <View style={styles.hoursBanner}>
+                    <View style={styles.hoursBannerHeader}>
+                      <Text style={styles.hoursBannerTitle}>🕒 OPERATING HOURS: 6:00 AM – 11:00 PM</Text>
+                      <View style={styles.hourRuleTag}>
+                        <Text style={styles.hourRuleTagText}>1-HR SLOTS</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.hoursBannerDesc}>
+                      The music room is open strictly from 6:00 AM to 11:00 PM daily. Only available slots can be reserved. Each band must book again to continue playing for another hour or vacate immediately upon slot expiry.
                     </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
+                  </View>
 
-            <View style={[styles.formGroup, { flex: 1, marginLeft: 8 }]}>
-              <Text style={styles.fieldLabel}>
-                PEOPLE PLAYING (PARTICIPANTS):
-              </Text>
-              <View style={styles.autoPeopleBox}>
-                <View style={styles.autoPeopleRow}>
-                  <Text style={styles.autoPeopleVal}>
-                    {autoPeoplePlaying} {autoPeoplePlaying === 1 ? 'PERSON' : 'PEOPLE'}
-                  </Text>
-                  <View style={styles.autoTag}>
-                    <Text style={styles.autoTagText}>AUTO</Text>
+                  {/* Available Hour-Wise Slots Grid */}
+                  <View style={styles.slotsSection}>
+                    <View style={styles.slotsHeaderRow}>
+                      <Text style={styles.fieldLabel}>AVAILABLE REHEARSAL SLOTS (6 AM - 11 PM):</Text>
+                      {loadingSlots && (
+                        <View style={styles.loadingSlotsRow}>
+                          <ActivityIndicator size="small" color="#e8c872" />
+                          <Text style={styles.loadingSlotsText}>REFRESHING SLOTS...</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={styles.slotsGrid}>
+                      {slots.map((slot) => {
+                        const isSelected = wizard.startTime === slot.start_time;
+                        const isReserved = !slot.is_available;
+
+                        return (
+                          <TouchableOpacity
+                            key={slot.start_time}
+                            style={[
+                              styles.slotChip,
+                              isReserved && styles.slotChipReserved,
+                              isSelected && styles.slotChipSelected,
+                            ]}
+                            activeOpacity={isReserved ? 1 : 0.7}
+                            onPress={() => {
+                              if (isReserved) {
+                                Alert.alert(
+                                  'Slot Already Reserved',
+                                  `The ${slot.label} slot has already been reserved by another band. Please select an available slot.`
+                                );
+                                return;
+                              }
+                              setBookingDateTime(wizard.bookingDate, slot.start_time, 60);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.slotTimeText,
+                                isReserved && styles.slotTimeTextReserved,
+                                isSelected && styles.slotTimeTextSelected,
+                              ]}
+                            >
+                              {slot.label}
+                            </Text>
+                            <View
+                              style={[
+                                styles.slotBadge,
+                                isReserved
+                                  ? styles.slotBadgeReserved
+                                  : isSelected
+                                  ? styles.slotBadgeSelected
+                                  : styles.slotBadgeAvailable,
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.slotBadgeText,
+                                  isReserved
+                                    ? styles.slotBadgeTextReserved
+                                    : isSelected
+                                    ? styles.slotBadgeTextSelected
+                                    : styles.slotBadgeTextAvailable,
+                                ]}
+                              >
+                                {isReserved ? 'RESERVED' : isSelected ? '✓ SELECTED' : 'AVAILABLE'}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
                   </View>
                 </View>
-                <Text style={styles.autoPeopleSub}>
-                  {isSoloPractice
-                    ? '1 Solo Musician / Performer'
-                    : isFullBandA
-                    ? 'Full Band (All Members Included)'
-                    : isMeetingSession
-                    ? 'Meeting Attendees'
-                    : `${totalInstruments} Instrument${totalInstruments === 1 ? '' : 's'} Selected`} • Max: {participantLimit}
-                </Text>
-              </View>
-            </View>
-          </View>
+              );
+            })()}
 
           {/* Confirm Reservation Button */}
           <TouchableOpacity
@@ -1093,5 +1229,165 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1.2,
+  },
+  quickDateRow: {
+    flexDirection: 'row',
+    marginTop: 6,
+    gap: 6,
+  },
+  quickDateBtn: {
+    flex: 1,
+    backgroundColor: '#1c1c1c',
+    borderWidth: 1,
+    borderColor: '#2e2e2e',
+    borderRadius: 4,
+    paddingVertical: 5,
+    alignItems: 'center',
+  },
+  quickDateBtnSelected: {
+    borderColor: '#e8c872',
+    backgroundColor: '#262013',
+  },
+  quickDateBtnText: {
+    color: '#888888',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  quickDateBtnTextSelected: {
+    color: '#e8c872',
+  },
+  hoursBanner: {
+    backgroundColor: '#161512',
+    borderWidth: 1,
+    borderColor: '#3d321b',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 16,
+  },
+  hoursBannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  hoursBannerTitle: {
+    color: '#e8c872',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  hourRuleTag: {
+    backgroundColor: '#2b2313',
+    borderWidth: 1,
+    borderColor: '#e8c872',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  hourRuleTagText: {
+    color: '#e8c872',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  hoursBannerDesc: {
+    color: '#999999',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  slotsSection: {
+    marginBottom: 18,
+  },
+  slotsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  loadingSlotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  loadingSlotsText: {
+    color: '#e8c872',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  slotsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  slotChip: {
+    width: '48.5%',
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: '#2e2e2e',
+    borderRadius: 6,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  slotChipSelected: {
+    borderColor: '#e8c872',
+    backgroundColor: '#221c12',
+  },
+  slotChipReserved: {
+    borderColor: '#381f1f',
+    backgroundColor: '#181212',
+    opacity: 0.65,
+  },
+  slotTimeText: {
+    color: '#f4ede4',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  slotTimeTextSelected: {
+    color: '#e8c872',
+    fontWeight: '900',
+  },
+  slotTimeTextReserved: {
+    color: '#775555',
+    textDecorationLine: 'line-through',
+  },
+  slotBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 4,
+  },
+  slotBadgeAvailable: {
+    backgroundColor: '#0e241b',
+    borderWidth: 1,
+    borderColor: '#1d4d3a',
+  },
+  slotBadgeSelected: {
+    backgroundColor: '#382b14',
+    borderWidth: 1,
+    borderColor: '#e8c872',
+  },
+  slotBadgeReserved: {
+    backgroundColor: '#2b1212',
+    borderWidth: 1,
+    borderColor: '#4d2020',
+  },
+  slotBadgeText: {
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  slotBadgeTextAvailable: {
+    color: '#52b79a',
+  },
+  slotBadgeTextSelected: {
+    color: '#e8c872',
+  },
+  slotBadgeTextReserved: {
+    color: '#e05a47',
   },
 });

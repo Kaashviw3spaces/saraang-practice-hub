@@ -99,6 +99,22 @@ export interface AcousticCheckResponse {
   rejection_reasons: string[];
 }
 
+export interface SlotAvailability {
+  start_time: string;
+  end_time: string;
+  label: string;
+  is_available: boolean;
+  status: 'Available' | 'Reserved';
+}
+
+export interface SessionSlotsResponse {
+  session_type_id: number;
+  session_name: string;
+  date: string;
+  operating_hours: string;
+  slots: SlotAvailability[];
+}
+
 export interface CreateBookingRequest {
   user_id: number;
   session_type_id: number;
@@ -142,6 +158,11 @@ export const api = {
 
   getSessionTypes: async () => {
     const res = await apiClient.get<SessionType[]>('/api/session-types');
+    return res.data;
+  },
+
+  getSessionSlots: async (sessionTypeId: number, date: string) => {
+    const res = await apiClient.get<SessionSlotsResponse>(`/api/sessions/${sessionTypeId}/slots?date=${date}`);
     return res.data;
   },
 
