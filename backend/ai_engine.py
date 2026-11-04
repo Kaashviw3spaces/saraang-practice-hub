@@ -141,9 +141,13 @@ def evaluate_acoustic_compatibility(
     # 3. Lockdown Rules (e.g. Recording Session requires stricter headroom)
     max_threshold = float(room.max_decibel_threshold)
     if session_type.is_strict_lockdown:
-        # Enforce a 10dB safety buffer during recording lockdown to prevent bleed
-        max_threshold = max(50.0, max_threshold - 10.0)
-        warnings.append("Strict lockdown active: room max decibel threshold reduced by 10dB safety headroom.")
+        # Enforce a 10dB safety buffer during recording lockdown in standard/booth rooms to prevent bleed.
+        # Designated live rooms (Studio A) are purpose-built and acoustically treated for high-SPL live tracking.
+        if "live room" in room.name.lower() or "studio a" in room.name.lower():
+            warnings.append("Recording lockdown active in Live Studio: room treated for high-SPL instrument tracking.")
+        else:
+            max_threshold = max(50.0, max_threshold - 10.0)
+            warnings.append("Strict lockdown active: room max decibel threshold reduced by 10dB safety headroom.")
 
     # 4. Decibel Threshold Check
     if effective_decibels > max_threshold:
@@ -159,9 +163,13 @@ def evaluate_acoustic_compatibility(
 
     # Strict lockdown cannot tolerate severe low-end clashes
     if session_type.is_strict_lockdown and collisions:
-        rejection_reasons.append(
-            f"Strict lockdown session rejects frequency clashes: {'; '.join(collisions)}"
-        )
+        # In designated Live Room (Studio A), multi-instrument tracking is permitted
+        if "live room" in room.name.lower() or "studio a" in room.name.lower():
+            warnings.append(f"Acoustic notice: Multi-instrument tracking with low-end balance: {'; '.join(collisions)}")
+        else:
+            rejection_reasons.append(
+                f"Strict lockdown session rejects frequency clashes: {'; '.join(collisions)}"
+            )
 
     compatible = len(rejection_reasons) == 0
 

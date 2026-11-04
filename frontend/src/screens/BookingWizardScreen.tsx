@@ -145,12 +145,22 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
   const handleConfirmReservation = async () => {
     if (!wizard.selectedSession) return;
 
+    const sNameUpper = (wizard.selectedSession.name || '').toUpperCase();
+    const isRecording = sNameUpper.includes('RECORDING');
+    const isMeeting = sNameUpper.includes('MEETING');
+    const isJamSession = sNameUpper.includes('JAM');
+    const isSolo = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
+    const isRecordingSolo = isRecording && wizard.practiceMode.toUpperCase().includes('SOLO');
+    const isRecordingGroup = isRecording && wizard.practiceMode.toUpperCase().includes('GROUP');
+
     // Validate operating hours (6:00 AM to 11:00 PM)
     const startHour = parseInt(wizard.startTime.split(':')[0], 10);
     if (isNaN(startHour) || startHour < 6 || startHour >= 23) {
       Alert.alert(
         'Operating Hours Notice',
-        'Rehearsals are only available between 6:00 AM and 11:00 PM (06:00 to 23:00). Please select an available slot.'
+        isRecording
+          ? 'Recording sessions are only available between 6:00 AM and 11:00 PM (06:00 to 23:00). Please select an available slot.'
+          : 'Rehearsals are only available between 6:00 AM and 11:00 PM (06:00 to 23:00). Please select an available slot.'
       );
       return;
     }
@@ -165,11 +175,6 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       return;
     }
 
-    const sNameUpper = (wizard.selectedSession.name || '').toUpperCase();
-    const isMeeting = sNameUpper.includes('MEETING');
-    const isJamSession = sNameUpper.includes('JAM');
-    const isSolo = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
-
     if (isSolo && selectedSlot && (selectedSlot.current_participants || 0) > 0) {
       Alert.alert(
         'Solo Practice Notice',
@@ -178,7 +183,15 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       return;
     }
 
-    // 1-Hour slot rule: rehearsals are 60 minutes
+    if (isRecording && selectedSlot && (selectedSlot.current_participants || 0) > 0) {
+      Alert.alert(
+        'Recording Studio Isolation',
+        'Recording sessions require complete studio isolation and cannot share a slot with any other session or musicians. Please select an available open slot.'
+      );
+      return;
+    }
+
+    // 1-Hour slot rule: 60 minutes
     const endHour = startHour + 1;
     const formattedEndTime = `${String(endHour).padStart(2, '0')}:00:00`;
 
@@ -196,6 +209,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
         'Instrument Selection Required',
         isJamSession
           ? 'Please select the instruments being used for your jam session.'
+          : isRecording
+          ? 'Please select the instrument(s) to record.'
           : 'Please select your instrument before confirming reservation.'
       );
       return;
@@ -209,9 +224,32 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       return;
     }
 
-    // For Jam Session: One user selects all instruments and books for everyone; peoplePlaying equals total instruments selected (up to 8).
+    if (isRecordingSolo && totalInstrumentsSelected !== 1) {
+      Alert.alert(
+        'Solo Recording Constraint',
+        `Solo Recording requires selecting exactly 1 instrument. Currently selected: ${totalInstrumentsSelected}.`
+      );
+      return;
+    }
+
+    if (isRecordingGroup && totalInstrumentsSelected > 4) {
+      Alert.alert(
+        'Constraint Exceeded',
+        `Constraint For Recording Session Max: 4. You have selected ${totalInstrumentsSelected} instruments. Please reduce to 4 or fewer.`
+      );
+      return;
+    }
+
+    // For Jam Session: One user selects all instruments and books for everyone (up to 8).
+    // For Recording Session: Solo = 1, Group = total instruments selected (up to 4, one user books for all).
     // For Meeting: 2. For Session A / B: 1 per booking.
-    const peoplePlaying = isMeeting ? 2 : isJamSession ? Math.min(8, Math.max(1, totalInstrumentsSelected)) : 1;
+    const peoplePlaying = isMeeting
+      ? 2
+      : isJamSession
+      ? Math.min(8, Math.max(1, totalInstrumentsSelected))
+      : isRecording
+      ? (isRecordingSolo ? 1 : Math.min(4, Math.max(1, totalInstrumentsSelected)))
+      : 1;
 
     if (peoplePlaying > wizard.selectedSession.participant_limit) {
       Alert.alert(
@@ -239,7 +277,9 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       setSuccessBooking(res);
       showNotification({
         title: 'BOOKING CONFIRMED',
-        message: `Booking Confirmed! Your ${res.session_name} rehearsal slot is locked in (${res.start_time}-${res.end_time}).`,
+        message: isRecording
+          ? `Booking Confirmed! Your ${res.session_name} studio recording slot is locked in (${res.start_time}-${res.end_time}).`
+          : `Booking Confirmed! Your ${res.session_name} rehearsal slot is locked in (${res.start_time}-${res.end_time}).`,
         type: 'success',
       });
     } catch (err: any) {
@@ -277,6 +317,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
   // Success Ticket View
   if (successBooking) {
+    const isRecordingSuccess = (successBooking.session_name || '').toUpperCase().includes('RECORDING');
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.ticketCard}>
@@ -285,7 +326,9 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
           </View>
           <Text style={styles.ticketTitle}>PASS #{successBooking.id}</Text>
           <Text style={styles.ticketSession}>
-            Booking Confirmed! Your {successBooking.session_name} rehearsal slot is locked in.
+            {isRecordingSuccess
+              ? `Booking Confirmed! Your ${successBooking.session_name} studio recording slot is locked in.`
+              : `Booking Confirmed! Your ${successBooking.session_name} rehearsal slot is locked in.`}
           </Text>
 
           <View style={styles.ticketGrid}>
@@ -343,9 +386,15 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
         <Text style={styles.stepSubtitle}>
           {wizard.step === 1 ? 'STEP 01 // SELECT SESSION TYPE' : 'STEP 02 // SETUP INSTRUMENTS & TIME'}
         </Text>
-        <Text style={styles.stepTitle}>BOOK REHEARSAL SLOT</Text>
+        <Text style={styles.stepTitle}>
+          {wizard.selectedSession?.name?.toUpperCase().includes('RECORDING')
+            ? 'BOOK RECORDING STUDIO SLOT'
+            : 'BOOK REHEARSAL SLOT'}
+        </Text>
         <Text style={styles.stepDesc}>
-          CHECK YOUR SETUP, SELECT SLOT, AND LOCK IN YOUR REHEARSAL WINDOW WITH AUTOMATED CONFLICT CHECKS.
+          {wizard.selectedSession?.name?.toUpperCase().includes('RECORDING')
+            ? 'CHECK YOUR SETUP, SELECT SLOT, AND LOCK IN YOUR ISOLATED STUDIO RECORDING WINDOW.'
+            : 'CHECK YOUR SETUP, SELECT SLOT, AND LOCK IN YOUR REHEARSAL WINDOW WITH AUTOMATED CONFLICT CHECKS.'}
         </Text>
       </View>
 
@@ -375,14 +424,21 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
         const isSessionA = sessionNameUpper.includes('SESSION A');
         const isSessionB = sessionNameUpper.includes('SESSION B');
         const isJamSession = sessionNameUpper.includes('JAM');
+        const isRecordingSession = sessionNameUpper.includes('RECORDING');
         const isFullBandA = isSessionA && wizard.practiceMode.toUpperCase() === 'FULL BAND REHEARSAL';
-        const isSoloPractice = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
+        const isRecordingSolo = isRecordingSession && wizard.practiceMode.toUpperCase().includes('SOLO');
+        const isRecordingGroup = isRecordingSession && wizard.practiceMode.toUpperCase().includes('GROUP');
+        const isSoloPractice = (wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE') || isRecordingSolo;
         const participantLimit = wizard.selectedSession.participant_limit;
 
         // Jam Session & Session B: Collaborative Practice only
         // Session A: Solo Practice or Collaborative Practice
+        // Recording Session: Solo Recording or Group Recording (strictly no rehearsal!)
         const practiceModes = (() => {
           if (isMeetingSession) return [];
+          if (isRecordingSession) {
+            return ['Solo Recording', 'Group Recording'];
+          }
           if (isSessionB) {
             return ['Collaborative Practice'];
           }
@@ -392,20 +448,23 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
           return ['Collaborative Practice'];
         })();
 
-        const totalJamInstruments = Object.values(wizard.instruments).reduce((sum, q) => sum + q, 0);
+        const totalInstrumentsCount = Object.values(wizard.instruments).reduce((sum, q) => sum + q, 0);
+        const totalJamInstruments = totalInstrumentsCount;
+        const totalRecordingInstruments = totalInstrumentsCount;
 
-        // Each user booking represents 1 participant playing their selected instrument in Session A / B.
-        // For Jam Session: One user selects all instruments being used for the jam session and books everything for everyone (Constraint Max: 8).
+        // autoPeoplePlaying
         const autoPeoplePlaying = isMeetingSession
           ? 2
           : isJamSession
           ? Math.min(8, Math.max(1, totalJamInstruments))
+          : isRecordingGroup
+          ? Math.min(4, Math.max(1, totalRecordingInstruments))
           : 1;
 
         // Primary instruments allowed for this session:
         // Session A: ONLY Electric Guitar or Drums ("For session A only, remove the display of other instruments except electric guitar and drums in this section.")
         // Session B: Session B instruments only (no Drums, no Electric Guitar)
-        // Jam Session: Display ALL instruments ("Display all the instruments here.")
+        // Jam Session & Recording Session: Display ALL instruments ("Again any instrument can be chosen here.")
         const allowedInstruments = instruments.filter((inst) => {
           const n = inst.name.toLowerCase();
           const isDrumsOrEG = n.includes('drum') || n.includes('electric guitar');
@@ -427,18 +486,24 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               </TouchableOpacity>
             </View>
 
-            {/* Automated Acoustic Calibration Banner */}
+            {/* Automated Acoustic Calibration / Studio Isolation Banner */}
             <View style={styles.autoAssignBanner}>
-              <Text style={styles.autoAssignTitle}>⚡ AUTOMATED ACOUSTIC CALIBRATION</Text>
+              <Text style={styles.autoAssignTitle}>
+                {isRecordingSession ? '🎙️ STUDIO ISOLATION & LOCKDOWN' : '⚡ AUTOMATED ACOUSTIC CALIBRATION'}
+              </Text>
               <Text style={styles.autoAssignText}>
-                Your rehearsal session is dynamically acoustic-calibrated and scheduled based on your session mode and instrumentation.
+                {isRecordingSession
+                  ? 'Your studio recording session has complete room isolation. No other sessions or musicians are permitted in this slot.'
+                  : 'Your rehearsal session is dynamically acoustic-calibrated and scheduled based on your session mode and instrumentation.'}
               </Text>
             </View>
 
             {/* Step 2B: Practice Mode Selection */}
             {practiceModes.length > 0 && (
               <View style={styles.formGroup}>
-                <Text style={styles.fieldLabel}>PRACTICE MODE (STEP 2B):</Text>
+                <Text style={styles.fieldLabel}>
+                  {isRecordingSession ? 'RECORDING MODE (STEP 2B):' : 'PRACTICE MODE (STEP 2B):'}
+                </Text>
                 <View style={styles.modeRow}>
                   {practiceModes.map((mode) => {
                     const isSelected = wizard.practiceMode.toLowerCase() === mode.toLowerCase();
@@ -553,11 +618,111 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                   })}
                 </View>
               </View>
+            ) : isRecordingGroup ? (
+              <View style={styles.formGroup}>
+                <Text style={styles.fieldLabel}>
+                  INSTRUMENTS FOR GROUP RECORDING (ONE USER BOOKS FOR ALL):
+                </Text>
+
+                <View style={styles.policyCard}>
+                  <Text style={styles.policyTitle}>🎙️ GROUP RECORDING RESERVATION</Text>
+                  <Text style={styles.policyText}>
+                    Record you and multiple instruments playing together. One single user books everything for everyone they want to record with by selecting multiple instruments. Constraint: Maximum 4 musicians. Any instrument can be chosen. Slot is completely isolated.
+                  </Text>
+                </View>
+
+                {/* Group Recording Counter Banner */}
+                <View style={styles.jamCounterBanner}>
+                  <View style={styles.jamCounterLeft}>
+                    <Text style={styles.jamCounterLabel}>RECORDING MUSICIANS / INSTRUMENTS:</Text>
+                    <Text style={styles.jamCounterValue}>
+                      {totalRecordingInstruments} / 4 MAX
+                    </Text>
+                  </View>
+                  <View style={[styles.jamCounterBadge, totalRecordingInstruments === 4 && styles.jamCounterBadgeFull]}>
+                    <Text style={styles.jamCounterBadgeText}>
+                      {totalRecordingInstruments === 0
+                        ? 'SELECT INSTRUMENTS'
+                        : totalRecordingInstruments === 4
+                        ? 'MAX 4 REACHED'
+                        : `${4 - totalRecordingInstruments} SPOTS REMAINING`}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Display all instruments with quantity steppers */}
+                <View style={styles.jamListContainer}>
+                  {allowedInstruments.map((inst) => {
+                    const qty = wizard.instruments[inst.id] || 0;
+                    const isSelected = qty > 0;
+                    const canAdd = totalRecordingInstruments < 4;
+
+                    return (
+                      <View
+                        key={inst.id}
+                        style={[styles.jamInstrumentCard, isSelected && styles.jamInstrumentCardSelected]}
+                      >
+                        <View style={styles.jamInstrumentInfo}>
+                          <Text style={[styles.jamInstrumentName, isSelected && styles.jamInstrumentNameSelected]}>
+                            {inst.name}
+                          </Text>
+                          <Text style={styles.jamInstrumentCategory}>
+                            {inst.category || 'Instrument'} • Band: {inst.frequency_band || 'Mid'}
+                          </Text>
+                        </View>
+
+                        <View style={styles.jamStepperRow}>
+                          <TouchableOpacity
+                            style={[styles.jamStepBtn, qty === 0 && styles.jamStepBtnDisabled]}
+                            disabled={qty === 0}
+                            onPress={() => setInstrumentQuantity(inst.id, Math.max(0, qty - 1))}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.jamStepBtnText, qty === 0 && styles.jamStepBtnTextDisabled]}>−</Text>
+                          </TouchableOpacity>
+
+                          <View style={[styles.jamQtyBox, isSelected && styles.jamQtyBoxSelected]}>
+                            <Text style={[styles.jamQtyText, isSelected && styles.jamQtyTextSelected]}>{qty}</Text>
+                          </View>
+
+                          <TouchableOpacity
+                            style={[styles.jamStepBtn, !canAdd && styles.jamStepBtnDisabled]}
+                            disabled={!canAdd}
+                            onPress={() => {
+                              if (canAdd) {
+                                setInstrumentQuantity(inst.id, qty + 1);
+                              } else {
+                                Alert.alert('Constraint Limit', 'Constraint For Recording Session Max: 4 musicians/instruments.');
+                              }
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[styles.jamStepBtnText, !canAdd && styles.jamStepBtnTextDisabled]}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
             ) : (
               <View style={styles.formGroup}>
                 <Text style={styles.fieldLabel}>
-                  {isSoloPractice ? 'YOUR INSTRUMENT (SOLO PRACTICE - PRIVATE ROOM):' : 'YOUR INSTRUMENT (COLLABORATIVE PRACTICE):'}
+                  {isRecordingSolo
+                    ? 'YOUR INSTRUMENT TO RECORD (SOLO RECORDING - STUDIO ISOLATION):'
+                    : isSoloPractice
+                    ? 'YOUR INSTRUMENT (SOLO PRACTICE - PRIVATE ROOM):'
+                    : 'YOUR INSTRUMENT (COLLABORATIVE PRACTICE):'}
                 </Text>
+
+                {isRecordingSolo && (
+                  <View style={styles.policyCard}>
+                    <Text style={styles.policyTitle}>🎙️ SOLO RECORDING</Text>
+                    <Text style={styles.policyText}>
+                      Record your solo instrument with complete studio room isolation. Select exactly one instrument. Any instrument can be chosen.
+                    </Text>
+                  </View>
+                )}
 
                 {isSessionA && isSoloPractice && (
                   <View style={styles.policyCard}>
@@ -647,7 +812,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               const isSlotFull = existingParticipants >= maxCapacity;
               const isSlotSoloBlocked = isSoloPractice && existingParticipants > 0;
               const isJamOccupied = isJamSession && (existingParticipants > 0 || !selectedSlot?.is_available);
-              const isReserved = !selectedSlot?.is_available || isSlotFull || isSlotSoloBlocked || isJamOccupied;
+              const isRecordingOccupied = isRecordingSession && (existingParticipants > 0 || !selectedSlot?.is_available);
+              const isReserved = !selectedSlot?.is_available || isSlotFull || isSlotSoloBlocked || isJamOccupied || isRecordingOccupied;
               const nextTotalParticipants = Math.min(maxCapacity, existingParticipants + 1);
 
               return (
@@ -787,13 +953,16 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                     const isSelected = wizard.startTime === slot.start_time;
                                     const isSlotSoloBlocked = isSoloPractice && (slot.current_participants || 0) > 0;
                                     const isSlotJamOccupied = isJamSession && ((slot.current_participants || 0) > 0 || !slot.is_available);
-                                    const isBlocked = !slot.is_available || isSlotSoloBlocked || isSlotJamOccupied;
+                                    const isSlotRecOccupied = isRecordingSession && ((slot.current_participants || 0) > 0 || !slot.is_available);
+                                    const isBlocked = !slot.is_available || isSlotSoloBlocked || isSlotJamOccupied || isSlotRecOccupied;
 
                                     const badgeText = (() => {
                                       if (isSlotSoloBlocked) return 'COLLAB ACTIVE (NO SOLO)';
                                       if (isSlotJamOccupied) return 'RESERVED (JAM)';
+                                      if (isSlotRecOccupied) return 'RESERVED (RECORDING)';
                                       if (!slot.is_available) {
                                         if (activeSession?.toUpperCase().includes('JAM') || slot.status?.toUpperCase().includes('JAM')) return 'RESERVED (JAM)';
+                                        if (activeSession?.toUpperCase().includes('RECORDING') || slot.status?.toUpperCase().includes('RECORDING')) return 'RESERVED (RECORDING)';
                                         if (activeSession) return `RESERVED (${activeSession.toUpperCase()})`;
                                         if (slot.status?.includes('Reserved')) return slot.status.toUpperCase();
                                         if (slot.status?.includes('Full')) return 'FULL';
@@ -801,6 +970,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                       }
                                       if (isSelected) return '✓ SELECTED';
                                       if (isJamSession) return 'AVAILABLE';
+                                      if (isRecordingSession) return 'AVAILABLE';
                                       if ((slot.current_participants || 0) > 0) return `${slot.current_participants}/${slot.max_participants || participantLimit} JOINABLE`;
                                       return 'AVAILABLE';
                                     })();
@@ -829,11 +999,25 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                             );
                                             return;
                                           }
+                                          if (isSlotRecOccupied || (isRecordingSession && (!slot.is_available || (slot.current_participants || 0) > 0))) {
+                                            Alert.alert(
+                                              'Recording Studio Isolation',
+                                              'Recording sessions require complete studio isolation and cannot share a slot with any other session or musicians. Please select an available open slot.'
+                                            );
+                                            return;
+                                          }
                                           if (!slot.is_available) {
                                             if (activeSession?.toUpperCase().includes('JAM') || slot.status?.toUpperCase().includes('JAM')) {
                                               Alert.alert(
                                                 'Jam Session Reserved',
                                                 `The ${slot.label} slot is reserved by a Jam Session. While in ${wizard.selectedSession?.name || 'this session'}'s collaborative practice, you cannot book a slot that Jam Session has reserved. If a slot is reserved by a Jam Session, it only belongs to it.`
+                                              );
+                                              return;
+                                            }
+                                            if (activeSession?.toUpperCase().includes('RECORDING') || slot.status?.toUpperCase().includes('RECORDING')) {
+                                              Alert.alert(
+                                                'Recording Session Reserved',
+                                                `The ${slot.label} slot is reserved by a Recording Session with complete studio isolation. No other session can book or join this slot.`
                                               );
                                               return;
                                             }
@@ -926,6 +1110,14 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                         <Text style={[styles.autoPeopleVal, isReserved && styles.autoPeopleValReserved]}>
                           {isMeetingSession
                             ? '2 PEOPLE'
+                            : isRecordingSolo
+                            ? (isReserved
+                                ? 'RESERVED (SLOT OCCUPIED)'
+                                : '1 MUSICIAN (SOLO RECORDING)')
+                            : isRecordingGroup
+                            ? (isReserved
+                                ? 'RESERVED (SLOT OCCUPIED)'
+                                : `${totalRecordingInstruments} MUSICIANS (${totalRecordingInstruments}/4 INSTRUMENTS TO RECORD)`)
                             : isSoloPractice
                             ? '1 PERSON (SOLO)'
                             : isJamSession
@@ -935,6 +1127,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                             : isReserved
                             ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
                                 ? 'RESERVED (JAM SESSION)'
+                                : selectedSlot?.booked_session_name?.toUpperCase().includes('RECORDING') || selectedSlot?.status?.toUpperCase().includes('RECORDING')
+                                ? 'RESERVED (RECORDING SESSION)'
                                 : `${existingParticipants}/${maxCapacity} FULL (RESERVED)`)
                             : existingParticipants === 0
                             ? `0 IN SLOT (+1 YOU → 1/${maxCapacity})`
@@ -945,7 +1139,13 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                             {isReserved
                               ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM') || isJamSession
                                   ? 'JAM RESERVED'
+                                  : selectedSlot?.booked_session_name?.toUpperCase().includes('RECORDING') || selectedSlot?.status?.toUpperCase().includes('RECORDING') || isRecordingSession
+                                  ? 'RECORDING RESERVED'
                                   : 'RESERVED')
+                              : isRecordingSolo
+                              ? 'SOLO RECORDING'
+                              : isRecordingGroup
+                              ? `${totalRecordingInstruments}/4 RECORDING`
                               : isSoloPractice
                               ? 'SOLO'
                               : isJamSession
@@ -957,6 +1157,14 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                       <Text style={styles.autoPeopleSub}>
                         {isMeetingSession
                           ? 'Meeting Attendees • Standard reservation'
+                          : isRecordingSolo
+                          ? (isReserved
+                              ? '⚠️ Slot is already booked. Recording sessions require complete studio isolation.'
+                              : 'Complete studio room isolation for your solo recording. No other session or musicians can enter.')
+                          : isRecordingGroup
+                          ? (isReserved
+                              ? '⚠️ Slot is already booked. Recording sessions require complete studio isolation.'
+                              : `One user booking for all ${totalRecordingInstruments} recording musician(s) (Constraint Max: 4). Complete studio isolation.`)
                           : isSoloPractice
                           ? (isSlotSoloBlocked
                               ? '⚠️ Slot already has active musicians. Solo practice requires an empty room.'
@@ -968,6 +1176,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                           : isReserved
                           ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
                               ? '⚠️ This slot is reserved by a Jam Session and only belongs to it. Not available for Session A or B collaborative practice.'
+                              : selectedSlot?.booked_session_name?.toUpperCase().includes('RECORDING') || selectedSlot?.status?.toUpperCase().includes('RECORDING')
+                              ? '⚠️ This slot is reserved by a Recording Session with complete studio isolation.'
                               : `Maximum capacity reached (${existingParticipants}/${maxCapacity}). This slot is reserved.`)
                           : existingParticipants === 0
                           ? `No musicians currently in this slot. You will be participant 1 of ${maxCapacity}.`
@@ -989,7 +1199,9 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             {isSubmitting ? (
               <ActivityIndicator color="#111111" />
             ) : (
-              <Text style={styles.confirmBtnText}>CONFIRM RESERVATION →</Text>
+              <Text style={styles.confirmBtnText}>
+                {isRecordingSession ? 'CONFIRM RECORDING RESERVATION →' : 'CONFIRM RESERVATION →'}
+              </Text>
             )}
           </TouchableOpacity>
         </View>

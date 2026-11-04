@@ -476,6 +476,67 @@ def validate_session_policy(
             )
         return
 
+    # 5. Recording Session
+    # No rehearsal, just recording.
+    # Two options:
+    # 1) Solo Recording: record solo instrument (exactly 1 instrument selected)
+    # 2) Group Recording: record with multiple instruments (one user books for all, max 4)
+    # Any instrument can be chosen.
+    if s_name == "recording session":
+        is_solo = mode_lower in ["solo recording", "solo", "record solo instrument", "solo practice"]
+        is_group = mode_lower in ["group recording", "group", "record with multiple instruments", "collaborative recording"]
+
+        if not (is_solo or is_group):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": f"Recording Session only supports 'Solo Recording' or 'Group Recording'. Invalid mode: '{mode}'.",
+                    "ai_acoustics": {
+                        "compatible": False,
+                        "reason": f"Recording Session Policy: Solo Recording and Group Recording are the only permitted options. Received: '{mode}'.",
+                    },
+                },
+            )
+
+        if is_solo:
+            if len(instrument_rows) != 1 or total_qty != 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "message": "Recording Session Solo Policy Violation: Solo Recording requires selecting exactly ONE instrument.",
+                        "ai_acoustics": {
+                            "compatible": False,
+                            "reason": f"Solo Recording requires exactly one instrument. Selected: {total_qty}",
+                        },
+                    },
+                )
+            return
+
+        if is_group:
+            if total_qty < 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "message": "Recording Session Group Policy Violation: Group Recording requires selecting at least one instrument.",
+                        "ai_acoustics": {
+                            "compatible": False,
+                            "reason": "Group Recording requires at least one instrument selected.",
+                        },
+                    },
+                )
+            if total_qty > 4:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "message": f"Constraint For Recording Session Max: 4. Total instruments selected ({total_qty}) exceeds the maximum constraint of 4.",
+                        "ai_acoustics": {
+                            "compatible": False,
+                            "reason": f"Recording Session constraint violation: Maximum 4 instruments permitted for recording session. Selected: {total_qty}",
+                        },
+                    },
+                )
+            return
+
 
 # ---------------------------------------------------------
 # Rooms, Session Types & Instruments Endpoints
@@ -769,6 +830,40 @@ async def get_session_slots_availability(
             )
             continue
 
+        # Check if this slot is reserved by a Recording Session:
+        # A Recording Session slot is COMPLETELY ISOLATED. No other session can join or collide here.
+        is_rec_in_slot = any(
+            b["session_type_id"] == 4
+            or "recording" in (b["session_name"] or "").lower()
+            or "recording" in (b["practice_mode"] or "").lower()
+            for b in slot_bookings
+        )
+        if is_rec_in_slot and session_type_id != 4:
+            total_slot_p = sum(b["participant_count"] for b in slot_bookings)
+            rec_inst_counts: Dict[str, int] = {}
+            for b in slot_bookings:
+                for inst in b["instruments"]:
+                    rec_inst_counts[inst["name"]] = rec_inst_counts.get(inst["name"], 0) + inst["qty"]
+            rec_inst_summary = [f"{name} ({qty})" for name, qty in rec_inst_counts.items()]
+
+            slots.append(
+                SlotAvailability(
+                    start_time=str(start_t),
+                    end_time=str(end_t),
+                    label=label,
+                    is_available=False,
+                    status="Reserved (Recording Session)",
+                    current_participants=total_slot_p,
+                    max_participants=4,
+                    instruments_summary=rec_inst_summary,
+                    collaborative_open=False,
+                    has_solo=False,
+                    booked_session_name="Recording Session",
+                    active_session_name="Recording Session",
+                )
+            )
+            continue
+
         # Check if this slot is reserved by a Jam Session:
         # A Jam Session slot strictly belongs to Jam Session and is NEVER joinable by Session A or B.
         is_jam_in_slot = any(
@@ -781,6 +876,8 @@ async def get_session_slots_availability(
         # For Session A: If slot has instruments other than drums or electric guitar (e.g. Bass, Vocals, Synth), it's a Jam Session
         if current_session_name.lower() == "session a" and not is_jam_in_slot:
             for b in slot_bookings:
+                if b["session_type_id"] == 4:
+                    continue
                 for inst in b["instruments"]:
                     n = inst["name"].lower()
                     if not ("drum" in n or "electric guitar" in n):
@@ -842,7 +939,10 @@ async def get_session_slots_availability(
             continue
 
         # All bookings in this slot belong to this session type
-        has_solo = any(b["practice_mode"].lower() == "solo practice" for b in slot_bookings)
+        has_solo = any(
+            b["practice_mode"].lower() in ["solo practice", "solo recording", "solo", "record solo instrument"]
+            for b in slot_bookings
+        )
         current_p = sum(b["participant_count"] for b in slot_bookings)
 
         # Aggregate instruments summary
@@ -867,6 +967,27 @@ async def get_session_slots_availability(
                     instruments_summary=instruments_summary,
                     collaborative_open=False,
                     has_solo=False,
+                    booked_session_name=current_session_name,
+                    active_session_name=current_session_name,
+                )
+            )
+            continue
+
+        if current_session_name.lower() == "recording session":
+            # For Recording Session: Completely isolated studio session.
+            # If a Recording session is booked in a slot, no other user can book or join this slot.
+            slots.append(
+                SlotAvailability(
+                    start_time=str(start_t),
+                    end_time=str(end_t),
+                    label=label,
+                    is_available=False,
+                    status="Reserved (Recording Session)",
+                    current_participants=current_p,
+                    max_participants=session_limit,
+                    instruments_summary=instruments_summary,
+                    collaborative_open=False,
+                    has_solo=has_solo,
                     booked_session_name=current_session_name,
                     active_session_name=current_session_name,
                 )
@@ -1169,8 +1290,41 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
     assigned_room = None
     chosen_evaluation = None
 
+    if booking.session_type_id == 4:
+        is_solo_req = p_mode_lower in ["solo recording", "solo", "record solo instrument", "solo practice"]
+        if is_solo_req and booking.participant_count != 1:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Solo Recording requires exactly 1 participant.",
+            )
+        if booking.participant_count > 4:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Constraint For Recording Session Max: 4. Requested participant count ({booking.participant_count}) exceeds the maximum constraint of 4.",
+            )
+
     if existing_slot_bookings:
-        # Check 1: Jam Session Exclusivity & Session Collision Prevention
+        # Check 1: Recording Session Complete Isolation
+        is_recording_in_slot = any(
+            b["session_type_id"] == 4
+            or "recording" in (b["session_name"] or "").lower()
+            or "recording" in (b["practice_mode"] or "").lower()
+            for b in existing_slot_bookings
+        )
+        if is_recording_in_slot and booking.session_type_id != 4:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is reserved for Recording Session. Recording sessions are completely isolated studio sessions and do not permit other sessions or musicians.",
+            )
+
+        if booking.session_type_id == 4:
+            booked_name = existing_slot_bookings[0]["session_name"]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is already booked ({booked_name}). Recording sessions require complete studio isolation and cannot share a slot with any other session or musicians.",
+            )
+
+        # Check 2: Jam Session Exclusivity & Session Collision Prevention
         # If a slot is reserved by Jam Session, it strictly belongs to Jam Session:
         # While in Session A's or Session B's collaborative practice you cannot book a slot reserved by Jam Session.
         is_jam_in_slot = any(
@@ -1207,18 +1361,21 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
                 detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is already booked for {other_name}. Only {session_row['name']} instrumentalists can play in this slot.",
             )
 
-        # Check 2: Solo Practice Exclusivity
-        has_solo_in_slot = any(b["practice_mode"].lower() == "solo practice" for b in existing_slot_bookings)
+        # Check 3: Solo Exclusivity
+        has_solo_in_slot = any(
+            b["practice_mode"].lower() in ["solo practice", "solo recording", "solo", "record solo instrument"]
+            for b in existing_slot_bookings
+        )
         if has_solo_in_slot:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="This slot is reserved for Solo Practice with no other musicians permitted in the room.",
             )
 
-        if p_mode_lower == "solo practice":
+        if p_mode_lower in ["solo practice", "solo recording", "solo", "record solo instrument"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Solo Practice requires an empty room. This slot already has active musicians.",
+                detail="Solo mode requires an empty room. This slot already has active musicians.",
             )
 
         # Check 3: Participant Capacity in Slot

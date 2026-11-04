@@ -123,6 +123,8 @@ export const useStore = create<AppState>((set, get) => ({
       ? 'Collaborative Practice'
       : sName.includes('jam')
       ? 'Collaborative Practice'
+      : sName.includes('recording')
+      ? 'Solo Recording'
       : sName.includes('meeting')
       ? 'Meeting'
       : 'Solo Practice';

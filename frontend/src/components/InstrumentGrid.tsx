@@ -39,11 +39,7 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
           return !isDrumsOrElectricGuitar;
         }
 
-        // Recording Session: moderate decibel instruments only
-        if (sName.includes('RECORDING')) {
-          return inst.base_decibels <= 90;
-        }
-
+        // Recording Session: Any instrument can be chosen here
         return true;
       })
       .filter((inst) => {
@@ -70,7 +66,7 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
         : '⚡ Session A Collaborative: Practice with other electric guitarists and drummers.';
     }
     if (sName.includes('RECORDING')) {
-      return '🎙️ Acoustic Filter: Low-bleed instruments for rehearsal recording.';
+      return '🎙️ Studio Recording: Any instrument can be chosen for studio recording.';
     }
     return '⚡ Rehearsal Space: Select gear for instrumentalists (vocalists do not require instruments).';
   };

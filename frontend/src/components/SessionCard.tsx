@@ -54,8 +54,8 @@ export const SessionCard: React.FC<SessionCardProps> = ({
       default:
         return {
           title: 'RECORDING SESSION',
-          description: 'Recording space for vocals and acoustic instruments.',
-          tagline: 'ISOLATED - PERFECT FOR FOCUSED RECORDING SESSIONS.',
+          description: 'Studio recording space for solo instruments or multi-instrument group tracking.',
+          tagline: 'ISOLATED STUDIO - PERFECT FOR FOCUSED AUDIO RECORDINGS (ANY INSTRUMENT ALLOWED).',
           capacity: '4',
           titleColor: '#f4ede4',
         };

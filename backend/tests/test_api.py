@@ -1629,6 +1629,216 @@ async def test_active_sessions_displayed_on_slots(client):
     assert s_12pm["is_available"] is False
 
 
+@pytest.mark.asyncio
+async def test_recording_session_modes_and_instrument_validation(client):
+    """
+    Recording Session Rules:
+    - No rehearsal, only recording (word 'rehearsal' must not be in logic/messages).
+    - Two options: Solo Recording (1 instrument) and Group Recording (up to 4 instruments, one user books for all).
+    - Any instrument can be chosen.
+    - Max 4 musicians constraint.
+    """
+    u = await client.post("/api/users", json={"name": "Recording Artist", "email": f"rec_{uuid.uuid4().hex[:8]}@test.com"})
+    uid = u.json()["id"]
+    test_date = get_unique_test_date()
+
+    # 1. Invalid mode: Full Band Rehearsal or Collaborative Practice rejected
+    resp_invalid_mode = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": uid,
+            "session_type_id": 4,  # Recording Session
+            "practice_mode": "Full Band Rehearsal",
+            "booking_date": test_date,
+            "start_time": "08:00:00",
+            "end_time": "09:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 1, "quantity": 1}],
+        },
+    )
+    assert resp_invalid_mode.status_code == 400
+    assert "Solo Recording" in resp_invalid_mode.text
+    assert "Group Recording" in resp_invalid_mode.text
+
+    # 2. Solo Recording with 2 instruments rejected (must be exactly 1)
+    resp_solo_two_inst = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": uid,
+            "session_type_id": 4,
+            "practice_mode": "Solo Recording",
+            "booking_date": test_date,
+            "start_time": "08:00:00",
+            "end_time": "09:00:00",
+            "participant_count": 1,
+            "instruments": [
+                {"instrument_id": 1, "quantity": 1},
+                {"instrument_id": 3, "quantity": 1},
+            ],
+        },
+    )
+    assert resp_solo_two_inst.status_code == 400
+    assert "exactly ONE instrument" in resp_solo_two_inst.text
+
+    # 3. Solo Recording with 1 instrument succeeds (any instrument, e.g. Drums or Vocals or Acoustic Guitar)
+    resp_solo_valid = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": uid,
+            "session_type_id": 4,
+            "practice_mode": "Solo Recording",
+            "booking_date": test_date,
+            "start_time": "08:00:00",
+            "end_time": "09:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 4, "quantity": 1}],  # Acoustic Guitar
+        },
+    )
+    assert resp_solo_valid.status_code == 201
+
+    # 4. Group Recording with 5 instruments rejected (max 4 constraint)
+    resp_group_five = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": uid,
+            "session_type_id": 4,
+            "practice_mode": "Group Recording",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 4,
+            "instruments": [
+                {"instrument_id": 1, "quantity": 1},
+                {"instrument_id": 2, "quantity": 1},
+                {"instrument_id": 3, "quantity": 1},
+                {"instrument_id": 4, "quantity": 1},
+                {"instrument_id": 5, "quantity": 1},
+            ],
+        },
+    )
+    assert resp_group_five.status_code == 400
+    assert "Constraint For Recording Session Max: 4" in resp_group_five.text
+
+    # 5. Group Recording with 3 instruments (one user books for all) succeeds
+    resp_group_valid = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": uid,
+            "session_type_id": 4,
+            "practice_mode": "Group Recording",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 3,
+            "instruments": [
+                {"instrument_id": 1, "quantity": 1},  # Drums
+                {"instrument_id": 3, "quantity": 1},  # Electric Guitar
+                {"instrument_id": 5, "quantity": 1},  # Vocals
+            ],
+        },
+    )
+    assert resp_group_valid.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_recording_session_complete_isolation(client):
+    """
+    Recording Session Isolation:
+    - Recording Session booking must NOT collide with any other session.
+    - No other session can collaboratively rehearse or join here; it must be completely isolated.
+    - Another user cannot book Recording Session in the same slot.
+    - Recording Session cannot book a slot occupied by Session A, B, or Jam Session.
+    """
+    u_a = await client.post("/api/users", json={"name": "User A Studio", "email": f"usera_{uuid.uuid4().hex[:8]}@test.com"})
+    user_a = u_a.json()["id"]
+    u_b = await client.post("/api/users", json={"name": "User B Musician", "email": f"userb_{uuid.uuid4().hex[:8]}@test.com"})
+    user_b = u_b.json()["id"]
+    test_date = get_unique_test_date()
+
+    # 1. User A books Recording Session (Group Recording) at 14:00 - 15:00
+    b_rec = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_a,
+            "session_type_id": 4,  # Recording Session
+            "practice_mode": "Group Recording",
+            "booking_date": test_date,
+            "start_time": "14:00:00",
+            "end_time": "15:00:00",
+            "participant_count": 2,
+            "instruments": [
+                {"instrument_id": 3, "quantity": 1},
+                {"instrument_id": 5, "quantity": 1},
+            ],
+        },
+    )
+    assert b_rec.status_code == 201
+
+    # 2. User B tries to book Session A Collaborative Practice in 14:00 - 15:00 -> REJECTED
+    resp_collab_a = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_b,
+            "session_type_id": 1,  # Session A
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "14:00:00",
+            "end_time": "15:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 1, "quantity": 1}],
+        },
+    )
+    assert resp_collab_a.status_code == 400
+    assert "reserved for Recording Session" in resp_collab_a.json()["detail"]
+
+    # 3. User B tries to book Jam Session in 14:00 - 15:00 -> REJECTED
+    resp_jam = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_b,
+            "session_type_id": 3,  # Jam Session
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "14:00:00",
+            "end_time": "15:00:00",
+            "participant_count": 2,
+            "instruments": [{"instrument_id": 2, "quantity": 2}],
+        },
+    )
+    assert resp_jam.status_code == 400
+
+    # 4. User B tries to book another Recording Session in 14:00 - 15:00 -> REJECTED (isolated)
+    resp_rec_b = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_b,
+            "session_type_id": 4,
+            "practice_mode": "Solo Recording",
+            "booking_date": test_date,
+            "start_time": "14:00:00",
+            "end_time": "15:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 4, "quantity": 1}],
+        },
+    )
+    assert resp_rec_b.status_code == 400
+    assert "Recording sessions require complete studio isolation" in resp_rec_b.json()["detail"]
+
+    # 5. Check slots availability for Session A: 14:00 slot is marked Reserved (Recording Session)
+    slots_a_resp = await client.get(f"/api/sessions/1/slots?date={test_date}")
+    assert slots_a_resp.status_code == 200
+    s_14 = next(s for s in slots_a_resp.json()["slots"] if s["start_time"] == "14:00:00")
+    assert s_14["is_available"] is False
+    assert s_14["active_session_name"] == "Recording Session"
+
+    # 6. Check slots availability for Recording Session: 14:00 slot is Reserved (not available)
+    slots_rec_resp = await client.get(f"/api/sessions/4/slots?date={test_date}")
+    assert slots_rec_resp.status_code == 200
+    s_rec_14 = next(s for s in slots_rec_resp.json()["slots"] if s["start_time"] == "14:00:00")
+    assert s_rec_14["is_available"] is False
+    assert s_rec_14["active_session_name"] == "Recording Session"
+
+
 
 
 
