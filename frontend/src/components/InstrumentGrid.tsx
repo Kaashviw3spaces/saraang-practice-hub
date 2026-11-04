@@ -66,7 +66,7 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
       return '⚠️ Session B Acoustic Policy: Full band rehearsals, drums, and electric guitar are not permitted.';
     }
     if (sName.includes('SESSION A') && pMode === 'SOLO PRACTICE') {
-      return '🎸 Session A Solo Policy: Primary instrument must be Acoustic Drums or Electric Guitar.';
+      return '🎸 Session A Solo Policy: Primary instrument must be Drums or Electric Guitar.';
     }
     if (sName.includes('SESSION A') && pMode === 'COLLABORATIVE JAM') {
       return '⚡ Session A Jam: All rehearsal instruments available.';

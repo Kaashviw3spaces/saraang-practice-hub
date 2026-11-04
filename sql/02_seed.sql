@@ -25,13 +25,17 @@ ON CONFLICT (name) DO UPDATE SET
     echo_factor = EXCLUDED.echo_factor;
 
 -- 3. Starter Instruments Catalogue (for AI Decibel & Frequency Engine)
-INSERT INTO instruments (name, category, base_decibels, frequency_band)
+INSERT INTO instruments (id, name, category, base_decibels, frequency_band)
 VALUES 
-    ('Acoustic Drum Kit', 'Percussion', 110, 'Low-Mid'),
-    ('Electric Bass & Amp', 'Strings', 100, 'Low'),
-    ('Electric Guitar & Half-Stack', 'Strings', 95, 'Mid'),
-    ('Acoustic Guitar', 'Strings', 75, 'Mid'),
-    ('Vocal Dynamic Microphone', 'Vocals', 85, 'High-Mid'),
-    ('Synthesizer / Keyboard', 'Keys', 80, 'Full-Range'),
-    ('Cajon & Hand Percussion', 'Percussion', 80, 'Mid')
-ON CONFLICT (name) DO NOTHING;
+    (1, 'Drums', 'Percussion', 110, 'Low-Mid'),
+    (2, 'Electric Bass', 'Strings', 100, 'Low'),
+    (3, 'Electric Guitar', 'Strings', 95, 'Mid'),
+    (4, 'Acoustic Guitar', 'Strings', 75, 'Mid'),
+    (5, 'Vocals', 'Vocals', 85, 'High-Mid'),
+    (6, 'Synthesizer / Keyboard', 'Keys', 80, 'Full-Range'),
+    (7, 'Cajon & Hand Percussion', 'Percussion', 80, 'Mid')
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    category = EXCLUDED.category,
+    base_decibels = EXCLUDED.base_decibels,
+    frequency_band = EXCLUDED.frequency_band;

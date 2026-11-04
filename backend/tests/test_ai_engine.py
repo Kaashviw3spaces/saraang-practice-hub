@@ -59,7 +59,7 @@ def test_acoustic_evaluation_threshold_rejection():
         echo_factor=1.0,
     )
     loud_drums = [
-        InstrumentAcousticProfile(id=1, name="Acoustic Drums", base_decibels=110, quantity=1, frequency_band="Low-Mid"),
+        InstrumentAcousticProfile(id=1, name="Drums", base_decibels=110, quantity=1, frequency_band="Low-Mid"),
     ]
     standard_session = SessionTypeRules(id=1, name="Session A", participant_limit=4, is_strict_lockdown=False)
 
@@ -72,8 +72,8 @@ def test_frequency_collision_and_lockdown():
     """Ensures strict lockdown recording sessions reject low-end clashes."""
     studio = RoomAcousticProfile(id=2, name="Studio A", max_decibel_threshold=120, echo_factor=1.0)
     clashing_instruments = [
-        InstrumentAcousticProfile(id=1, name="Acoustic Drums", base_decibels=95, quantity=1, frequency_band="Low"),
-        InstrumentAcousticProfile(id=2, name="Bass Guitar", base_decibels=95, quantity=1, frequency_band="Low"),
+        InstrumentAcousticProfile(id=1, name="Drums", base_decibels=95, quantity=1, frequency_band="Low"),
+        InstrumentAcousticProfile(id=2, name="Electric Bass", base_decibels=95, quantity=1, frequency_band="Low"),
     ]
     recording_session = SessionTypeRules(id=4, name="Recording Session", participant_limit=3, is_strict_lockdown=True)
 

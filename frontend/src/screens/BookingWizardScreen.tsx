@@ -381,7 +381,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                   <View style={styles.policyCard}>
                     <Text style={styles.policyTitle}>🎸 SESSION A SOLO POLICY</Text>
                     <Text style={styles.policyText}>
-                      Solo practice requires selecting only ONE instrument: Acoustic Drums or Electric Guitar.
+                      Solo practice requires selecting only ONE instrument: Drums or Electric Guitar.
                     </Text>
                   </View>
                 )}

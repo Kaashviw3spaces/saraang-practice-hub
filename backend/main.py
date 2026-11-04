@@ -283,12 +283,12 @@ def validate_session_policy(
     Validates practice mode and instrument constraints based on session type:
     - Session A:
         Modes: Solo Practice, Collaborative Jam, Full Band Rehearsal.
-        Solo Practice: Instruments array must contain only ONE instrument: Acoustic Drums or Electric Guitar.
+        Solo Practice: Instruments array must contain only ONE instrument: Drums or Electric Guitar.
         Full Band Rehearsal: Bypasses individual instrument checks ("All Instruments Included").
     - Session B:
         Modes: Solo Practice, Collaborative Jam (Full Band Rehearsal not allowed).
         Solo Practice: Instruments array must contain only ONE instrument.
-        Acoustic Policy: Instruments must NOT contain Acoustic Drums or Electric Guitar.
+        Acoustic Policy: Instruments must NOT contain Drums or Electric Guitar.
     - Meeting Session:
         Bypasses instrument validation completely.
     """
@@ -335,7 +335,7 @@ def validate_session_policy(
                         "message": "Session A Solo Policy Violation: Solo practice requires selecting only ONE instrument.",
                         "ai_acoustics": {
                             "compatible": False,
-                            "reason": "Session A Solo Policy: Solo practice requires selecting only ONE instrument (Acoustic Drums or Electric Guitar).",
+                            "reason": "Session A Solo Policy: Solo practice requires selecting only ONE instrument (Drums or Electric Guitar).",
                         },
                     },
                 )
@@ -347,7 +347,7 @@ def validate_session_policy(
                         "message": f"Session A Solo Policy Violation: '{inst_name}' is not permitted.",
                         "ai_acoustics": {
                             "compatible": False,
-                            "reason": f"Session A Solo Policy: Solo practice requires Acoustic Drums or Electric Guitar only. Selected: {inst_name}",
+                            "reason": f"Session A Solo Policy: Solo practice requires Drums or Electric Guitar only. Selected: {inst_name}",
                         },
                     },
                 )

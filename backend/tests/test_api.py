@@ -60,7 +60,10 @@ async def test_catalogues_retrieval(client):
     assert inst_resp.status_code == 200
     instruments = inst_resp.json()
     assert len(instruments) >= 7
-    assert any(i["name"] == "Acoustic Drum Kit" for i in instruments)
+    assert any(i["name"] == "Drums" for i in instruments)
+    assert any(i["name"] == "Electric Bass" for i in instruments)
+    assert any(i["name"] == "Electric Guitar" for i in instruments)
+    assert any(i["name"] == "Vocals" for i in instruments)
 
 
 @pytest.mark.asyncio
