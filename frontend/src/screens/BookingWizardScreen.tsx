@@ -526,62 +526,11 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
             {/* Step 2C: Filtered Instrument Selection */}
             {isMeetingSession ? (
-              <View style={styles.formGroup}>
-                <Text style={styles.fieldLabel}>MEETING PARTICIPANTS (MANUAL ENTRY):</Text>
-                <View style={styles.policyCard}>
-                  <Text style={styles.policyTitle}>📋 MEETING SESSION</Text>
-                  <Text style={styles.policyText}>
-                    Standard reservation for music club meetings, setlists, and planning. No musical instruments required. Set the number of people attending manually.
-                  </Text>
-                </View>
-
-                {/* Meeting Manual Stepper Banner */}
-                <View style={styles.jamCounterBanner}>
-                  <View style={styles.jamCounterLeft}>
-                    <Text style={styles.jamCounterLabel}>PEOPLE IN MEETING (MANUAL):</Text>
-                    <Text style={styles.jamCounterValue}>
-                      {wizard.participantCount} / {participantLimit} MAX
-                    </Text>
-                  </View>
-                  <View style={styles.jamStepperRow}>
-                    <TouchableOpacity
-                      style={[styles.jamStepBtn, wizard.participantCount <= 1 && styles.jamStepBtnDisabled]}
-                      disabled={wizard.participantCount <= 1}
-                      onPress={() => setParticipantCount(Math.max(1, wizard.participantCount - 1))}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.jamStepBtnText, wizard.participantCount <= 1 && styles.jamStepBtnTextDisabled]}>−</Text>
-                    </TouchableOpacity>
-
-                    <View style={[styles.jamQtyBox, styles.jamQtyBoxSelected]}>
-                      <Text style={[styles.jamQtyText, styles.jamQtyTextSelected]}>{wizard.participantCount}</Text>
-                    </View>
-
-                    <TouchableOpacity
-                      style={[styles.jamStepBtn, wizard.participantCount >= participantLimit && styles.jamStepBtnDisabled]}
-                      disabled={wizard.participantCount >= participantLimit}
-                      onPress={() => setParticipantCount(Math.min(participantLimit, wizard.participantCount + 1))}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.jamStepBtnText, wizard.participantCount >= participantLimit && styles.jamStepBtnTextDisabled]}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Quick Count Selectors */}
-                <View style={styles.quickDateRow}>
-                  {[1, 2, 4, 6, 8, 10].map((num) => (
-                    <TouchableOpacity
-                      key={num}
-                      style={[styles.quickDateBtn, wizard.participantCount === num && styles.quickDateBtnSelected]}
-                      onPress={() => setParticipantCount(num)}
-                    >
-                      <Text style={[styles.quickDateBtnText, wizard.participantCount === num && styles.quickDateBtnTextSelected]}>
-                        {num} {num === 1 ? 'PERSON' : 'PEOPLE'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+              <View style={styles.policyCard}>
+                <Text style={styles.policyTitle}>📋 MEETING SESSION</Text>
+                <Text style={styles.policyText}>
+                  Standard reservation for music club meetings, setlists, and production planning. No musical instruments required. Type the number of attendees in the box below.
+                </Text>
               </View>
             ) : isJamSession ? (
               <View style={styles.formGroup}>
@@ -1173,62 +1122,43 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
                     {isMeetingSession ? (
                       <View style={[styles.autoPeopleBox, isReserved && styles.autoPeopleBoxReserved]}>
-                        <View style={styles.meetingAutoBoxRow}>
-                          <View style={styles.meetingAutoBoxLeft}>
+                        <View style={styles.meetingInputRow}>
+                          <View style={styles.meetingInputCol}>
                             <Text style={[styles.autoPeopleVal, isReserved && styles.autoPeopleValReserved]}>
                               {isReserved
                                 ? 'RESERVED (SLOT OCCUPIED)'
-                                : `${wizard.participantCount} ${wizard.participantCount === 1 ? 'PERSON' : 'PEOPLE'} (MANUAL ENTRY)`}
+                                : `${wizard.participantCount || 0} ${wizard.participantCount === 1 ? 'PERSON' : 'PEOPLE'} ATTENDING`}
                             </Text>
                             <Text style={styles.autoPeopleSub}>
                               {isReserved
                                 ? '⚠️ This slot is already booked for another session. Please select an available slot.'
-                                : `Meeting participants updated manually • ${wizard.participantCount}/${participantLimit} capacity`}
+                                : `Type number of attendees manually (1 to ${participantLimit} max)`}
                             </Text>
                           </View>
 
                           {!isReserved && (
-                            <View style={styles.jamStepperRow}>
-                              <TouchableOpacity
-                                style={[styles.jamStepBtn, wizard.participantCount <= 1 && styles.jamStepBtnDisabled]}
-                                disabled={wizard.participantCount <= 1}
-                                onPress={() => setParticipantCount(Math.max(1, wizard.participantCount - 1))}
-                                activeOpacity={0.7}
-                              >
-                                <Text style={[styles.jamStepBtnText, wizard.participantCount <= 1 && styles.jamStepBtnTextDisabled]}>−</Text>
-                              </TouchableOpacity>
-
-                              <View style={[styles.jamQtyBox, styles.jamQtyBoxSelected]}>
-                                <Text style={[styles.jamQtyText, styles.jamQtyTextSelected]}>{wizard.participantCount}</Text>
-                              </View>
-
-                              <TouchableOpacity
-                                style={[styles.jamStepBtn, wizard.participantCount >= participantLimit && styles.jamStepBtnDisabled]}
-                                disabled={wizard.participantCount >= participantLimit}
-                                onPress={() => setParticipantCount(Math.min(participantLimit, wizard.participantCount + 1))}
-                                activeOpacity={0.7}
-                              >
-                                <Text style={[styles.jamStepBtnText, wizard.participantCount >= participantLimit && styles.jamStepBtnTextDisabled]}>+</Text>
-                              </TouchableOpacity>
+                            <View style={styles.meetingSmallInputWrap}>
+                              <TextInput
+                                style={styles.meetingSmallInput}
+                                value={wizard.participantCount ? String(wizard.participantCount) : ''}
+                                onChangeText={(text) => {
+                                  const digits = text.replace(/[^0-9]/g, '');
+                                  if (digits === '') {
+                                    setParticipantCount(0);
+                                  } else {
+                                    const val = parseInt(digits, 10);
+                                    setParticipantCount(Math.min(participantLimit, Math.max(1, val)));
+                                  }
+                                }}
+                                placeholder="5"
+                                placeholderTextColor="#666666"
+                                keyboardType="number-pad"
+                                maxLength={2}
+                              />
+                              <Text style={styles.meetingInputLimitTag}>/ {participantLimit} MAX</Text>
                             </View>
                           )}
                         </View>
-
-                        {!isReserved && (
-                          <View style={[styles.quickDateRow, { marginTop: 12 }]}>
-                            {[1, 2, 4, 6, 8, 10].map((num) => (
-                              <TouchableOpacity
-                                key={num}
-                                style={[styles.quickDateBtn, wizard.participantCount === num && styles.quickDateBtnSelected]}
-                                onPress={() => setParticipantCount(num)}
-                              >
-                                <Text style={[styles.quickDateBtnText, wizard.participantCount === num && styles.quickDateBtnTextSelected]}>
-                                  {num} {num === 1 ? 'PERSON' : 'PEOPLE'}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        )}
                       </View>
                     ) : (
                       <View style={[styles.autoPeopleBox, isReserved && styles.autoPeopleBoxReserved]}>
@@ -2263,15 +2193,38 @@ const styles = StyleSheet.create({
     color: '#e8c872',
     fontWeight: '800',
   },
-  meetingAutoBoxRow: {
+  meetingInputRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    flexWrap: 'wrap',
+    gap: 12,
+  },
+  meetingInputCol: {
+    flex: 1,
+  },
+  meetingSmallInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
   },
-  meetingAutoBoxLeft: {
-    flex: 1,
-    minWidth: 160,
+  meetingSmallInput: {
+    backgroundColor: '#1a1813',
+    borderWidth: 1,
+    borderColor: '#e8c872',
+    borderRadius: 6,
+    color: '#e8c872',
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    width: 60,
+    height: 38,
+  },
+  meetingInputLimitTag: {
+    color: '#888888',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });
