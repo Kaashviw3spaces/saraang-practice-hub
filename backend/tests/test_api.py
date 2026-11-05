@@ -1898,6 +1898,51 @@ async def test_meeting_session_manual_participants_and_isolation(client):
     assert "exclusive room reservation" in b2.json()["detail"]
 
 
+@pytest.mark.asyncio
+async def test_meeting_session_custom_typed_context(client):
+    """
+    Verify Meeting Session supports custom typed meeting context (agenda/topic)
+    and stores it accurately in practice_mode for display on passes.
+    """
+    st_resp = await client.get("/api/session-types")
+    meeting_st = next(s for s in st_resp.json() if "meeting" in s["name"].lower())
+    meeting_id = meeting_st["id"]
+
+    user = await client.post("/api/users", json={"name": "Meeting Host", "email": f"host_{uuid.uuid4().hex[:8]}@test.com"})
+    user_id = user.json()["id"]
+    test_date = get_unique_test_date()
+
+    custom_context = "Setlist curation & Spring Fest stage rehearsal agenda"
+
+    # Book meeting with typed context
+    b_resp = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": user_id,
+            "session_type_id": meeting_id,
+            "booking_date": test_date,
+            "start_time": "11:00:00",
+            "end_time": "12:00:00",
+            "practice_mode": custom_context,
+            "participant_count": 5,
+            "instruments": [],
+        },
+    )
+    assert b_resp.status_code == 201
+    booking_data = b_resp.json()
+    assert booking_data["practice_mode"] == custom_context
+    assert booking_data["participant_count"] == 5
+
+    # Verify pass list retrieval preserves the custom context
+    user_bookings_resp = await client.get(f"/api/bookings?user_id={user_id}")
+    assert user_bookings_resp.status_code == 200
+    user_bookings = user_bookings_resp.json()
+    found = next((b for b in user_bookings if b["id"] == booking_data["id"]), None)
+    assert found is not None
+    assert found["practice_mode"] == custom_context
+
+
+
 
 
 

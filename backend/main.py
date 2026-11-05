@@ -321,7 +321,7 @@ def validate_session_policy(
     mode_lower = mode.lower()
 
     # 1. Meeting Session: Bypass completely
-    if s_name == "meeting session":
+    if "meeting" in s_name:
         return
 
     def is_drums(name: str) -> bool:

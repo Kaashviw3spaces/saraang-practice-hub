@@ -173,7 +173,9 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
                 </View>
                 {b.practice_mode ? (
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>MODE:</Text>
+                    <Text style={styles.detailLabel}>
+                      {(b.session_name || '').toUpperCase().includes('MEETING') ? 'CONTEXT:' : 'MODE:'}
+                    </Text>
                     <Text style={styles.detailVal}>{b.practice_mode}</Text>
                   </View>
                 ) : null}
@@ -188,7 +190,9 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
                   </Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>PEOPLE PLAYING:</Text>
+                  <Text style={styles.detailLabel}>
+                    {(b.session_name || '').toUpperCase().includes('MEETING') ? 'PARTICIPANTS:' : 'PEOPLE PLAYING:'}
+                  </Text>
                   <Text style={styles.detailVal}>
                     {b.participant_count} {b.participant_count === 1 ? 'Person' : 'People'}
                   </Text>

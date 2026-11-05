@@ -26,6 +26,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     setWizardStep,
     selectSession,
     setPracticeMode,
+    setMeetingContext,
     setBookingDateTime,
     setParticipantCount,
     setInstrumentQuantity,
@@ -261,13 +262,18 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     }
 
     // Auto-Room Assignment: room_id is omitted so backend dynamically assigns the optimal available room
+    const meetingCtx = wizard.meetingContext.trim();
+    const finalPracticeMode = isMeeting
+      ? (meetingCtx || 'General Discussion')
+      : wizard.practiceMode;
+
     const payload = {
       user_id: currentUser.id,
       session_type_id: wizard.selectedSession.id,
       booking_date: wizard.bookingDate,
       start_time: wizard.startTime,
       end_time: formattedEndTime,
-      practice_mode: wizard.practiceMode,
+      practice_mode: finalPracticeMode,
       participant_count: peoplePlaying,
       instruments: selectedInstrumentsList,
     };
@@ -280,6 +286,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
         title: 'BOOKING CONFIRMED',
         message: isRecording
           ? `Booking Confirmed! Your ${res.session_name} studio recording slot is locked in (${res.start_time}-${res.end_time}).`
+          : isMeeting
+          ? `Booking Confirmed! Your ${res.session_name} slot is locked in (${res.start_time}-${res.end_time}).`
           : `Booking Confirmed! Your ${res.session_name} rehearsal slot is locked in (${res.start_time}-${res.end_time}).`,
         type: 'success',
       });
@@ -319,6 +327,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
   // Success Ticket View
   if (successBooking) {
     const isRecordingSuccess = (successBooking.session_name || '').toUpperCase().includes('RECORDING');
+    const isMeetingSuccess = (successBooking.session_name || '').toUpperCase().includes('MEETING');
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.ticketCard}>
@@ -329,6 +338,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
           <Text style={styles.ticketSession}>
             {isRecordingSuccess
               ? `Booking Confirmed! Your ${successBooking.session_name} studio recording slot is locked in.`
+              : isMeetingSuccess
+              ? `Booking Confirmed! Your ${successBooking.session_name} slot is locked in.`
               : `Booking Confirmed! Your ${successBooking.session_name} rehearsal slot is locked in.`}
           </Text>
 
@@ -339,7 +350,9 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             </View>
             {successBooking.practice_mode ? (
               <View style={styles.ticketField}>
-                <Text style={styles.ticketLabel}>PRACTICE MODE:</Text>
+                <Text style={styles.ticketLabel}>
+                  {isMeetingSuccess ? 'CONTEXT:' : 'PRACTICE MODE:'}
+                </Text>
                 <Text style={styles.ticketVal}>{successBooking.practice_mode}</Text>
               </View>
             ) : null}
@@ -352,7 +365,9 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               <Text style={styles.ticketVal}>{successBooking.start_time} - {successBooking.end_time}</Text>
             </View>
             <View style={styles.ticketField}>
-              <Text style={styles.ticketLabel}>PEOPLE PLAYING:</Text>
+              <Text style={styles.ticketLabel}>
+                {isMeetingSuccess ? 'PARTICIPANTS:' : 'PEOPLE PLAYING:'}
+              </Text>
               <Text style={styles.ticketVal}>
                 {successBooking.participant_count} {successBooking.participant_count === 1 ? 'PERSON' : 'PEOPLE'}
               </Text>
@@ -526,11 +541,29 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
             {/* Step 2C: Filtered Instrument Selection */}
             {isMeetingSession ? (
-              <View style={styles.policyCard}>
-                <Text style={styles.policyTitle}>📋 MEETING SESSION</Text>
-                <Text style={styles.policyText}>
-                  Standard reservation for music club meetings, setlists, and production planning. No musical instruments required. Type the number of attendees in the box below.
-                </Text>
+              <View style={styles.meetingConfigBox}>
+                <View style={styles.policyCard}>
+                  <Text style={styles.policyTitle}>📋 MEETING SESSION</Text>
+                  <Text style={styles.policyText}>
+                    Standard reservation for music club meetings, setlists, and production planning. No musical instruments required.
+                  </Text>
+                </View>
+
+                {/* Meeting Context Input */}
+                <View style={styles.meetingContextCard}>
+                  <Text style={styles.fieldLabel}>MEETING CONTEXT / AGENDA (TYPE IT):</Text>
+                  <TextInput
+                    style={styles.meetingContextInput}
+                    value={wizard.meetingContext}
+                    onChangeText={setMeetingContext}
+                    placeholder="e.g. Setlist curation, tour planning, album launch..."
+                    placeholderTextColor="#666666"
+                    maxLength={150}
+                  />
+                  <Text style={styles.meetingContextHelper}>
+                    Type meeting purpose or topic. This will be displayed on your pass as CONTEXT.
+                  </Text>
+                </View>
               </View>
             ) : isJamSession ? (
               <View style={styles.formGroup}>
@@ -2226,5 +2259,33 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  meetingConfigBox: {
+    gap: 12,
+  },
+  meetingContextCard: {
+    backgroundColor: '#16140e',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3a321a',
+    padding: 14,
+  },
+  meetingContextInput: {
+    backgroundColor: '#1e1c14',
+    borderWidth: 1,
+    borderColor: '#e8c872',
+    borderRadius: 6,
+    color: '#ffffff',
+    fontSize: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  meetingContextHelper: {
+    color: '#888888',
+    fontSize: 11,
+    marginTop: 6,
+    fontStyle: 'italic',
   },
 });

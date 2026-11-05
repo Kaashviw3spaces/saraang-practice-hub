@@ -13,6 +13,7 @@ export interface BookingWizardState {
   step: 1 | 2 | 3;
   selectedSession: SessionType | null;
   practiceMode: string;
+  meetingContext: string;
   bookingDate: string; // YYYY-MM-DD
   startTime: string;   // HH:MM:00
   durationMinutes: number; // 60 or 120
@@ -59,6 +60,7 @@ interface AppState {
   setWizardStep: (step: 1 | 2 | 3) => void;
   selectSession: (session: SessionType) => void;
   setPracticeMode: (mode: string) => void;
+  setMeetingContext: (context: string) => void;
   setBookingDateTime: (date: string, time: string, duration: number) => void;
   setParticipantCount: (count: number) => void;
   setInstrumentQuantity: (instrumentId: number, qty: number) => void;
@@ -101,6 +103,7 @@ export const useStore = create<AppState>((set, get) => ({
     step: 1,
     selectedSession: null,
     practiceMode: 'Solo Practice',
+    meetingContext: '',
     bookingDate: new Date().toISOString().split('T')[0],
     startTime: '16:00:00',
     durationMinutes: 60,
@@ -136,6 +139,7 @@ export const useStore = create<AppState>((set, get) => ({
         ...state.wizard,
         selectedSession: session,
         practiceMode: defaultMode,
+        meetingContext: '',
         participantCount: defaultParticipants,
         step: 2,
         // Reset instruments on session change to guarantee filter compliance
@@ -154,6 +158,14 @@ export const useStore = create<AppState>((set, get) => ({
         // Reset instruments when mode changes
         instruments: {},
         acousticPreview: null,
+      },
+    })),
+
+  setMeetingContext: (meetingContext) =>
+    set((state) => ({
+      wizard: {
+        ...state.wizard,
+        meetingContext,
       },
     })),
 
@@ -211,6 +223,7 @@ export const useStore = create<AppState>((set, get) => ({
         step: 1,
         selectedSession: null,
         practiceMode: 'Solo Practice',
+        meetingContext: '',
         bookingDate: new Date().toISOString().split('T')[0],
         startTime: '16:00:00',
         durationMinutes: 60,
