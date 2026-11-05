@@ -1839,6 +1839,65 @@ async def test_recording_session_complete_isolation(client):
     assert s_rec_14["active_session_name"] == "Recording Session"
 
 
+@pytest.mark.asyncio
+async def test_meeting_session_manual_participants_and_isolation(client):
+    """
+    Meeting Session:
+    - User can manually set participant count (e.g. 7 attendees).
+    - Requires exclusive room reservation.
+    - Other users cannot collide in the same slot.
+    """
+    st_resp = await client.get("/api/session-types")
+    meeting_st = next(s for s in st_resp.json() if "meeting" in s["name"].lower())
+    meeting_id = meeting_st["id"]
+
+    u1 = await client.post("/api/users", json={"name": "Meeting Lead", "email": f"lead_{uuid.uuid4().hex[:8]}@test.com"})
+    u1_id = u1.json()["id"]
+    test_date = get_unique_test_date()
+
+    # 1. Book Meeting Session manually specifying 7 participants
+    b1 = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u1_id,
+            "session_type_id": meeting_id,
+            "booking_date": test_date,
+            "start_time": "15:00:00",
+            "end_time": "16:00:00",
+            "participant_count": 7,
+            "instruments": [],
+        },
+    )
+    assert b1.status_code == 201
+    assert b1.json()["participant_count"] == 7
+
+    # 2. Check slots availability for Meeting Session at 15:00
+    slots_resp = await client.get(f"/api/sessions/{meeting_id}/slots?date={test_date}")
+    assert slots_resp.status_code == 200
+    s_15 = next(s for s in slots_resp.json()["slots"] if s["start_time"] == "15:00:00")
+    assert s_15["is_available"] is False
+    assert s_15["active_session_name"] == "Meeting Session"
+
+    # 3. Another user cannot book the same slot
+    u2 = await client.post("/api/users", json={"name": "User 2", "email": f"u2_{uuid.uuid4().hex[:8]}@test.com"})
+    u2_id = u2.json()["id"]
+
+    b2 = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u2_id,
+            "session_type_id": meeting_id,
+            "booking_date": test_date,
+            "start_time": "15:00:00",
+            "end_time": "16:00:00",
+            "participant_count": 4,
+            "instruments": [],
+        },
+    )
+    assert b2.status_code == 400
+    assert "exclusive room reservation" in b2.json()["detail"]
+
+
 
 
 

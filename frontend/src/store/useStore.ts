@@ -129,12 +129,14 @@ export const useStore = create<AppState>((set, get) => ({
       ? 'Meeting'
       : 'Solo Practice';
 
+    const defaultParticipants = sName.includes('meeting') ? 2 : 1;
+
     set((state) => ({
       wizard: {
         ...state.wizard,
         selectedSession: session,
         practiceMode: defaultMode,
-        participantCount: 1,
+        participantCount: defaultParticipants,
         step: 2,
         // Reset instruments on session change to guarantee filter compliance
         instruments: {},

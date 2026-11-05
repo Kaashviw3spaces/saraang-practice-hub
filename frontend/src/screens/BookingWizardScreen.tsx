@@ -242,9 +242,10 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
     // For Jam Session: One user selects all instruments and books for everyone (up to 8).
     // For Recording Session: Solo = 1, Group = total instruments selected (up to 4, one user books for all).
-    // For Meeting: 2. For Session A / B: 1 per booking.
+    // For Meeting: Manually updated participant count (up to 10).
+    // For Session A / B: 1 per booking.
     const peoplePlaying = isMeeting
-      ? 2
+      ? Math.max(1, Math.min(wizard.selectedSession.participant_limit, wizard.participantCount || 2))
       : isJamSession
       ? Math.min(8, Math.max(1, totalInstrumentsSelected))
       : isRecording
@@ -452,9 +453,9 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
         const totalJamInstruments = totalInstrumentsCount;
         const totalRecordingInstruments = totalInstrumentsCount;
 
-        // autoPeoplePlaying
+        // autoPeoplePlaying (For meeting session: manually updated by user instead of auto-fetching)
         const autoPeoplePlaying = isMeetingSession
-          ? 2
+          ? (wizard.participantCount || 2)
           : isJamSession
           ? Math.min(8, Math.max(1, totalJamInstruments))
           : isRecordingGroup
@@ -525,11 +526,62 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
             {/* Step 2C: Filtered Instrument Selection */}
             {isMeetingSession ? (
-              <View style={styles.policyCard}>
-                <Text style={styles.policyTitle}>📋 MEETING SESSION</Text>
-                <Text style={styles.policyText}>
-                  Standard reservation for music club meetings and planning. No musical instruments required.
-                </Text>
+              <View style={styles.formGroup}>
+                <Text style={styles.fieldLabel}>MEETING PARTICIPANTS (MANUAL ENTRY):</Text>
+                <View style={styles.policyCard}>
+                  <Text style={styles.policyTitle}>📋 MEETING SESSION</Text>
+                  <Text style={styles.policyText}>
+                    Standard reservation for music club meetings, setlists, and planning. No musical instruments required. Set the number of people attending manually.
+                  </Text>
+                </View>
+
+                {/* Meeting Manual Stepper Banner */}
+                <View style={styles.jamCounterBanner}>
+                  <View style={styles.jamCounterLeft}>
+                    <Text style={styles.jamCounterLabel}>PEOPLE IN MEETING (MANUAL):</Text>
+                    <Text style={styles.jamCounterValue}>
+                      {wizard.participantCount} / {participantLimit} MAX
+                    </Text>
+                  </View>
+                  <View style={styles.jamStepperRow}>
+                    <TouchableOpacity
+                      style={[styles.jamStepBtn, wizard.participantCount <= 1 && styles.jamStepBtnDisabled]}
+                      disabled={wizard.participantCount <= 1}
+                      onPress={() => setParticipantCount(Math.max(1, wizard.participantCount - 1))}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.jamStepBtnText, wizard.participantCount <= 1 && styles.jamStepBtnTextDisabled]}>−</Text>
+                    </TouchableOpacity>
+
+                    <View style={[styles.jamQtyBox, styles.jamQtyBoxSelected]}>
+                      <Text style={[styles.jamQtyText, styles.jamQtyTextSelected]}>{wizard.participantCount}</Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={[styles.jamStepBtn, wizard.participantCount >= participantLimit && styles.jamStepBtnDisabled]}
+                      disabled={wizard.participantCount >= participantLimit}
+                      onPress={() => setParticipantCount(Math.min(participantLimit, wizard.participantCount + 1))}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.jamStepBtnText, wizard.participantCount >= participantLimit && styles.jamStepBtnTextDisabled]}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Quick Count Selectors */}
+                <View style={styles.quickDateRow}>
+                  {[1, 2, 4, 6, 8, 10].map((num) => (
+                    <TouchableOpacity
+                      key={num}
+                      style={[styles.quickDateBtn, wizard.participantCount === num && styles.quickDateBtnSelected]}
+                      onPress={() => setParticipantCount(num)}
+                    >
+                      <Text style={[styles.quickDateBtnText, wizard.participantCount === num && styles.quickDateBtnTextSelected]}>
+                        {num} {num === 1 ? 'PERSON' : 'PEOPLE'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
             ) : isJamSession ? (
               <View style={styles.formGroup}>
@@ -813,7 +865,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               const isSlotSoloBlocked = isSoloPractice && existingParticipants > 0;
               const isJamOccupied = isJamSession && (existingParticipants > 0 || !selectedSlot?.is_available);
               const isRecordingOccupied = isRecordingSession && (existingParticipants > 0 || !selectedSlot?.is_available);
-              const isReserved = !selectedSlot?.is_available || isSlotFull || isSlotSoloBlocked || isJamOccupied || isRecordingOccupied;
+              const isMeetingOccupied = isMeetingSession && (existingParticipants > 0 || !selectedSlot?.is_available);
+              const isReserved = !selectedSlot?.is_available || isSlotFull || isSlotSoloBlocked || isJamOccupied || isRecordingOccupied || isMeetingOccupied;
               const nextTotalParticipants = Math.min(maxCapacity, existingParticipants + 1);
 
               return (
@@ -954,12 +1007,14 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                     const isSlotSoloBlocked = isSoloPractice && (slot.current_participants || 0) > 0;
                                     const isSlotJamOccupied = isJamSession && ((slot.current_participants || 0) > 0 || !slot.is_available);
                                     const isSlotRecOccupied = isRecordingSession && ((slot.current_participants || 0) > 0 || !slot.is_available);
-                                    const isBlocked = !slot.is_available || isSlotSoloBlocked || isSlotJamOccupied || isSlotRecOccupied;
+                                    const isSlotMeetingOccupied = isMeetingSession && ((slot.current_participants || 0) > 0 || !slot.is_available);
+                                    const isBlocked = !slot.is_available || isSlotSoloBlocked || isSlotJamOccupied || isSlotRecOccupied || isSlotMeetingOccupied;
 
                                     const badgeText = (() => {
                                       if (isSlotSoloBlocked) return 'COLLAB ACTIVE (NO SOLO)';
                                       if (isSlotJamOccupied) return 'RESERVED (JAM)';
                                       if (isSlotRecOccupied) return 'RESERVED (RECORDING)';
+                                      if (isSlotMeetingOccupied) return 'RESERVED';
                                       if (!slot.is_available) {
                                         if (activeSession?.toUpperCase().includes('JAM') || slot.status?.toUpperCase().includes('JAM')) return 'RESERVED (JAM)';
                                         if (activeSession?.toUpperCase().includes('RECORDING') || slot.status?.toUpperCase().includes('RECORDING')) return 'RESERVED (RECORDING)';
@@ -971,6 +1026,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                       if (isSelected) return '✓ SELECTED';
                                       if (isJamSession) return 'AVAILABLE';
                                       if (isRecordingSession) return 'AVAILABLE';
+                                      if (isMeetingSession) return 'AVAILABLE';
                                       if ((slot.current_participants || 0) > 0) return `${slot.current_participants}/${slot.max_participants || participantLimit} JOINABLE`;
                                       return 'AVAILABLE';
                                     })();
@@ -1003,6 +1059,13 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                             Alert.alert(
                                               'Recording Studio Isolation',
                                               'Recording sessions require complete studio isolation and cannot share a slot with any other session or musicians. Please select an available open slot.'
+                                            );
+                                            return;
+                                          }
+                                          if (isSlotMeetingOccupied || (isMeetingSession && (!slot.is_available || (slot.current_participants || 0) > 0))) {
+                                            Alert.alert(
+                                              'Meeting Room Occupied',
+                                              'This slot already has active bookings. Meeting sessions require an empty room reservation. Please select an available slot.'
                                             );
                                             return;
                                           }
@@ -1104,86 +1167,146 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
                   {/* Dynamic People Playing (Participants in Slot) */}
                   <View style={styles.formGroup}>
-                    <Text style={styles.fieldLabel}>PEOPLE PLAYING (PARTICIPANTS IN SLOT):</Text>
-                    <View style={[styles.autoPeopleBox, isReserved && styles.autoPeopleBoxReserved]}>
-                      <View style={styles.autoPeopleRow}>
-                        <Text style={[styles.autoPeopleVal, isReserved && styles.autoPeopleValReserved]}>
-                          {isMeetingSession
-                            ? '2 PEOPLE'
-                            : isRecordingSolo
-                            ? (isReserved
+                    <Text style={styles.fieldLabel}>
+                      {isMeetingSession ? 'PEOPLE IN MEETING (PARTICIPANTS IN SLOT - MANUAL ENTRY):' : 'PEOPLE PLAYING (PARTICIPANTS IN SLOT):'}
+                    </Text>
+
+                    {isMeetingSession ? (
+                      <View style={[styles.autoPeopleBox, isReserved && styles.autoPeopleBoxReserved]}>
+                        <View style={styles.meetingAutoBoxRow}>
+                          <View style={styles.meetingAutoBoxLeft}>
+                            <Text style={[styles.autoPeopleVal, isReserved && styles.autoPeopleValReserved]}>
+                              {isReserved
                                 ? 'RESERVED (SLOT OCCUPIED)'
-                                : '1 MUSICIAN (SOLO RECORDING)')
+                                : `${wizard.participantCount} ${wizard.participantCount === 1 ? 'PERSON' : 'PEOPLE'} (MANUAL ENTRY)`}
+                            </Text>
+                            <Text style={styles.autoPeopleSub}>
+                              {isReserved
+                                ? '⚠️ This slot is already booked for another session. Please select an available slot.'
+                                : `Meeting participants updated manually • ${wizard.participantCount}/${participantLimit} capacity`}
+                            </Text>
+                          </View>
+
+                          {!isReserved && (
+                            <View style={styles.jamStepperRow}>
+                              <TouchableOpacity
+                                style={[styles.jamStepBtn, wizard.participantCount <= 1 && styles.jamStepBtnDisabled]}
+                                disabled={wizard.participantCount <= 1}
+                                onPress={() => setParticipantCount(Math.max(1, wizard.participantCount - 1))}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={[styles.jamStepBtnText, wizard.participantCount <= 1 && styles.jamStepBtnTextDisabled]}>−</Text>
+                              </TouchableOpacity>
+
+                              <View style={[styles.jamQtyBox, styles.jamQtyBoxSelected]}>
+                                <Text style={[styles.jamQtyText, styles.jamQtyTextSelected]}>{wizard.participantCount}</Text>
+                              </View>
+
+                              <TouchableOpacity
+                                style={[styles.jamStepBtn, wizard.participantCount >= participantLimit && styles.jamStepBtnDisabled]}
+                                disabled={wizard.participantCount >= participantLimit}
+                                onPress={() => setParticipantCount(Math.min(participantLimit, wizard.participantCount + 1))}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={[styles.jamStepBtnText, wizard.participantCount >= participantLimit && styles.jamStepBtnTextDisabled]}>+</Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+                        </View>
+
+                        {!isReserved && (
+                          <View style={[styles.quickDateRow, { marginTop: 12 }]}>
+                            {[1, 2, 4, 6, 8, 10].map((num) => (
+                              <TouchableOpacity
+                                key={num}
+                                style={[styles.quickDateBtn, wizard.participantCount === num && styles.quickDateBtnSelected]}
+                                onPress={() => setParticipantCount(num)}
+                              >
+                                <Text style={[styles.quickDateBtnText, wizard.participantCount === num && styles.quickDateBtnTextSelected]}>
+                                  {num} {num === 1 ? 'PERSON' : 'PEOPLE'}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    ) : (
+                      <View style={[styles.autoPeopleBox, isReserved && styles.autoPeopleBoxReserved]}>
+                        <View style={styles.autoPeopleRow}>
+                          <Text style={[styles.autoPeopleVal, isReserved && styles.autoPeopleValReserved]}>
+                            {isRecordingSolo
+                              ? (isReserved
+                                  ? 'RESERVED (SLOT OCCUPIED)'
+                                  : '1 MUSICIAN (SOLO RECORDING)')
+                              : isRecordingGroup
+                              ? (isReserved
+                                  ? 'RESERVED (SLOT OCCUPIED)'
+                                  : `${totalRecordingInstruments} MUSICIANS (${totalRecordingInstruments}/4 INSTRUMENTS TO RECORD)`)
+                              : isSoloPractice
+                              ? '1 PERSON (SOLO)'
+                              : isJamSession
+                              ? (isReserved
+                                  ? 'RESERVED (JAM SESSION ALREADY BOOKED)'
+                                  : `${totalJamInstruments} MUSICIANS (${totalJamInstruments}/8 INSTRUMENTS)`)
+                              : isReserved
+                              ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
+                                  ? 'RESERVED (JAM SESSION)'
+                                  : selectedSlot?.booked_session_name?.toUpperCase().includes('RECORDING') || selectedSlot?.status?.toUpperCase().includes('RECORDING')
+                                  ? 'RESERVED (RECORDING SESSION)'
+                                  : `${existingParticipants}/${maxCapacity} FULL (RESERVED)`)
+                              : existingParticipants === 0
+                              ? `0 IN SLOT (+1 YOU → 1/${maxCapacity})`
+                              : `${existingParticipants} IN SLOT (+1 YOU → ${nextTotalParticipants}/${maxCapacity})`}
+                          </Text>
+                          <View style={[styles.autoTag, isReserved && styles.autoTagReserved]}>
+                            <Text style={[styles.autoTagText, isReserved && styles.autoTagTextReserved]}>
+                              {isReserved
+                                ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM') || isJamSession
+                                    ? 'JAM RESERVED'
+                                    : selectedSlot?.booked_session_name?.toUpperCase().includes('RECORDING') || selectedSlot?.status?.toUpperCase().includes('RECORDING') || isRecordingSession
+                                    ? 'RECORDING RESERVED'
+                                    : 'RESERVED')
+                                : isRecordingSolo
+                                ? 'SOLO RECORDING'
+                                : isRecordingGroup
+                                ? `${totalRecordingInstruments}/4 RECORDING`
+                                : isSoloPractice
+                                ? 'SOLO'
+                                : isJamSession
+                                ? `${totalJamInstruments}/8 JAM PLAYERS`
+                                : `${existingParticipants}/${maxCapacity} ACTIVE`}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.autoPeopleSub}>
+                          {isRecordingSolo
+                            ? (isReserved
+                                ? '⚠️ Slot is already booked. Recording sessions require complete studio isolation.'
+                                : 'Complete studio room isolation for your solo recording. No other session or musicians can enter.')
                             : isRecordingGroup
                             ? (isReserved
-                                ? 'RESERVED (SLOT OCCUPIED)'
-                                : `${totalRecordingInstruments} MUSICIANS (${totalRecordingInstruments}/4 INSTRUMENTS TO RECORD)`)
+                                ? '⚠️ Slot is already booked. Recording sessions require complete studio isolation.'
+                                : `One user booking for all ${totalRecordingInstruments} recording musician(s) (Constraint Max: 4). Complete studio isolation.`)
                             : isSoloPractice
-                            ? '1 PERSON (SOLO)'
+                            ? (isSlotSoloBlocked
+                                ? '⚠️ Slot already has active musicians. Solo practice requires an empty room.'
+                                : '0 existing musicians in slot • Private room for you alone (no other players allowed)')
                             : isJamSession
                             ? (isReserved
-                                ? 'RESERVED (JAM SESSION ALREADY BOOKED)'
-                                : `${totalJamInstruments} MUSICIANS (${totalJamInstruments}/8 INSTRUMENTS)`)
+                                ? '⚠️ A Jam session is already booked in this slot by another user. User B cannot select this slot; please select a different one.'
+                                : `One user booking for all ${totalJamInstruments} musician(s) in this Jam Session (Constraint Max: 8). This slot will be reserved exclusively for your session.`)
                             : isReserved
                             ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
-                                ? 'RESERVED (JAM SESSION)'
+                                ? '⚠️ This slot is reserved by a Jam Session and only belongs to it. Not available for Session A or B collaborative practice.'
                                 : selectedSlot?.booked_session_name?.toUpperCase().includes('RECORDING') || selectedSlot?.status?.toUpperCase().includes('RECORDING')
-                                ? 'RESERVED (RECORDING SESSION)'
-                                : `${existingParticipants}/${maxCapacity} FULL (RESERVED)`)
+                                ? '⚠️ This slot is reserved by a Recording Session with complete studio isolation.'
+                                : `Maximum capacity reached (${existingParticipants}/${maxCapacity}). This slot is reserved.`)
                             : existingParticipants === 0
-                            ? `0 IN SLOT (+1 YOU → 1/${maxCapacity})`
-                            : `${existingParticipants} IN SLOT (+1 YOU → ${nextTotalParticipants}/${maxCapacity})`}
+                            ? `No musicians currently in this slot. You will be participant 1 of ${maxCapacity}.`
+                            : `${existingParticipants} existing ${existingParticipants === 1 ? 'musician' : 'musicians'} (${selectedSlot?.instruments_summary?.join(', ') || 'playing'}) • Adding your booking makes it ${nextTotalParticipants}/${maxCapacity}`}
                         </Text>
-                        <View style={[styles.autoTag, isReserved && styles.autoTagReserved]}>
-                          <Text style={[styles.autoTagText, isReserved && styles.autoTagTextReserved]}>
-                            {isReserved
-                              ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM') || isJamSession
-                                  ? 'JAM RESERVED'
-                                  : selectedSlot?.booked_session_name?.toUpperCase().includes('RECORDING') || selectedSlot?.status?.toUpperCase().includes('RECORDING') || isRecordingSession
-                                  ? 'RECORDING RESERVED'
-                                  : 'RESERVED')
-                              : isRecordingSolo
-                              ? 'SOLO RECORDING'
-                              : isRecordingGroup
-                              ? `${totalRecordingInstruments}/4 RECORDING`
-                              : isSoloPractice
-                              ? 'SOLO'
-                              : isJamSession
-                              ? `${totalJamInstruments}/8 JAM PLAYERS`
-                              : `${existingParticipants}/${maxCapacity} ACTIVE`}
-                          </Text>
-                        </View>
                       </View>
-                      <Text style={styles.autoPeopleSub}>
-                        {isMeetingSession
-                          ? 'Meeting Attendees • Standard reservation'
-                          : isRecordingSolo
-                          ? (isReserved
-                              ? '⚠️ Slot is already booked. Recording sessions require complete studio isolation.'
-                              : 'Complete studio room isolation for your solo recording. No other session or musicians can enter.')
-                          : isRecordingGroup
-                          ? (isReserved
-                              ? '⚠️ Slot is already booked. Recording sessions require complete studio isolation.'
-                              : `One user booking for all ${totalRecordingInstruments} recording musician(s) (Constraint Max: 4). Complete studio isolation.`)
-                          : isSoloPractice
-                          ? (isSlotSoloBlocked
-                              ? '⚠️ Slot already has active musicians. Solo practice requires an empty room.'
-                              : '0 existing musicians in slot • Private room for you alone (no other players allowed)')
-                          : isJamSession
-                          ? (isReserved
-                              ? '⚠️ A Jam session is already booked in this slot by another user. User B cannot select this slot; please select a different one.'
-                              : `One user booking for all ${totalJamInstruments} musician(s) in this Jam Session (Constraint Max: 8). This slot will be reserved exclusively for your session.`)
-                          : isReserved
-                          ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
-                              ? '⚠️ This slot is reserved by a Jam Session and only belongs to it. Not available for Session A or B collaborative practice.'
-                              : selectedSlot?.booked_session_name?.toUpperCase().includes('RECORDING') || selectedSlot?.status?.toUpperCase().includes('RECORDING')
-                              ? '⚠️ This slot is reserved by a Recording Session with complete studio isolation.'
-                              : `Maximum capacity reached (${existingParticipants}/${maxCapacity}). This slot is reserved.`)
-                          : existingParticipants === 0
-                          ? `No musicians currently in this slot. You will be participant 1 of ${maxCapacity}.`
-                          : `${existingParticipants} existing ${existingParticipants === 1 ? 'musician' : 'musicians'} (${selectedSlot?.instruments_summary?.join(', ') || 'playing'}) • Adding your booking makes it ${nextTotalParticipants}/${maxCapacity}`}
-                      </Text>
-                    </View>
+                    )}
                   </View>
                 </View>
               );
@@ -2139,5 +2262,16 @@ const styles = StyleSheet.create({
   jamQtyTextSelected: {
     color: '#e8c872',
     fontWeight: '800',
+  },
+  meetingAutoBoxRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  meetingAutoBoxLeft: {
+    flex: 1,
+    minWidth: 160,
   },
 });

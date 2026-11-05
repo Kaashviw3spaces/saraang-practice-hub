@@ -994,6 +994,26 @@ async def get_session_slots_availability(
             )
             continue
 
+        if current_session_name.lower() == "meeting session":
+            # For Meeting Session: Exclusive room reservation.
+            slots.append(
+                SlotAvailability(
+                    start_time=str(start_t),
+                    end_time=str(end_t),
+                    label=label,
+                    is_available=False,
+                    status=f"Reserved ({slot_bookings[0]['session_name']})",
+                    current_participants=current_p,
+                    max_participants=session_limit,
+                    instruments_summary=[],
+                    collaborative_open=False,
+                    has_solo=False,
+                    booked_session_name=slot_bookings[0]["session_name"],
+                    active_session_name=slot_bookings[0]["session_name"],
+                )
+            )
+            continue
+
         if has_solo:
             # Solo Practice: room exclusively locked
             slots.append(
@@ -1324,6 +1344,13 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
                 detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is already booked ({booked_name}). Recording sessions require complete studio isolation and cannot share a slot with any other session or musicians.",
             )
 
+        if session_row["name"].lower() == "meeting session":
+            booked_name = existing_slot_bookings[0]["session_name"]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is already booked ({booked_name}). Meeting sessions require an exclusive room reservation.",
+            )
+
         # Check 2: Jam Session Exclusivity & Session Collision Prevention
         # If a slot is reserved by Jam Session, it strictly belongs to Jam Session:
         # While in Session A's or Session B's collaborative practice you cannot book a slot reserved by Jam Session.
@@ -1416,7 +1443,15 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
             candidate_rooms = list(available_rooms)
 
         # Capacity check: room must be able to accommodate requested participants
-        candidate_rooms = [r for r in candidate_rooms if r["base_capacity"] >= booking.participant_count]
+        s_name_lower = session_row["name"].lower()
+        if s_name_lower == "meeting session":
+            candidate_rooms = sorted(available_rooms, key=lambda r: r["base_capacity"], reverse=True)
+            if candidate_rooms and booking.participant_count > candidate_rooms[0]["base_capacity"]:
+                candidate_rooms = [candidate_rooms[0]]
+            else:
+                candidate_rooms = [r for r in candidate_rooms if r["base_capacity"] >= booking.participant_count]
+        else:
+            candidate_rooms = [r for r in candidate_rooms if r["base_capacity"] >= booking.participant_count]
 
         if not candidate_rooms:
             if not available_rooms:
