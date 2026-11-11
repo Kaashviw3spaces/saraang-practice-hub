@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Modal, Platform, Animated } from 'react-native';
+import { AnimatedPressable } from './AnimatedPressable';
 
 interface AcousticRejectionModalProps {
   visible: boolean;
@@ -21,6 +22,29 @@ export const AcousticRejectionModal: React.FC<AcousticRejectionModalProps> = ({
   onClose,
   onAdjustInstruments,
 }) => {
+  const scaleAnim = useRef(new Animated.Value(0.92)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      scaleAnim.setValue(0.92);
+      fadeAnim.setValue(0);
+      Animated.parallel([
+        Animated.spring(scaleAnim, {
+          toValue: 1,
+          friction: 6,
+          tension: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible, scaleAnim, fadeAnim]);
+
   return (
     <Modal
       visible={visible}
@@ -29,7 +53,15 @@ export const AcousticRejectionModal: React.FC<AcousticRejectionModalProps> = ({
       onRequestClose={onClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.modalBox}>
+        <Animated.View
+          style={[
+            styles.modalBox,
+            {
+              opacity: fadeAnim,
+              transform: [{ scale: scaleAnim }],
+            },
+          ]}
+        >
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.warningBadge}>
@@ -70,23 +102,23 @@ export const AcousticRejectionModal: React.FC<AcousticRejectionModalProps> = ({
 
           {/* Action Buttons */}
           <View style={styles.buttonRow}>
-            <TouchableOpacity
+            <AnimatedPressable
               style={styles.modifyBtn}
-              activeOpacity={0.8}
               onPress={onAdjustInstruments}
+              scaleTo={0.96}
             >
               <Text style={styles.modifyBtnText}>ADJUST INSTRUMENTS →</Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
 
-            <TouchableOpacity
+            <AnimatedPressable
               style={styles.cancelBtn}
-              activeOpacity={0.8}
               onPress={onClose}
+              scaleTo={0.96}
             >
               <Text style={styles.cancelBtnText}>DISMISS</Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -95,22 +127,22 @@ export const AcousticRejectionModal: React.FC<AcousticRejectionModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(0, 0, 0, 0.88)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   modalBox: {
     width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#161313',
-    borderWidth: 1.5,
-    borderColor: '#e05a47',
-    borderRadius: 8,
+    maxWidth: 440,
+    backgroundColor: '#15151A',
+    borderWidth: 2,
+    borderColor: '#82191F',
+    borderRadius: 10,
     padding: 22,
-    shadowColor: '#e05a47',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
+    shadowColor: '#82191F',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
     shadowRadius: 16,
     elevation: 8,
   },
@@ -121,112 +153,117 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#2e120f',
-    borderWidth: 1,
-    borderColor: '#e05a47',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
+    backgroundColor: '#240C10',
+    borderWidth: 1.5,
+    borderColor: '#7D1D22',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
   warningIcon: {
     fontSize: 14,
     marginRight: 6,
   },
   headerTitle: {
-    color: '#e05a47',
+    color: '#F6F2EB',
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 1.2,
+    letterSpacing: 0.9,
   },
   mainReason: {
-    color: '#f4ede4',
+    color: '#F6F2EB',
     fontSize: 15,
     fontWeight: '700',
     lineHeight: 22,
     marginBottom: 16,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
   reasonHighlight: {
-    color: '#e05a47',
-    fontWeight: '800',
+    color: '#F87171',
+    fontWeight: '900',
   },
   telemetryBox: {
-    backgroundColor: '#1c1514',
-    borderWidth: 1,
-    borderColor: '#382522',
-    borderRadius: 6,
-    padding: 12,
+    backgroundColor: '#0D0D10',
+    borderWidth: 1.5,
+    borderColor: '#261C20',
+    borderRadius: 8,
+    padding: 14,
     marginBottom: 14,
   },
   telemetryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   telemetryLabel: {
-    color: '#888888',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
+    color: '#9E9891',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   telemetryDanger: {
-    color: '#e05a47',
+    color: '#F87171',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   telemetrySafe: {
-    color: '#52b79a',
+    color: '#9E9891',
     fontSize: 12,
     fontWeight: '800',
   },
   collisionBox: {
-    backgroundColor: '#1f1a14',
-    borderWidth: 1,
-    borderColor: '#4d3a20',
-    borderRadius: 6,
-    padding: 12,
+    backgroundColor: '#200B0E',
+    borderWidth: 1.5,
+    borderColor: '#7D1D22',
+    borderRadius: 8,
+    padding: 14,
     marginBottom: 20,
   },
   collisionHeader: {
-    color: '#e8c872',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
+    color: '#F6F2EB',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
     marginBottom: 6,
   },
   collisionItem: {
-    color: '#cbb585',
-    fontSize: 11,
-    lineHeight: 16,
+    color: '#E0D0D1',
+    fontSize: 12,
+    lineHeight: 17,
     marginBottom: 4,
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
+    gap: 10,
   },
   modifyBtn: {
-    backgroundColor: '#f7f4ea',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 4,
-    marginRight: 10,
+    backgroundColor: '#F6F2EB',
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
   },
   modifyBtnText: {
-    color: '#111111',
+    color: '#0D0D10',
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.9,
   },
   cancelBtn: {
-    backgroundColor: '#262626',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 4,
+    backgroundColor: '#22222A',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#2E2E38',
   },
   cancelBtnText: {
-    color: '#888888',
+    color: '#F6F2EB',
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
 });

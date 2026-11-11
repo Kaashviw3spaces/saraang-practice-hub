@@ -25,3 +25,13 @@ frontend/web-build/
 
 # OS generated files
 .DS_Store
+Screenshot*.png
+
+# Tooling & Assistant
+.agent/
+.agents/
+.claude/
+.codex/
+.cursor/
+.gemini/
+.impeccable/

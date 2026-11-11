@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,14 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Animated,
+  Easing,
 } from 'react-native';
 import { api, BookingResponse } from '../api/client';
 import { useStore } from '../store/useStore';
+import { AnimatedPressable } from '../components/AnimatedPressable';
+import { RockTextureOverlay } from '../components/RockTextureOverlay';
+import { LightningSvg } from '../components/LightningSvg';
 
 interface BookingsListScreenProps {
   onNavigateToWizard: () => void;
@@ -22,6 +27,22 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+
+  const quotaAnim = useRef(new Animated.Value(0)).current;
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const activeTodayCount = userBookings.filter(
+    (b) => b.booking_date === todayStr && b.status !== 'Cancelled'
+  ).length;
+
+  useEffect(() => {
+    Animated.timing(quotaAnim, {
+      toValue: Math.min(100, (activeTodayCount / 3) * 100),
+      duration: 500,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [activeTodayCount, quotaAnim]);
 
   const fetchBookings = useCallback(async () => {
     try {
@@ -69,11 +90,6 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
     );
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const activeTodayCount = userBookings.filter(
-    (b) => b.booking_date === todayStr && b.status !== 'Cancelled'
-  ).length;
-
   return (
     <ScrollView
       style={styles.container}
@@ -85,7 +101,7 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
             setRefreshing(true);
             fetchBookings();
           }}
-          tintColor="#e8c872"
+          tintColor="#FFFFFF"
         />
       }
     >
@@ -108,11 +124,20 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
             </Text>
           </View>
           <View style={styles.quotaTrack}>
-            <View
+            <Animated.View
               style={[
                 styles.quotaFill,
-                { width: `${Math.min(100, (activeTodayCount / 3) * 100)}%` },
-                activeTodayCount >= 3 ? styles.fillDanger : styles.fillSafe,
+                {
+                  width: quotaAnim.interpolate({
+                    inputRange: [0, 100],
+                    outputRange: ['0%', '100%'],
+                  }),
+                },
+                activeTodayCount >= 3
+                  ? styles.fillDanger
+                  : activeTodayCount === 2
+                  ? styles.fillWarning
+                  : styles.fillSafe,
               ]}
             />
           </View>
@@ -122,7 +147,7 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
       {/* Bookings List */}
       {loading && !refreshing ? (
         <View style={styles.centerBox}>
-          <ActivityIndicator size="large" color="#e8c872" />
+          <ActivityIndicator size="large" color="#00E5FF" />
         </View>
       ) : userBookings.length === 0 ? (
         <View style={styles.emptyBox}>
@@ -130,9 +155,12 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
           <Text style={styles.emptyText}>
             You have not booked any rehearsal sessions. Browse available sessions and lock in your window.
           </Text>
-          <TouchableOpacity style={styles.bookEmptyBtn} onPress={onNavigateToWizard}>
-            <Text style={styles.bookEmptyBtnText}>+ BOOK REHEARSAL SLOT</Text>
-          </TouchableOpacity>
+          <AnimatedPressable style={styles.bookEmptyBtn} onPress={onNavigateToWizard} scaleTo={0.96}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <LightningSvg color="#0D0D10" size={14} style={{ marginRight: 6 }} />
+              <Text style={styles.bookEmptyBtnText}>BOOK REHEARSAL SLOT</Text>
+            </View>
+          </AnimatedPressable>
         </View>
       ) : (
         userBookings.map((b) => {
@@ -141,10 +169,12 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
 
           return (
             <View key={b.id} style={[styles.bookingCard, isCancelled && styles.cancelledCard]}>
+              <RockTextureOverlay pattern="mesh" opacity={isConfirmed ? 0.06 : 0.03} />
+
               <View style={styles.cardHeader}>
                 <View>
                   <Text style={styles.bookingId}>PASS #{b.id}</Text>
-                  <Text style={styles.bookingSessionTitle}>{b.session_name}</Text>
+                  <Text style={styles.bookingSessionTitle}>{b.session_name.toUpperCase()}</Text>
                 </View>
 
                 <View
@@ -154,6 +184,7 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
                     isCancelled && styles.cancelledBadge,
                   ]}
                 >
+                  {isConfirmed && <LightningSvg color="#FFFFFF" size={10} style={{ marginRight: 4 }} />}
                   <Text
                     style={[
                       styles.statusText,
@@ -161,14 +192,14 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
                       isCancelled && styles.cancelledText,
                     ]}
                   >
-                    {b.status.toUpperCase()}
+                    {isConfirmed ? '★ ALL ACCESS PASS' : b.status.toUpperCase()}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.detailsGrid}>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>SESSION:</Text>
+                  <Text style={styles.detailLabel}>ROOM // SESSION:</Text>
                   <Text style={styles.detailVal}>{b.session_name}</Text>
                 </View>
                 {b.practice_mode ? (
@@ -184,7 +215,7 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
                   <Text style={styles.detailVal}>{b.booking_date}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>TIME:</Text>
+                  <Text style={styles.detailLabel}>WINDOW:</Text>
                   <Text style={styles.detailVal}>
                     {b.start_time} - {b.end_time}
                   </Text>
@@ -200,18 +231,18 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
               </View>
 
               {isConfirmed && (
-                <TouchableOpacity
+                <AnimatedPressable
                   style={styles.cancelBtn}
-                  activeOpacity={0.8}
                   onPress={() => handleCancelBooking(b)}
                   disabled={cancellingId === b.id}
+                  scaleTo={0.97}
                 >
                   {cancellingId === b.id ? (
-                    <ActivityIndicator size="small" color="#e05a47" />
+                    <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <Text style={styles.cancelBtnText}>CANCEL RESERVATION</Text>
                   )}
-                </TouchableOpacity>
+                </AnimatedPressable>
               )}
             </View>
           );
@@ -224,7 +255,7 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d0d0d',
+    backgroundColor: '#0D0D10',
   },
   content: {
     padding: 16,
@@ -234,26 +265,27 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   headerSubtitle: {
-    color: '#e05a47',
+    color: '#9E9891',
     fontSize: 11,
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
     fontWeight: '800',
     marginBottom: 4,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
   headerTitle: {
-    color: '#f4ede4',
+    color: '#F6F2EB',
     fontSize: 24,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     marginBottom: 14,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
   quotaBanner: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#262626',
-    borderRadius: 6,
-    padding: 12,
+    backgroundColor: '#15151A',
+    borderWidth: 1.5,
+    borderColor: '#261C20',
+    borderRadius: 10,
+    padding: 14,
   },
   quotaRow: {
     flexDirection: 'row',
@@ -262,87 +294,101 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   quotaTitle: {
-    color: '#888888',
+    color: '#9E9891',
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   quotaNum: {
     fontSize: 11,
-    fontWeight: '800',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '900',
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
   quotaSafe: {
-    color: '#52b79a',
+    color: '#F6F2EB',
   },
   quotaDanger: {
-    color: '#e05a47',
+    color: '#F87171',
   },
   quotaTrack: {
     height: 4,
-    backgroundColor: '#262626',
+    backgroundColor: '#0D0D10',
     borderRadius: 2,
     overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: '#261C20',
   },
   quotaFill: {
     height: '100%',
   },
   fillSafe: {
-    backgroundColor: '#3ddc97',
+    backgroundColor: '#10B981',
+  },
+  fillWarning: {
+    backgroundColor: '#FBBF24',
   },
   fillDanger: {
-    backgroundColor: '#e05a47',
+    backgroundColor: '#EF4444',
   },
   centerBox: {
     padding: 40,
     alignItems: 'center',
   },
   emptyBox: {
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: '#262626',
-    borderRadius: 8,
+    backgroundColor: '#15151A',
+    borderWidth: 1.5,
+    borderColor: '#261C20',
+    borderRadius: 10,
     padding: 30,
     alignItems: 'center',
     marginTop: 20,
   },
   emptyTitle: {
-    color: '#f4ede4',
+    color: '#F6F2EB',
     fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 1,
+    fontWeight: '900',
+    letterSpacing: 0.8,
     marginBottom: 8,
   },
   emptyText: {
-    color: '#777777',
+    color: '#9E9891',
     fontSize: 12,
     textAlign: 'center',
     lineHeight: 18,
     marginBottom: 20,
   },
   bookEmptyBtn: {
-    backgroundColor: '#f7f4ea',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
   },
   bookEmptyBtnText: {
-    color: '#111111',
+    color: '#0D0D10',
     fontSize: 12,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   bookingCard: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#282828',
-    borderRadius: 8,
-    padding: 18,
+    backgroundColor: '#15151A',
+    borderWidth: 2,
+    borderColor: '#261C20',
+    borderRadius: 10,
+    padding: 20,
     marginBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
   },
   cancelledCard: {
-    opacity: 0.6,
-    borderColor: '#1e1e1e',
+    opacity: 0.45,
+    borderColor: '#1D1D22',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -351,77 +397,82 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   bookingId: {
-    color: '#888888',
+    color: '#9E9891',
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
     marginBottom: 2,
   },
   bookingSessionTitle: {
-    color: '#f4ede4',
+    color: '#F6F2EB',
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
     borderWidth: 1,
   },
   confirmedBadge: {
-    backgroundColor: '#0f241e',
-    borderColor: '#255e4e',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E1E26',
+    borderColor: '#4A4A5A',
   },
   cancelledBadge: {
-    backgroundColor: '#201a1a',
-    borderColor: '#3a2e2e',
+    backgroundColor: '#0D0D10',
+    borderColor: '#261C20',
   },
   statusText: {
     fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   confirmedText: {
-    color: '#52b79a',
+    color: '#FFFFFF',
   },
   cancelledText: {
-    color: '#777777',
+    color: '#6A6560',
   },
   detailsGrid: {
-    backgroundColor: '#121212',
+    backgroundColor: '#0D0D10',
     borderRadius: 6,
-    padding: 12,
+    padding: 14,
     marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#261C20',
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   detailLabel: {
-    color: '#777777',
+    color: '#9E9891',
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   detailVal: {
-    color: '#f4ede4',
+    color: '#F6F2EB',
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   cancelBtn: {
-    borderWidth: 1,
-    borderColor: '#4d2320',
-    backgroundColor: '#1a1212',
-    paddingVertical: 9,
-    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#7D1D22',
+    backgroundColor: '#240C10',
+    paddingVertical: 10,
+    borderRadius: 6,
     alignItems: 'center',
   },
   cancelBtnText: {
-    color: '#e05a47',
+    color: '#F6F2EB',
     fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
 });

@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Platform, Image } from 'react-native';
 import { useStore } from '../store/useStore';
 import { api } from '../api/client';
+import { AnimatedPressable } from '../components/AnimatedPressable';
+import { RockTextureOverlay } from '../components/RockTextureOverlay';
+import { SoundwaveSvg } from '../components/SoundwaveSvg';
+import { LightningSvg } from '../components/LightningSvg';
 
 export const ProfileScreen: React.FC = () => {
   const { currentUser, setCurrentUser, showNotification } = useStore();
@@ -15,7 +19,7 @@ export const ProfileScreen: React.FC = () => {
   const handleTestNotification = () => {
     showNotification({
       title: 'SESSION REMINDER (15M MARK)',
-      message: 'Your rehearsal session starts in 15 minutes. Please proceed to Stage // 01.',
+      message: 'Your rehearsal session starts in 15 minutes. Please proceed to Room // 01.',
       type: 'warning',
     });
   };
@@ -35,17 +39,40 @@ export const ProfileScreen: React.FC = () => {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <View style={styles.headerBox}>
         <Text style={styles.headerSubtitle}>MEMBER PROFILE</Text>
-        <Text style={styles.headerTitle}>STAGE CREDENTIALS</Text>
+        <Text style={styles.headerTitle}>ROOM CREDENTIALS</Text>
       </View>
 
-      {/* User Card */}
+      {/* User Card styled as official artist backstage credential */}
       <View style={styles.userCard}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{currentUser.name.charAt(0)}</Text>
+        <RockTextureOverlay pattern="mesh" opacity={0.06} />
+
+        {/* Authentic Rock Band Watermark */}
+        <Image
+          source={require('../../assets/metallica.png')}
+          style={styles.cardWatermark}
+          resizeMode="cover"
+        />
+
+        <View style={styles.passHeaderStamp}>
+          <LightningSvg color="#FFFFFF" size={12} style={{ marginRight: 6 }} />
+          <Text style={styles.passHeaderStampText}>OFFICIAL BAND MEMBER // ALL ACCESS CREDENTIAL</Text>
+          <LightningSvg color="#FFFFFF" size={12} style={{ marginLeft: 6 }} />
+        </View>
+
+        <View style={styles.clubBadgeWrap}>
+          <Image
+            source={require('../../assets/saarang_logo.png')}
+            style={styles.clubBadgeImage}
+            resizeMode="contain"
+          />
         </View>
         <Text style={styles.userName}>{currentUser.name}</Text>
         <Text style={styles.userEmail}>{currentUser.email}</Text>
-        <Text style={styles.userId}>MEMBER ID: #{currentUser.id}</Text>
+        <Text style={styles.userId}>CREDENTIAL ID: #SRG-{currentUser.id}</Text>
+
+        <View style={styles.credentialSoundwave}>
+          <SoundwaveSvg color="#EF4444" secondaryColor="#00E5FF" height={22} variant="metallica" />
+        </View>
       </View>
 
       {/* User Switcher */}
@@ -55,16 +82,18 @@ export const ProfileScreen: React.FC = () => {
           {sampleUsers.map((u) => {
             const isSelected = currentUser.id === u.id;
             return (
-              <TouchableOpacity
+              <AnimatedPressable
                 key={u.id}
                 style={[styles.userPill, isSelected && styles.userPillSelected]}
                 onPress={() => setCurrentUser(u)}
+                scaleTo={0.96}
+                containerStyle={{ flex: 1, marginRight: 10 }}
               >
                 <Text style={[styles.userPillName, isSelected && styles.userPillTextSelected]}>
                   {u.name}
                 </Text>
                 <Text style={styles.userPillMeta}>ID #{u.id}</Text>
-              </TouchableOpacity>
+              </AnimatedPressable>
             );
           })}
         </View>
@@ -76,13 +105,16 @@ export const ProfileScreen: React.FC = () => {
         <View style={styles.notifyCard}>
           <Text style={styles.notifyStatus}>{pushTokenStatus}</Text>
 
-          <TouchableOpacity style={styles.registerBtn} onPress={handleRegisterToken}>
-            <Text style={styles.registerBtnText}>REGISTER DEVICE PUSH TOKEN</Text>
-          </TouchableOpacity>
+          <AnimatedPressable style={styles.registerBtn} onPress={handleRegisterToken} scaleTo={0.97}>
+            <View style={styles.btnRow}>
+              <LightningSvg color="#0D0D10" size={13} style={{ marginRight: 6 }} />
+              <Text style={styles.registerBtnText}>REGISTER ROOM PUSH TOKEN</Text>
+            </View>
+          </AnimatedPressable>
 
-          <TouchableOpacity style={styles.testBtn} onPress={handleTestNotification}>
+          <AnimatedPressable style={styles.testBtn} onPress={handleTestNotification} scaleTo={0.97}>
             <Text style={styles.testBtnText}>SIMULATE 15-MIN FOREGROUND BANNER</Text>
-          </TouchableOpacity>
+          </AnimatedPressable>
         </View>
       </View>
 
@@ -101,7 +133,7 @@ export const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d0d0d',
+    backgroundColor: '#0D0D10',
   },
   content: {
     padding: 16,
@@ -111,67 +143,120 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   headerSubtitle: {
-    color: '#e05a47',
+    color: '#9E9891',
     fontSize: 11,
-    letterSpacing: 1.5,
+    letterSpacing: 1.2,
     fontWeight: '800',
     marginBottom: 4,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
   headerTitle: {
-    color: '#f4ede4',
+    color: '#F6F2EB',
     fontSize: 24,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
   userCard: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#262626',
-    borderRadius: 8,
+    backgroundColor: '#15151A',
+    borderWidth: 2,
+    borderColor: '#7D1D22',
+    borderRadius: 12,
     padding: 24,
     alignItems: 'center',
     marginBottom: 24,
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#7D1D22',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#e8c872',
+  cardWatermark: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: '50%',
+    opacity: 0.08,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  passHeaderStamp: {
+    backgroundColor: '#15151A',
+    borderWidth: 1,
+    borderColor: '#262635',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 4,
+    marginBottom: 16,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
   },
-  avatarText: {
-    color: '#111111',
-    fontSize: 24,
+  passHeaderStampText: {
+    color: '#FFFFFF',
+    fontSize: 9,
     fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  clubBadgeWrap: {
+    width: 76,
+    height: 76,
+    borderRadius: 12,
+    backgroundColor: '#121216',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    borderWidth: 1.5,
+    borderColor: '#262635',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  clubBadgeImage: {
+    width: '100%',
+    height: '100%',
   },
   userName: {
-    color: '#f4ede4',
+    color: '#F6F2EB',
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '900',
+    letterSpacing: 0.8,
     marginBottom: 4,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
   userEmail: {
-    color: '#888888',
-    fontSize: 12,
+    color: '#9E9891',
+    fontSize: 13,
     marginBottom: 6,
   },
   userId: {
-    color: '#555555',
-    fontSize: 10,
-    letterSpacing: 1.2,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#8A847D',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
+  },
+  credentialSoundwave: {
+    width: '80%',
+    marginTop: 14,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#261C20',
   },
   section: {
     marginBottom: 24,
   },
   sectionTitle: {
-    color: '#e8c872',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+    color: '#F6F2EB',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1,
     marginBottom: 12,
   },
   switcherRow: {
@@ -179,86 +264,100 @@ const styles = StyleSheet.create({
   },
   userPill: {
     flex: 1,
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#282828',
-    borderRadius: 6,
-    padding: 12,
+    backgroundColor: '#15151A',
+    borderWidth: 2,
+    borderColor: '#261C20',
+    borderRadius: 8,
+    padding: 14,
     marginRight: 10,
   },
   userPillSelected: {
-    borderColor: '#e8c872',
-    backgroundColor: '#1c1913',
+    borderColor: '#82191F',
+    backgroundColor: '#2A0E13',
   },
   userPillName: {
-    color: '#cccccc',
-    fontSize: 12,
-    fontWeight: '800',
+    color: '#9E9891',
+    fontSize: 13,
+    fontWeight: '900',
   },
   userPillTextSelected: {
-    color: '#e8c872',
+    color: '#F6F2EB',
   },
   userPillMeta: {
-    color: '#666666',
-    fontSize: 10,
+    color: '#6A6560',
+    fontSize: 11,
+    fontWeight: '700',
     marginTop: 2,
   },
   notifyCard: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#282828',
-    borderRadius: 6,
-    padding: 16,
+    backgroundColor: '#15151A',
+    borderWidth: 1.5,
+    borderColor: '#261C20',
+    borderRadius: 10,
+    padding: 18,
   },
   notifyStatus: {
-    color: '#52b79a',
+    color: '#9E9891',
     fontSize: 11,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
     marginBottom: 14,
   },
+  btnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   registerBtn: {
-    backgroundColor: '#f7f4ea',
-    paddingVertical: 10,
-    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    borderRadius: 6,
     alignItems: 'center',
     marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   registerBtnText: {
-    color: '#111111',
+    color: '#0D0D10',
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.9,
   },
   testBtn: {
-    borderWidth: 1,
-    borderColor: '#383838',
-    paddingVertical: 10,
-    borderRadius: 4,
+    backgroundColor: '#240C10',
+    borderWidth: 1.5,
+    borderColor: '#EF4444',
+    paddingVertical: 12,
+    borderRadius: 6,
     alignItems: 'center',
   },
   testBtnText: {
-    color: '#888888',
+    color: '#EF4444',
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
   policyCard: {
-    backgroundColor: '#131313',
-    borderWidth: 1,
-    borderColor: '#222222',
-    borderRadius: 6,
-    padding: 16,
+    backgroundColor: '#200B0E',
+    borderWidth: 1.5,
+    borderColor: '#7D1D22',
+    borderRadius: 10,
+    padding: 18,
   },
   policyTitle: {
-    color: '#777777',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+    color: '#F6F2EB',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 0.9,
     marginBottom: 8,
   },
   policyItem: {
-    color: '#999999',
-    fontSize: 11,
+    color: '#E0D0D1',
+    fontSize: 12,
     lineHeight: 18,
     marginBottom: 4,
   },

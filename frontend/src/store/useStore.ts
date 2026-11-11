@@ -154,7 +154,7 @@ export const useStore = create<AppState>((set, get) => ({
       wizard: {
         ...state.wizard,
         practiceMode,
-        participantCount: 1,
+        participantCount: practiceMode.toLowerCase() === 'full band rehearsal' ? 4 : 1,
         // Reset instruments when mode changes
         instruments: {},
         acousticPreview: null,

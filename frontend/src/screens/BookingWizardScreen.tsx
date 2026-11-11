@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,27 @@ import {
   TextInput,
   Alert,
   Platform,
+  Animated,
+  Easing,
+  Image,
 } from 'react-native';
 import { api, SessionType, Instrument, SlotAvailability } from '../api/client';
 import { useStore } from '../store/useStore';
 import { SessionCard } from '../components/SessionCard';
 import { InstrumentGrid } from '../components/InstrumentGrid';
 import { AcousticRejectionModal } from '../components/AcousticRejectionModal';
+import { AnimatedPressable } from '../components/AnimatedPressable';
+import { SoundwaveSvg } from '../components/SoundwaveSvg';
+import { RockTextureOverlay } from '../components/RockTextureOverlay';
+import { LightningSvg } from '../components/LightningSvg';
+import { EqualizerBars } from '../components/EqualizerBars';
+
+const getFreqColor = (band?: string) => {
+  const b = (band || '').toUpperCase();
+  if (b.includes('LOW') || b.includes('SUB') || b.includes('BASS')) return '#EF4444';
+  if (b.includes('HI') || b.includes('TREBLE')) return '#00E5FF';
+  return '#F59E0B';
+};
 
 interface BookingWizardScreenProps {
   onBookingSuccess: () => void;
@@ -47,6 +62,61 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
   const [slots, setSlots] = useState<SlotAvailability[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [isSlotDropdownOpen, setIsSlotDropdownOpen] = useState(false);
+
+  const stepFade = useRef(new Animated.Value(1)).current;
+  const stepSlide = useRef(new Animated.Value(0)).current;
+  const dropdownAnim = useRef(new Animated.Value(0)).current;
+  const ticketFade = useRef(new Animated.Value(0)).current;
+  const ticketScale = useRef(new Animated.Value(0.92)).current;
+
+  useEffect(() => {
+    stepFade.setValue(0.25);
+    stepSlide.setValue(14);
+    Animated.parallel([
+      Animated.timing(stepFade, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(stepSlide, {
+        toValue: 0,
+        friction: 8,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [wizard.step]);
+
+  useEffect(() => {
+    Animated.spring(dropdownAnim, {
+      toValue: isSlotDropdownOpen ? 1 : 0,
+      friction: 8,
+      tension: 90,
+      useNativeDriver: false,
+    }).start();
+  }, [isSlotDropdownOpen, dropdownAnim]);
+
+  useEffect(() => {
+    if (successBooking) {
+      ticketFade.setValue(0);
+      ticketScale.setValue(0.92);
+      Animated.parallel([
+        Animated.timing(ticketFade, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(ticketScale, {
+          toValue: 1,
+          friction: 6,
+          tension: 80,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [successBooking, ticketFade, ticketScale]);
 
   // Load catalogues
   useEffect(() => {
@@ -114,9 +184,12 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             setSlots(returnedSlots);
 
             const isSolo = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
+            const isSessionA = (wizard.selectedSession?.name || '').toUpperCase().includes('SESSION A');
+            const isFullBandA = isSessionA && wizard.practiceMode.toUpperCase() === 'FULL BAND REHEARSAL';
             const isSlotValid = (s: SlotAvailability) => {
               if (!s.is_available) return false;
               if (isSolo && (s.current_participants || 0) > 0) return false;
+              if (isFullBandA && (s.current_participants || 0) > 0) return false;
               return (s.current_participants || 0) < (s.max_participants || 8);
             };
 
@@ -150,6 +223,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     const isRecording = sNameUpper.includes('RECORDING');
     const isMeeting = sNameUpper.includes('MEETING');
     const isJamSession = sNameUpper.includes('JAM');
+    const isSessionA = sNameUpper.includes('SESSION A');
+    const isFullBandA = isSessionA && wizard.practiceMode.toUpperCase() === 'FULL BAND REHEARSAL';
     const isSolo = wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE';
     const isRecordingSolo = isRecording && wizard.practiceMode.toUpperCase().includes('SOLO');
     const isRecordingGroup = isRecording && wizard.practiceMode.toUpperCase().includes('GROUP');
@@ -184,12 +259,37 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
       return;
     }
 
+    if (isFullBandA && selectedSlot && ((selectedSlot.current_participants || 0) > 0 || !selectedSlot.is_available)) {
+      Alert.alert(
+        'Full Band Rehearsal Exclusivity',
+        'Full Band Rehearsal reserves the entire sound room exclusively for your band. This slot already has active musicians or is reserved. Please select an empty available slot.'
+      );
+      return;
+    }
+
     if (isRecording && selectedSlot && (selectedSlot.current_participants || 0) > 0) {
       Alert.alert(
         'Recording Studio Isolation',
         'Recording sessions require complete studio isolation and cannot share a slot with any other session or musicians. Please select an available open slot.'
       );
       return;
+    }
+
+    if (isFullBandA) {
+      if (!wizard.participantCount || wizard.participantCount < 1) {
+        Alert.alert(
+          'Participants Required',
+          'Please enter the number of band members participating in this rehearsal (1 to 11).'
+        );
+        return;
+      }
+      if (wizard.participantCount > 11) {
+        Alert.alert(
+          'Participant Limit Exceeded',
+          `Full Band Rehearsal limit is 11 musicians. You entered ${wizard.participantCount}.`
+        );
+        return;
+      }
     }
 
     // 1-Hour slot rule: 60 minutes
@@ -205,7 +305,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
     const totalInstrumentsSelected = Object.values(wizard.instruments).reduce((sum, q) => sum + q, 0);
 
-    if (!isMeeting && selectedInstrumentsList.length === 0) {
+    if (!isMeeting && !isFullBandA && selectedInstrumentsList.length === 0) {
       Alert.alert(
         'Instrument Selection Required',
         isJamSession
@@ -244,19 +344,23 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     // For Jam Session: One user selects all instruments and books for everyone (up to 8).
     // For Recording Session: Solo = 1, Group = total instruments selected (up to 4, one user books for all).
     // For Meeting: Manually updated participant count (up to 10).
-    // For Session A / B: 1 per booking.
+    // For Full Band Rehearsal: Manually entered participant count (up to 11).
+    // For Session A / B (Solo / Collab): 1 per booking.
+    const maxAllowedLimit = isFullBandA ? 11 : wizard.selectedSession.participant_limit;
     const peoplePlaying = isMeeting
       ? Math.max(1, Math.min(wizard.selectedSession.participant_limit, wizard.participantCount || 2))
+      : isFullBandA
+      ? Math.max(1, Math.min(11, wizard.participantCount || 4))
       : isJamSession
       ? Math.min(8, Math.max(1, totalInstrumentsSelected))
       : isRecording
       ? (isRecordingSolo ? 1 : Math.min(4, Math.max(1, totalInstrumentsSelected)))
       : 1;
 
-    if (peoplePlaying > wizard.selectedSession.participant_limit) {
+    if (peoplePlaying > maxAllowedLimit) {
       Alert.alert(
         'Participant Limit Exceeded',
-        `The number of people playing based on selected instruments (${peoplePlaying}) exceeds the participant limit of ${wizard.selectedSession.participant_limit} for ${wizard.selectedSession.name}. Please remove ${peoplePlaying - wizard.selectedSession.participant_limit} instrument(s).`
+        `The number of people playing (${peoplePlaying}) exceeds the participant limit of ${maxAllowedLimit} for ${wizard.selectedSession.name}.`
       );
       return;
     }
@@ -265,6 +369,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     const meetingCtx = wizard.meetingContext.trim();
     const finalPracticeMode = isMeeting
       ? (meetingCtx || 'General Discussion')
+      : isFullBandA
+      ? 'Full Band Rehearsal'
       : wizard.practiceMode;
 
     const payload = {
@@ -288,6 +394,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
           ? `Booking Confirmed! Your ${res.session_name} studio recording slot is locked in (${res.start_time}-${res.end_time}).`
           : isMeeting
           ? `Booking Confirmed! Your ${res.session_name} slot is locked in (${res.start_time}-${res.end_time}).`
+          : isFullBandA
+          ? `Booking Confirmed! Your ${res.session_name} Full Band Rehearsal is locked in (${res.start_time}-${res.end_time}). Private room reserved.`
           : `Booking Confirmed! Your ${res.session_name} rehearsal slot is locked in (${res.start_time}-${res.end_time}).`,
         type: 'success',
       });
@@ -318,42 +426,91 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
   if (loading) {
     return (
       <View style={styles.centerBox}>
-        <ActivityIndicator size="large" color="#e8c872" />
-        <Text style={styles.loadingText}>LOADING STAGE SPECIFICATIONS...</Text>
+        <ActivityIndicator size="large" color="#FFFFFF" />
+        <Text style={styles.loadingText}>LOADING ROOM SPECIFICATIONS...</Text>
       </View>
     );
   }
 
-  // Success Ticket View
+  // Success Ticket View: VIP Backstage Laminate Pass
   if (successBooking) {
     const isRecordingSuccess = (successBooking.session_name || '').toUpperCase().includes('RECORDING');
     const isMeetingSuccess = (successBooking.session_name || '').toUpperCase().includes('MEETING');
+    const sName = (successBooking.session_name || '').toUpperCase();
+    const passWatermark = sName.includes('SESSION A')
+      ? require('../../assets/band6.jpg')
+      : sName.includes('SESSION B')
+      ? require('../../assets/band1.jpg')
+      : sName.includes('RECORDING')
+      ? require('../../assets/band3.jpg')
+      : isMeetingSuccess
+      ? require('../../assets/band2.jpg')
+      : require('../../assets/band4.avif');
+
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <View style={styles.ticketCard}>
+        <Animated.View
+          style={[
+            styles.ticketCard,
+            {
+              opacity: ticketFade,
+              transform: [{ scale: ticketScale }],
+            },
+          ]}
+        >
+          {/* Subtle Room Texture */}
+          <RockTextureOverlay pattern="mesh" opacity={0.06} />
+
+          {/* Authentic Rock Band Watermark */}
+          <Image
+            source={passWatermark}
+            style={styles.ticketWatermark}
+            resizeMode="cover"
+          />
+
+          {/* Lanyard Hole / VIP Header Stamp */}
+          <View style={styles.ticketLanyardSlot}>
+            <View style={styles.ticketHole} />
+            <LightningSvg color="#FFFFFF" size={13} style={{ marginRight: 6 }} />
+            <Text style={styles.ticketLanyardText}>★ ALL ACCESS BACKSTAGE PASS ★</Text>
+          </View>
+
           <View style={styles.ticketBadge}>
             <Text style={styles.ticketBadgeText}>RESERVATION CONFIRMED</Text>
           </View>
+
           <Text style={styles.ticketTitle}>PASS #{successBooking.id}</Text>
           <Text style={styles.ticketSession}>
             {isRecordingSuccess
               ? `Booking Confirmed! Your ${successBooking.session_name} studio recording slot is locked in.`
               : isMeetingSuccess
               ? `Booking Confirmed! Your ${successBooking.session_name} slot is locked in.`
+              : (successBooking.practice_mode || '').toUpperCase().includes('FULL BAND')
+              ? `Booking Confirmed! Your ${successBooking.session_name} Full Band Rehearsal is locked in.`
               : `Booking Confirmed! Your ${successBooking.session_name} rehearsal slot is locked in.`}
           </Text>
 
+          {/* Metallica & Arctic Monkeys dual-channel Soundwave */}
+          <View style={styles.ticketSoundwaveWrap}>
+            <SoundwaveSvg
+              color="#EF4444"
+              secondaryColor="#00E5FF"
+              height={22}
+              variant="metallica"
+            />
+          </View>
+
           <View style={styles.ticketGrid}>
             <View style={styles.ticketField}>
-              <Text style={styles.ticketLabel}>SESSION:</Text>
-              <Text style={styles.ticketVal}>{successBooking.session_name}</Text>
+              <Text style={styles.ticketLabel}>ROOM / SESSION:</Text>
+              <Text style={[styles.ticketVal, { color: '#00E5FF' }]}>{successBooking.session_name.toUpperCase()}</Text>
             </View>
             {successBooking.practice_mode ? (
               <View style={styles.ticketField}>
                 <Text style={styles.ticketLabel}>
                   {isMeetingSuccess ? 'CONTEXT:' : 'PRACTICE MODE:'}
                 </Text>
-                <Text style={styles.ticketVal}>{successBooking.practice_mode}</Text>
+                <Text style={[styles.ticketVal, { color: '#FFFFFF' }]}>{successBooking.practice_mode.toUpperCase()}</Text>
               </View>
             ) : null}
             <View style={styles.ticketField}>
@@ -361,7 +518,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               <Text style={styles.ticketVal}>{successBooking.booking_date}</Text>
             </View>
             <View style={styles.ticketField}>
-              <Text style={styles.ticketLabel}>WINDOW:</Text>
+              <Text style={styles.ticketLabel}>TIME WINDOW:</Text>
               <Text style={styles.ticketVal}>{successBooking.start_time} - {successBooking.end_time}</Text>
             </View>
             <View style={styles.ticketField}>
@@ -374,61 +531,135 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             </View>
           </View>
 
-          <View style={styles.ticketDivider} />
+          <View style={styles.ticketPerforatedLine} />
 
           <Text style={styles.pushNote}>
             🔔 Automatic FCM session reminders active at 45m and 60m marks.
           </Text>
 
-          <TouchableOpacity
+          <AnimatedPressable
             style={styles.doneBtn}
             onPress={() => {
               setSuccessBooking(null);
               resetWizard();
               onBookingSuccess();
             }}
+            scaleTo={0.97}
           >
-            <Text style={styles.doneBtnText}>VIEW MY BOOKINGS →</Text>
-          </TouchableOpacity>
-        </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+              <LightningSvg color="#0D0D10" size={15} style={{ marginRight: 6 }} />
+              <Text style={styles.doneBtnText}>VIEW MY BOOKINGS →</Text>
+            </View>
+          </AnimatedPressable>
+        </Animated.View>
       </ScrollView>
     );
   }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Step Indicator Header */}
-      <View style={styles.stepHeader}>
-        <Text style={styles.stepSubtitle}>
-          {wizard.step === 1 ? 'STEP 01 // SELECT SESSION TYPE' : 'STEP 02 // SETUP INSTRUMENTS & TIME'}
-        </Text>
-        <Text style={styles.stepTitle}>
-          {wizard.selectedSession?.name?.toUpperCase().includes('RECORDING')
-            ? 'BOOK RECORDING STUDIO SLOT'
-            : 'BOOK REHEARSAL SLOT'}
-        </Text>
-        <Text style={styles.stepDesc}>
-          {wizard.selectedSession?.name?.toUpperCase().includes('RECORDING')
-            ? 'CHECK YOUR SETUP, SELECT SLOT, AND LOCK IN YOUR ISOLATED STUDIO RECORDING WINDOW.'
-            : 'CHECK YOUR SETUP, SELECT SLOT, AND LOCK IN YOUR REHEARSAL WINDOW WITH AUTOMATED CONFLICT CHECKS.'}
-        </Text>
+      {/* Studio Header Console with Rock Progress Indicators */}
+      <View style={styles.heroConsole}>
+        <RockTextureOverlay pattern="mesh" opacity={0.06} />
+
+        {/* Dual-step Rock Progress Pills */}
+        <View style={styles.progressRow}>
+          <TouchableOpacity
+            style={[
+              styles.progressStepPill,
+              wizard.step === 1 ? styles.progressStepPillActive : styles.progressStepPillDone,
+            ]}
+            onPress={() => setWizardStep(1)}
+            activeOpacity={0.8}
+          >
+            <LightningSvg
+              color={wizard.step === 1 ? '#0D0D10' : '#10B981'}
+              size={11}
+              style={{ marginRight: 5 }}
+            />
+            <Text
+              style={[
+                styles.progressStepText,
+                wizard.step === 1 ? styles.progressStepTextActive : styles.progressStepTextDone,
+              ]}
+            >
+              01 // ROOM
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.progressStepDivider} />
+
+          <View
+            style={[
+              styles.progressStepPill,
+              wizard.step === 2 ? styles.progressStepPillActive : styles.progressStepPillPending,
+            ]}
+          >
+            <LightningSvg
+              color={wizard.step === 2 ? '#0D0D10' : '#6A6560'}
+              size={11}
+              style={{ marginRight: 5 }}
+            />
+            <Text
+              style={[
+                styles.progressStepText,
+                wizard.step === 2 ? styles.progressStepTextActive : styles.progressStepTextPending,
+              ]}
+            >
+              02 // RIG & TIME
+            </Text>
+          </View>
+        </View>
+
+        {/* Header Title with Soundwave Equalizer */}
+        <View style={styles.consoleTitleRow}>
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={styles.consoleTitle}>
+              {wizard.selectedSession?.name?.toUpperCase().includes('RECORDING')
+                ? 'RECORDING STUDIO BOOKING'
+                : 'REHEARSAL ROOM BOOKING'}
+            </Text>
+            <Text style={styles.consoleSubtitle}>
+              {wizard.step === 1
+                ? 'SELECT A ROOM TO CONFIGURE YOUR SESSION'
+                : 'CALIBRATE YOUR RIG, LOCK IN TIME & CONFIRM YOUR SLOT'}
+            </Text>
+          </View>
+          <EqualizerBars active={true} color="#EF4444" size={14} />
+        </View>
+
+        {/* Mini soundwave divider */}
+        <View style={styles.consoleSoundwaveWrap}>
+          <SoundwaveSvg color="#EF4444" secondaryColor="#38BDF8" height={16} variant="metallica" />
+        </View>
       </View>
 
       {/* ========================================================= */}
       {/* STEP 2A: SESSION SELECTION                                 */}
       {/* ========================================================= */}
       {wizard.step === 1 && (
-        <View>
-          {sessionTypes.map((session, index) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              stageNumber={`0${index + 1}`}
-              isSelected={wizard.selectedSession?.id === session.id}
-              onBookSlot={() => selectSession(session)}
-            />
-          ))}
-        </View>
+        <Animated.View style={{ opacity: stepFade, transform: [{ translateY: stepSlide }] }}>
+          <View style={styles.carouselHintBar}>
+            <Text style={styles.carouselHintText}>◀ SWIPE ROOMS • TAP CARD TO CONFIGURE ▶</Text>
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
+            snapToInterval={326}
+            contentContainerStyle={styles.horizontalCarouselContent}
+          >
+            {sessionTypes.map((session, index) => (
+              <SessionCard
+                key={session.id}
+                session={session}
+                roomNumber={`0${index + 1}`}
+                isSelected={wizard.selectedSession?.id === session.id}
+                onBookSlot={() => selectSession(session)}
+              />
+            ))}
+          </ScrollView>
+        </Animated.View>
       )}
 
       {/* ========================================================= */}
@@ -446,9 +677,10 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
         const isRecordingGroup = isRecordingSession && wizard.practiceMode.toUpperCase().includes('GROUP');
         const isSoloPractice = (wizard.practiceMode.toUpperCase() === 'SOLO PRACTICE') || isRecordingSolo;
         const participantLimit = wizard.selectedSession.participant_limit;
+        const effectiveParticipantLimit = isFullBandA ? 11 : participantLimit;
 
         // Jam Session & Session B: Collaborative Practice only
-        // Session A: Solo Practice or Collaborative Practice
+        // Session A: Solo Practice, Collaborative Practice, or Full Band Rehearsal
         // Recording Session: Solo Recording or Group Recording (strictly no rehearsal!)
         const practiceModes = (() => {
           if (isMeetingSession) return [];
@@ -459,7 +691,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             return ['Collaborative Practice'];
           }
           if (isSessionA) {
-            return ['Solo Practice', 'Collaborative Practice'];
+            return ['Solo Practice', 'Collaborative Practice', 'Full Band Rehearsal'];
           }
           return ['Collaborative Practice'];
         })();
@@ -490,28 +722,19 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
         });
 
         return (
-          <View>
-            {/* Selected Session Pill */}
+          <Animated.View style={{ opacity: stepFade, transform: [{ translateY: stepSlide }] }}>
+            {/* Selected Session Channel Rack Banner */}
             <View style={styles.selectedSessionPill}>
-              <View>
-                <Text style={styles.pillLabel}>SELECTED SESSION:</Text>
-                <Text style={styles.pillValue}>{wizard.selectedSession.name}</Text>
+              <RockTextureOverlay pattern="grooves" opacity={0.06} />
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <Text style={styles.pillValue}>{wizard.selectedSession.name.toUpperCase()}</Text>
+                <Text style={styles.rackSessionMeta}>
+                  CAPACITY // UP TO {effectiveParticipantLimit} MUSICIANS
+                </Text>
               </View>
-              <TouchableOpacity style={styles.changeBtn} onPress={() => setWizardStep(1)}>
-                <Text style={styles.changeBtnText}>CHANGE</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Automated Acoustic Calibration / Studio Isolation Banner */}
-            <View style={styles.autoAssignBanner}>
-              <Text style={styles.autoAssignTitle}>
-                {isRecordingSession ? '🎙️ STUDIO ISOLATION & LOCKDOWN' : '⚡ AUTOMATED ACOUSTIC CALIBRATION'}
-              </Text>
-              <Text style={styles.autoAssignText}>
-                {isRecordingSession
-                  ? 'Your studio recording session has complete room isolation. No other sessions or musicians are permitted in this slot.'
-                  : 'Your rehearsal session is dynamically acoustic-calibrated and scheduled based on your session mode and instrumentation.'}
-              </Text>
+              <AnimatedPressable style={styles.changeBtn} onPress={() => setWizardStep(1)} scaleTo={0.95}>
+                <Text style={styles.changeBtnText}>CHANGE ↻</Text>
+              </AnimatedPressable>
             </View>
 
             {/* Step 2B: Practice Mode Selection */}
@@ -524,15 +747,21 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                   {practiceModes.map((mode) => {
                     const isSelected = wizard.practiceMode.toLowerCase() === mode.toLowerCase();
                     return (
-                      <TouchableOpacity
+                      <AnimatedPressable
                         key={mode}
                         style={[styles.modeBtn, isSelected && styles.modeBtnSelected]}
                         onPress={() => setPracticeMode(mode)}
+                        scaleTo={0.96}
                       >
-                        <Text style={[styles.modeBtnText, isSelected && styles.modeBtnTextSelected]}>
-                          {mode.toUpperCase()}
-                        </Text>
-                      </TouchableOpacity>
+                        <View style={styles.modeBtnContent}>
+                          {isSelected && (
+                            <LightningSvg color="#FFFFFF" size={11} style={{ marginRight: 6 }} />
+                          )}
+                          <Text style={[styles.modeBtnText, isSelected && styles.modeBtnTextSelected]}>
+                            {mode.toUpperCase()}
+                          </Text>
+                        </View>
+                      </AnimatedPressable>
                     );
                   })}
                 </View>
@@ -562,6 +791,16 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                   />
                   <Text style={styles.meetingContextHelper}>
                     Type meeting purpose or topic. This will be displayed on your pass as CONTEXT.
+                  </Text>
+                </View>
+              </View>
+            ) : isFullBandA ? (
+              <View style={styles.formGroup}>
+                <View style={styles.policyCard}>
+                  <RockTextureOverlay pattern="mesh" opacity={0.06} />
+                  <Text style={styles.policyTitle}>🥁 SESSION A FULL BAND REHEARSAL</Text>
+                  <Text style={styles.policyText}>
+                    Full Band Rehearsal reserves the entire sound room exclusively for your band (up to 11 musicians). Select date and 1-hour time slot, and manually enter your band's participant count below. No individual instrument selection needed. This is not a collaborative practice—the entire room is private and locked so no outside musicians can join your slot.
                   </Text>
                 </View>
               </View>
@@ -597,42 +836,60 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                   </View>
                 </View>
 
-                {/* Display all instruments with quantity steppers */}
-                <View style={styles.jamListContainer}>
+                {/* Display all instruments with quantity steppers in horizontal carousel */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  decelerationRate="fast"
+                  snapToInterval={262}
+                  contentContainerStyle={styles.horizontalCarouselContent}
+                >
                   {allowedInstruments.map((inst) => {
                     const qty = wizard.instruments[inst.id] || 0;
                     const isSelected = qty > 0;
                     const canAdd = totalJamInstruments < 8;
+                    const freqColor = getFreqColor(inst.frequency_band);
 
                     return (
                       <View
                         key={inst.id}
                         style={[styles.jamInstrumentCard, isSelected && styles.jamInstrumentCardSelected]}
                       >
-                        <View style={styles.jamInstrumentInfo}>
+                        <RockTextureOverlay pattern="dots" opacity={0.04} />
+                        <View style={styles.jamInstrumentHeader}>
                           <Text style={[styles.jamInstrumentName, isSelected && styles.jamInstrumentNameSelected]}>
-                            {inst.name}
+                            {inst.name.toUpperCase()}
                           </Text>
-                          <Text style={styles.jamInstrumentCategory}>
-                            {inst.category || 'Instrument'} • Band: {inst.frequency_band || 'Mid'}
-                          </Text>
+                          {isSelected && (
+                            <View style={styles.selectedCheckBadge}>
+                              <Text style={styles.selectedCheckText}>✓</Text>
+                            </View>
+                          )}
+                        </View>
+                        <View style={styles.bandTagRow}>
+                          <View style={[styles.bandTagPill, { borderColor: freqColor }]}>
+                            <Text style={[styles.bandTagPillText, { color: freqColor }]}>
+                              {inst.frequency_band?.toUpperCase() || 'MID'} FREQ
+                            </Text>
+                          </View>
+                          <Text style={styles.soloCategoryText}>{inst.category?.toUpperCase() || 'GEAR'}</Text>
                         </View>
 
                         <View style={styles.jamStepperRow}>
-                          <TouchableOpacity
+                          <AnimatedPressable
                             style={[styles.jamStepBtn, qty === 0 && styles.jamStepBtnDisabled]}
                             disabled={qty === 0}
                             onPress={() => setInstrumentQuantity(inst.id, Math.max(0, qty - 1))}
-                            activeOpacity={0.7}
+                            scaleTo={0.88}
                           >
                             <Text style={[styles.jamStepBtnText, qty === 0 && styles.jamStepBtnTextDisabled]}>−</Text>
-                          </TouchableOpacity>
+                          </AnimatedPressable>
 
                           <View style={[styles.jamQtyBox, isSelected && styles.jamQtyBoxSelected]}>
                             <Text style={[styles.jamQtyText, isSelected && styles.jamQtyTextSelected]}>{qty}</Text>
                           </View>
 
-                          <TouchableOpacity
+                          <AnimatedPressable
                             style={[styles.jamStepBtn, !canAdd && styles.jamStepBtnDisabled]}
                             disabled={!canAdd}
                             onPress={() => {
@@ -642,15 +899,21 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                 Alert.alert('Constraint Limit', 'Constraint For Jam Session Max: 8 musicians/instruments.');
                               }
                             }}
-                            activeOpacity={0.7}
+                            scaleTo={0.88}
                           >
                             <Text style={[styles.jamStepBtnText, !canAdd && styles.jamStepBtnTextDisabled]}>+</Text>
-                          </TouchableOpacity>
+                          </AnimatedPressable>
                         </View>
+
+                        {isSelected && (
+                          <View style={styles.selectedStatusStrip}>
+                            <Text style={styles.selectedStatusStripText}>● {qty} IN RIG</Text>
+                          </View>
+                        )}
                       </View>
                     );
                   })}
-                </View>
+                </ScrollView>
               </View>
             ) : isRecordingGroup ? (
               <View style={styles.formGroup}>
@@ -684,42 +947,60 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                   </View>
                 </View>
 
-                {/* Display all instruments with quantity steppers */}
-                <View style={styles.jamListContainer}>
+                {/* Display all instruments with quantity steppers in horizontal carousel */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  decelerationRate="fast"
+                  snapToInterval={262}
+                  contentContainerStyle={styles.horizontalCarouselContent}
+                >
                   {allowedInstruments.map((inst) => {
                     const qty = wizard.instruments[inst.id] || 0;
                     const isSelected = qty > 0;
                     const canAdd = totalRecordingInstruments < 4;
+                    const freqColor = getFreqColor(inst.frequency_band);
 
                     return (
                       <View
                         key={inst.id}
                         style={[styles.jamInstrumentCard, isSelected && styles.jamInstrumentCardSelected]}
                       >
-                        <View style={styles.jamInstrumentInfo}>
+                        <RockTextureOverlay pattern="dots" opacity={0.04} />
+                        <View style={styles.jamInstrumentHeader}>
                           <Text style={[styles.jamInstrumentName, isSelected && styles.jamInstrumentNameSelected]}>
-                            {inst.name}
+                            {inst.name.toUpperCase()}
                           </Text>
-                          <Text style={styles.jamInstrumentCategory}>
-                            {inst.category || 'Instrument'} • Band: {inst.frequency_band || 'Mid'}
-                          </Text>
+                          {isSelected && (
+                            <View style={styles.selectedCheckBadge}>
+                              <Text style={styles.selectedCheckText}>✓</Text>
+                            </View>
+                          )}
+                        </View>
+                        <View style={styles.bandTagRow}>
+                          <View style={[styles.bandTagPill, { borderColor: freqColor }]}>
+                            <Text style={[styles.bandTagPillText, { color: freqColor }]}>
+                              {inst.frequency_band?.toUpperCase() || 'MID'} FREQ
+                            </Text>
+                          </View>
+                          <Text style={styles.soloCategoryText}>{inst.category?.toUpperCase() || 'GEAR'}</Text>
                         </View>
 
                         <View style={styles.jamStepperRow}>
-                          <TouchableOpacity
+                          <AnimatedPressable
                             style={[styles.jamStepBtn, qty === 0 && styles.jamStepBtnDisabled]}
                             disabled={qty === 0}
                             onPress={() => setInstrumentQuantity(inst.id, Math.max(0, qty - 1))}
-                            activeOpacity={0.7}
+                            scaleTo={0.88}
                           >
                             <Text style={[styles.jamStepBtnText, qty === 0 && styles.jamStepBtnTextDisabled]}>−</Text>
-                          </TouchableOpacity>
+                          </AnimatedPressable>
 
                           <View style={[styles.jamQtyBox, isSelected && styles.jamQtyBoxSelected]}>
                             <Text style={[styles.jamQtyText, isSelected && styles.jamQtyTextSelected]}>{qty}</Text>
                           </View>
 
-                          <TouchableOpacity
+                          <AnimatedPressable
                             style={[styles.jamStepBtn, !canAdd && styles.jamStepBtnDisabled]}
                             disabled={!canAdd}
                             onPress={() => {
@@ -729,15 +1010,21 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                 Alert.alert('Constraint Limit', 'Constraint For Recording Session Max: 4 musicians/instruments.');
                               }
                             }}
-                            activeOpacity={0.7}
+                            scaleTo={0.88}
                           >
                             <Text style={[styles.jamStepBtnText, !canAdd && styles.jamStepBtnTextDisabled]}>+</Text>
-                          </TouchableOpacity>
+                          </AnimatedPressable>
                         </View>
+
+                        {isSelected && (
+                          <View style={styles.selectedStatusStrip}>
+                            <Text style={styles.selectedStatusStripText}>● {qty} IN RIG</Text>
+                          </View>
+                        )}
                       </View>
                     );
                   })}
-                </View>
+                </ScrollView>
               </View>
             ) : (
               <View style={styles.formGroup}>
@@ -785,15 +1072,22 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                   </View>
                 )}
 
-                {/* Single-select per user */}
-                <View style={styles.soloPickerContainer}>
+                {/* Single-select per user in horizontal carousel */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  decelerationRate="fast"
+                  snapToInterval={242}
+                  contentContainerStyle={styles.horizontalCarouselContent}
+                >
                   {allowedInstruments.map((inst) => {
                     const isSelected = (wizard.instruments[inst.id] || 0) === 1;
+                    const freqColor = getFreqColor(inst.frequency_band);
                     return (
-                      <TouchableOpacity
+                      <AnimatedPressable
                         key={inst.id}
                         style={[styles.soloInstrumentCard, isSelected && styles.soloInstrumentCardSelected]}
-                        activeOpacity={0.8}
+                        scaleTo={0.96}
                         onPress={() => {
                           // Select exactly this ONE instrument for this user
                           allowedInstruments.forEach((other) => {
@@ -801,28 +1095,36 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                           });
                         }}
                       >
-                        <View style={styles.soloRadioRow}>
-                          <View style={[styles.radioCircle, isSelected && styles.radioCircleSelected]}>
-                            {isSelected && <View style={styles.radioDot} />}
-                          </View>
-                          <View style={styles.soloTextCol}>
-                            <Text style={[styles.soloInstrumentName, isSelected && styles.soloInstrumentNameSelected]}>
-                              {inst.name}
+                        <RockTextureOverlay pattern="dots" opacity={0.04} />
+                        <View style={styles.soloCardHeader}>
+                          <Text style={[styles.soloInstrumentName, isSelected && styles.soloInstrumentNameSelected]}>
+                            {inst.name.toUpperCase()}
+                          </Text>
+                          {isSelected ? (
+                            <View style={styles.selectedCheckBadge}>
+                              <Text style={styles.selectedCheckText}>✓</Text>
+                            </View>
+                          ) : (
+                            <View style={styles.unselectedRadioCircle} />
+                          )}
+                        </View>
+                        <View style={styles.bandTagRow}>
+                          <View style={[styles.bandTagPill, { borderColor: freqColor }]}>
+                            <Text style={[styles.bandTagPillText, { color: freqColor }]}>
+                              {inst.frequency_band?.toUpperCase() || 'MID'} FREQ
                             </Text>
-                            <Text style={styles.soloInstrumentCategory}>
-                              {inst.category || 'Instrument'} • Band: {inst.frequency_band || 'Mid'}
-                            </Text>
                           </View>
+                          <Text style={styles.soloCategoryText}>{inst.category?.toUpperCase() || 'GEAR'}</Text>
                         </View>
                         {isSelected && (
-                          <View style={styles.selectedBadge}>
-                            <Text style={styles.selectedBadgeText}>SELECTED</Text>
+                          <View style={styles.selectedStatusStrip}>
+                            <Text style={styles.selectedStatusStripText}>● RIG ARMED</Text>
                           </View>
                         )}
-                      </TouchableOpacity>
+                      </AnimatedPressable>
                     );
                   })}
-                </View>
+                </ScrollView>
               </View>
             )}
 
@@ -841,14 +1143,15 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
 
               const selectedSlot = slots.find((s) => s.start_time === wizard.startTime);
-              const maxCapacity = selectedSlot?.max_participants || participantLimit;
+              const maxCapacity = selectedSlot?.max_participants || effectiveParticipantLimit;
               const existingParticipants = selectedSlot?.current_participants || 0;
               const isSlotFull = existingParticipants >= maxCapacity;
               const isSlotSoloBlocked = isSoloPractice && existingParticipants > 0;
               const isJamOccupied = isJamSession && (existingParticipants > 0 || !selectedSlot?.is_available);
               const isRecordingOccupied = isRecordingSession && (existingParticipants > 0 || !selectedSlot?.is_available);
               const isMeetingOccupied = isMeetingSession && (existingParticipants > 0 || !selectedSlot?.is_available);
-              const isReserved = !selectedSlot?.is_available || isSlotFull || isSlotSoloBlocked || isJamOccupied || isRecordingOccupied || isMeetingOccupied;
+              const isFullBandOccupied = isFullBandA && (existingParticipants > 0 || !selectedSlot?.is_available);
+              const isReserved = !selectedSlot?.is_available || isSlotFull || isSlotSoloBlocked || isJamOccupied || isRecordingOccupied || isMeetingOccupied || isFullBandOccupied;
               const nextTotalParticipants = Math.min(maxCapacity, existingParticipants + 1);
 
               return (
@@ -864,22 +1167,40 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                       placeholderTextColor="#666666"
                     />
                     <View style={styles.quickDateRow}>
-                      <TouchableOpacity
-                        style={[styles.quickDateBtn, wizard.bookingDate === todayStr && styles.quickDateBtnSelected]}
+                      <AnimatedPressable
+                        style={[styles.quickDateBtn, wizard.bookingDate === todayStr && styles.quickDateBtnTodaySelected]}
                         onPress={() => setBookingDateTime(todayStr, wizard.startTime, 60)}
+                        scaleTo={0.96}
+                        containerStyle={{ flex: 1 }}
                       >
-                        <Text style={[styles.quickDateBtnText, wizard.bookingDate === todayStr && styles.quickDateBtnTextSelected]}>
-                          TODAY
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.quickDateBtn, wizard.bookingDate === tomorrowStr && styles.quickDateBtnSelected]}
+                        <View style={styles.quickDateInner}>
+                          <LightningSvg
+                            color={wizard.bookingDate === todayStr ? '#EF4444' : '#8A8580'}
+                            size={11}
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text style={[styles.quickDateBtnText, wizard.bookingDate === todayStr && styles.quickDateBtnTextSelected]}>
+                            TODAY (LIVE)
+                          </Text>
+                        </View>
+                      </AnimatedPressable>
+                      <AnimatedPressable
+                        style={[styles.quickDateBtn, wizard.bookingDate === tomorrowStr && styles.quickDateBtnTomorrowSelected]}
                         onPress={() => setBookingDateTime(tomorrowStr, wizard.startTime, 60)}
+                        scaleTo={0.96}
+                        containerStyle={{ flex: 1 }}
                       >
-                        <Text style={[styles.quickDateBtnText, wizard.bookingDate === tomorrowStr && styles.quickDateBtnTextSelected]}>
-                          TOMORROW
-                        </Text>
-                      </TouchableOpacity>
+                        <View style={styles.quickDateInner}>
+                          <LightningSvg
+                            color={wizard.bookingDate === tomorrowStr ? '#38BDF8' : '#8A8580'}
+                            size={11}
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text style={[styles.quickDateBtnText, wizard.bookingDate === tomorrowStr && styles.quickDateBtnTomorrowTextSelected]}>
+                            TOMORROW
+                          </Text>
+                        </View>
+                      </AnimatedPressable>
                     </View>
                   </View>
 
@@ -889,7 +1210,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                       <Text style={styles.fieldLabel}>TIME SLOT (1-HOUR SESSIONS):</Text>
                       {loadingSlots && (
                         <View style={styles.loadingSlotsRow}>
-                          <ActivityIndicator size="small" color="#e8c872" />
+                          <ActivityIndicator size="small" color="#FFFFFF" />
                           <Text style={styles.loadingSlotsText}>REFRESHING...</Text>
                         </View>
                       )}
@@ -951,9 +1272,23 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                   </Text>
                                 </View>
                               )}
-                              <Text style={styles.dropdownChevron}>
-                                {isSlotDropdownOpen ? '▲' : '▼'}
-                              </Text>
+                              <Animated.Text
+                                style={[
+                                  styles.dropdownChevron,
+                                  {
+                                    transform: [
+                                      {
+                                        rotate: dropdownAnim.interpolate({
+                                          inputRange: [0, 1],
+                                          outputRange: ['0deg', '180deg'],
+                                        }),
+                                      },
+                                    ],
+                                  },
+                                ]}
+                              >
+                                ▼
+                              </Animated.Text>
                             </View>
                           </TouchableOpacity>
 
@@ -970,7 +1305,21 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                           )}
 
                           {isSlotDropdownOpen && (
-                            <View style={styles.dropdownMenu}>
+                            <Animated.View
+                              style={[
+                                styles.dropdownMenu,
+                                {
+                                  maxHeight: dropdownAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0, 240],
+                                  }),
+                                  opacity: dropdownAnim.interpolate({
+                                    inputRange: [0, 0.2, 1],
+                                    outputRange: [0, 0.4, 1],
+                                  }),
+                                },
+                              ]}
+                            >
                               <ScrollView
                                 style={styles.dropdownScroll}
                                 nestedScrollEnabled={true}
@@ -990,14 +1339,17 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                     const isSlotJamOccupied = isJamSession && ((slot.current_participants || 0) > 0 || !slot.is_available);
                                     const isSlotRecOccupied = isRecordingSession && ((slot.current_participants || 0) > 0 || !slot.is_available);
                                     const isSlotMeetingOccupied = isMeetingSession && ((slot.current_participants || 0) > 0 || !slot.is_available);
-                                    const isBlocked = !slot.is_available || isSlotSoloBlocked || isSlotJamOccupied || isSlotRecOccupied || isSlotMeetingOccupied;
+                                    const isSlotFullBandBlocked = isFullBandA && ((slot.current_participants || 0) > 0 || !slot.is_available);
+                                    const isBlocked = !slot.is_available || isSlotSoloBlocked || isSlotJamOccupied || isSlotRecOccupied || isSlotMeetingOccupied || isSlotFullBandBlocked;
 
                                     const badgeText = (() => {
                                       if (isSlotSoloBlocked) return 'COLLAB ACTIVE (NO SOLO)';
+                                      if (isSlotFullBandBlocked) return 'OCCUPIED (EMPTY ROOM REQ)';
                                       if (isSlotJamOccupied) return 'RESERVED (JAM)';
                                       if (isSlotRecOccupied) return 'RESERVED (RECORDING)';
                                       if (isSlotMeetingOccupied) return 'RESERVED';
                                       if (!slot.is_available) {
+                                        if (activeSession?.toUpperCase().includes('FULL BAND') || slot.status?.toUpperCase().includes('FULL BAND')) return 'RESERVED (FULL BAND)';
                                         if (activeSession?.toUpperCase().includes('JAM') || slot.status?.toUpperCase().includes('JAM')) return 'RESERVED (JAM)';
                                         if (activeSession?.toUpperCase().includes('RECORDING') || slot.status?.toUpperCase().includes('RECORDING')) return 'RESERVED (RECORDING)';
                                         if (activeSession) return `RESERVED (${activeSession.toUpperCase()})`;
@@ -1006,6 +1358,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                         return slot.status?.toUpperCase() || 'RESERVED';
                                       }
                                       if (isSelected) return '✓ SELECTED';
+                                      if (isFullBandA) return 'AVAILABLE (EMPTY ROOM)';
                                       if (isJamSession) return 'AVAILABLE';
                                       if (isRecordingSession) return 'AVAILABLE';
                                       if (isMeetingSession) return 'AVAILABLE';
@@ -1027,6 +1380,13 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                             Alert.alert(
                                               'Solo Practice Exclusivity',
                                               'Solo practice requires an empty room. This slot already has collaborative musicians.'
+                                            );
+                                            return;
+                                          }
+                                          if (isSlotFullBandBlocked || (isFullBandA && ((slot.current_participants || 0) > 0 || !slot.is_available))) {
+                                            Alert.alert(
+                                              'Full Band Rehearsal Exclusivity',
+                                              'Full Band Rehearsal reserves the entire sound room exclusively for your band. This slot already has active musicians or is reserved. Please select an empty available slot.'
                                             );
                                             return;
                                           }
@@ -1052,6 +1412,13 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                             return;
                                           }
                                           if (!slot.is_available) {
+                                            if (activeSession?.toUpperCase().includes('FULL BAND') || slot.status?.toUpperCase().includes('FULL BAND')) {
+                                              Alert.alert(
+                                                'Full Band Rehearsal Reserved',
+                                                `The ${slot.label} slot is reserved for Full Band Rehearsal. It is an exclusive reservation and cannot be joined.`
+                                              );
+                                              return;
+                                            }
                                             if (activeSession?.toUpperCase().includes('JAM') || slot.status?.toUpperCase().includes('JAM')) {
                                               Alert.alert(
                                                 'Jam Session Reserved',
@@ -1136,7 +1503,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                   })
                                 )}
                               </ScrollView>
-                            </View>
+                            </Animated.View>
                           )}
                         </View>
                       );
@@ -1150,21 +1517,31 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                   {/* Dynamic People Playing (Participants in Slot) */}
                   <View style={styles.formGroup}>
                     <Text style={styles.fieldLabel}>
-                      {isMeetingSession ? 'PEOPLE IN MEETING (PARTICIPANTS IN SLOT - MANUAL ENTRY):' : 'PEOPLE PLAYING (PARTICIPANTS IN SLOT):'}
+                      {isMeetingSession
+                        ? 'PEOPLE IN MEETING (PARTICIPANTS IN SLOT - MANUAL ENTRY):'
+                        : isFullBandA
+                        ? 'BAND MEMBERS (PARTICIPANTS IN SLOT - MANUAL ENTRY):'
+                        : 'PEOPLE PLAYING (PARTICIPANTS IN SLOT):'}
                     </Text>
 
-                    {isMeetingSession ? (
+                    {isMeetingSession || isFullBandA ? (
                       <View style={[styles.autoPeopleBox, isReserved && styles.autoPeopleBoxReserved]}>
                         <View style={styles.meetingInputRow}>
                           <View style={styles.meetingInputCol}>
                             <Text style={[styles.autoPeopleVal, isReserved && styles.autoPeopleValReserved]}>
                               {isReserved
                                 ? 'RESERVED (SLOT OCCUPIED)'
+                                : isFullBandA
+                                ? `${wizard.participantCount || 0} ${wizard.participantCount === 1 ? 'MEMBER' : 'MEMBERS'} IN BAND`
                                 : `${wizard.participantCount || 0} ${wizard.participantCount === 1 ? 'PERSON' : 'PEOPLE'} ATTENDING`}
                             </Text>
                             <Text style={styles.autoPeopleSub}>
                               {isReserved
-                                ? '⚠️ This slot is already booked for another session. Please select an available slot.'
+                                ? (isFullBandA
+                                    ? '⚠️ This slot already has active musicians or is reserved. Full band rehearsal requires an empty room.'
+                                    : '⚠️ This slot is already booked for another session. Please select an available slot.')
+                                : isFullBandA
+                                ? `Enter number of band members manually (1 to ${effectiveParticipantLimit} max). Room reserved exclusively for your band.`
                                 : `Type number of attendees manually (1 to ${participantLimit} max)`}
                             </Text>
                           </View>
@@ -1180,15 +1557,15 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                     setParticipantCount(0);
                                   } else {
                                     const val = parseInt(digits, 10);
-                                    setParticipantCount(Math.min(participantLimit, Math.max(1, val)));
+                                    setParticipantCount(Math.min(effectiveParticipantLimit, Math.max(1, val)));
                                   }
                                 }}
-                                placeholder="5"
+                                placeholder={isFullBandA ? "6" : "5"}
                                 placeholderTextColor="#666666"
                                 keyboardType="number-pad"
                                 maxLength={2}
                               />
-                              <Text style={styles.meetingInputLimitTag}>/ {participantLimit} MAX</Text>
+                              <Text style={styles.meetingInputLimitTag}>/ {effectiveParticipantLimit} MAX</Text>
                             </View>
                           )}
                         </View>
@@ -1276,21 +1653,29 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             })()}
 
           {/* Confirm Reservation Button */}
-          <TouchableOpacity
+          <AnimatedPressable
             style={[styles.confirmBtn, isSubmitting && styles.confirmBtnDisabled]}
-            activeOpacity={0.8}
             onPress={handleConfirmReservation}
             disabled={isSubmitting}
+            scaleTo={0.98}
           >
             {isSubmitting ? (
-              <ActivityIndicator color="#111111" />
+              <ActivityIndicator color="#0D0D10" />
             ) : (
-              <Text style={styles.confirmBtnText}>
-                {isRecordingSession ? 'CONFIRM RECORDING RESERVATION →' : 'CONFIRM RESERVATION →'}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+                <LightningSvg color="#0D0D10" size={16} style={{ marginRight: 8 }} />
+                <Text style={styles.confirmBtnText}>
+                  {isRecordingSession
+                    ? 'CONFIRM RECORDING RESERVATION'
+                    : isFullBandA
+                    ? 'CONFIRM FULL BAND RESERVATION'
+                    : 'CONFIRM RESERVATION'}
+                </Text>
+                <LightningSvg color="#0D0D10" size={16} style={{ marginLeft: 8 }} />
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
+          </AnimatedPressable>
+        </Animated.View>
         );
       })()}
 
@@ -1309,97 +1694,228 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d0d0d',
+    backgroundColor: '#0D0D10',
   },
   content: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 48,
+  },
+  horizontalCarouselContent: {
+    paddingVertical: 8,
+    paddingRight: 16,
   },
   centerBox: {
     flex: 1,
-    backgroundColor: '#0d0d0d',
+    backgroundColor: '#0D0D10',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   loadingText: {
-    color: '#888888',
-    fontSize: 11,
-    letterSpacing: 1.2,
+    color: '#9E9891',
+    fontSize: 12,
+    letterSpacing: 0.8,
     fontWeight: '700',
     marginTop: 12,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
-  stepHeader: {
-    marginBottom: 20,
+
+  /* ========================================================= */
+  /* STUDIO HERO CONSOLE & PROGRESS STEPPERS                   */
+  /* ========================================================= */
+  heroConsole: {
+    backgroundColor: '#15151A',
+    borderWidth: 1.5,
+    borderColor: '#262635',
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 4,
   },
-  stepSubtitle: {
-    color: '#e05a47',
-    fontSize: 11,
-    letterSpacing: 1.5,
-    fontWeight: '800',
-    marginBottom: 4,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
   },
-  stepTitle: {
-    color: '#f4ede4',
-    fontSize: 24,
+  progressStepPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  progressStepPillActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  progressStepPillDone: {
+    backgroundColor: '#0F291E',
+    borderColor: '#10B981',
+  },
+  progressStepPillPending: {
+    backgroundColor: '#1C1C24',
+    borderColor: '#2E2E3E',
+  },
+  progressStepDivider: {
+    width: 24,
+    height: 1,
+    backgroundColor: '#2E2E3E',
+    marginHorizontal: 8,
+  },
+  progressStepText: {
+    fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 1,
-    marginBottom: 6,
+    letterSpacing: 0.9,
   },
-  stepDesc: {
-    color: '#888888',
-    fontSize: 11,
+  progressStepTextActive: {
+    color: '#0D0D10',
+  },
+  progressStepTextDone: {
+    color: '#10B981',
+  },
+  progressStepTextPending: {
+    color: '#6A6560',
+  },
+  consoleTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  consoleTitle: {
+    color: '#FFFFFF',
+    fontSize: 20,
+    fontWeight: '900',
     letterSpacing: 0.8,
-    lineHeight: 16,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
+  consoleSubtitle: {
+    color: '#9E9891',
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginTop: 4,
+  },
+  consoleSoundwaveWrap: {
+    width: '100%',
+    marginTop: 4,
+  },
+  carouselHintBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#15151A',
+    borderWidth: 1,
+    borderColor: '#262635',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginBottom: 12,
+  },
+  carouselHintText: {
+    color: '#A0A0A0',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.2,
+  },
+
+  /* ========================================================= */
+  /* CHANNEL RACK BANNER & ROOM SPECS                          */
+  /* ========================================================= */
   selectedSessionPill: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#e8c872',
-    borderRadius: 6,
-    padding: 14,
+    backgroundColor: '#14141A',
+    borderWidth: 1.5,
+    borderColor: '#262638',
+    borderLeftWidth: 3.5,
+    borderLeftColor: '#EF4444',
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  rackLiveDotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  rackLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+    marginRight: 6,
   },
   pillLabel: {
-    color: '#888888',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1,
+    color: '#8A8FA0',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.9,
   },
   pillValue: {
-    color: '#e8c872',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     marginTop: 2,
   },
+  rackSessionMeta: {
+    color: '#8A8FA0',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.7,
+    marginTop: 4,
+  },
   changeBtn: {
-    backgroundColor: '#262626',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   changeBtnText: {
-    color: '#f4ede4',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
+    color: '#0D0D10',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
+
+  /* ========================================================= */
+  /* FORMS & PRACTICE MODES                                    */
+  /* ========================================================= */
   formGroup: {
-    marginBottom: 16,
-  },
-  formRow: {
-    flexDirection: 'row',
+    marginBottom: 18,
   },
   fieldLabel: {
-    color: '#888888',
-    fontSize: 10,
+    color: '#9E9891',
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     marginBottom: 8,
   },
   modeRow: {
@@ -1408,472 +1924,394 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   modeBtn: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#2e2e2e',
-    borderRadius: 6,
-    paddingHorizontal: 12,
+    backgroundColor: '#14141A',
+    borderWidth: 1.5,
+    borderColor: '#262638',
+    borderRadius: 8,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     marginRight: 8,
     marginBottom: 8,
   },
   modeBtnSelected: {
-    borderColor: '#e8c872',
-    backgroundColor: '#1f1b13',
+    borderColor: '#EF4444',
+    backgroundColor: '#1E1E28',
+    borderWidth: 2,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
+  modeBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   modeBtnText: {
-    color: '#888888',
-    fontSize: 10,
+    color: '#9E9891',
+    fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   modeBtnTextSelected: {
-    color: '#e8c872',
+    color: '#FFFFFF',
+    fontWeight: '900',
   },
   policyCard: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#2d2d2d',
-    borderRadius: 6,
+    backgroundColor: '#161410',
+    borderWidth: 1.5,
+    borderColor: '#382D18',
+    borderRadius: 10,
     padding: 14,
     marginBottom: 16,
+    position: 'relative',
+    overflow: 'hidden',
   },
   policyTitle: {
-    color: '#e8c872',
+    color: '#FBBF24',
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     marginBottom: 4,
   },
   policyText: {
-    color: '#cccccc',
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  soloPickerRow: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  soloPill: {
-    flex: 1,
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#2e2e2e',
-    borderRadius: 6,
-    padding: 14,
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  soloPillSelected: {
-    borderColor: '#e8c872',
-    backgroundColor: '#1f1b13',
-  },
-  soloPillText: {
-    color: '#cccccc',
+    color: '#E0D6C8',
     fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  soloPillTextSelected: {
-    color: '#e8c872',
-  },
-  soloPillSub: {
-    color: '#666666',
-    fontSize: 10,
+    lineHeight: 16,
   },
   warningBox: {
-    backgroundColor: '#1f1a10',
-    borderWidth: 1,
-    borderColor: '#3d321b',
-    borderRadius: 6,
-    padding: 10,
+    backgroundColor: '#18130E',
+    borderWidth: 1.5,
+    borderColor: '#4A3312',
+    borderRadius: 8,
+    padding: 12,
     marginBottom: 16,
   },
   warningText: {
-    color: '#e8c872',
+    color: '#FDE68A',
     fontSize: 11,
     lineHeight: 16,
+    fontWeight: '600',
   },
-  aiPreviewBox: {
-    backgroundColor: '#161512',
-    borderWidth: 1,
-    borderColor: '#3d321b',
-    borderRadius: 6,
+
+  /* ========================================================= */
+  /* JAM & GROUP RECORDING COUNTER BANNERS                     */
+  /* ========================================================= */
+  jamCounterBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#131319',
+    borderWidth: 1.5,
+    borderColor: '#262638',
+    borderRadius: 10,
     padding: 14,
-    marginBottom: 18,
+    marginBottom: 14,
+    position: 'relative',
+    overflow: 'hidden',
   },
-  previewHeader: {
+  jamCounterLeft: {
+    flex: 1,
+  },
+  jamCounterLabel: {
+    color: '#8A8FA0',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  jamCounterValue: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+    marginTop: 2,
+    letterSpacing: 0.6,
+  },
+  jamCounterBadge: {
+    backgroundColor: '#1E1628',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#3D2A54',
+  },
+  jamCounterBadgeFull: {
+    backgroundColor: '#261218',
+    borderColor: '#EF4444',
+  },
+  jamCounterBadgeText: {
+    color: '#C084FC',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+
+  /* ========================================================= */
+  /* INSTRUMENT CARDS (JAM, GROUP & SOLO)                      */
+  /* ========================================================= */
+  jamInstrumentCard: {
+    width: 250,
+    backgroundColor: '#14141B',
+    borderWidth: 1.5,
+    borderColor: '#252538',
+    borderRadius: 12,
+    padding: 16,
+    marginRight: 12,
+    justifyContent: 'space-between',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  jamInstrumentCardSelected: {
+    borderColor: '#EF4444',
+    backgroundColor: '#1A1A24',
+    borderWidth: 2,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  jamInstrumentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
   },
-  previewTitle: {
-    color: '#e8c872',
-    fontSize: 10,
+  jamInstrumentName: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '900',
-    letterSpacing: 1,
-  },
-  previewStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 4,
-  },
-  statItem: {
-    color: '#888888',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  statVal: {
-    color: '#f4ede4',
-    fontWeight: '800',
-  },
-  statSafe: {
-    color: '#52b79a',
-  },
-  statDanger: {
-    color: '#e05a47',
-  },
-  previewWarn: {
-    color: '#e8c872',
-    fontSize: 10,
-    marginTop: 4,
-    lineHeight: 14,
-  },
-  previewFail: {
-    color: '#e05a47',
-    fontSize: 10,
-    marginTop: 4,
-    fontWeight: '700',
-    lineHeight: 14,
-  },
-  previewPlaceholder: {
-    color: '#777777',
-    fontSize: 11,
-    fontStyle: 'italic',
-  },
-  textInput: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#2e2e2e',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#f4ede4',
-    fontSize: 12,
-    letterSpacing: 1,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  autoPeopleBox: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#2e2e2e',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    justifyContent: 'center',
-    minHeight: 40,
-  },
-  autoPeopleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  autoPeopleVal: {
-    color: '#e8c872',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 1,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  autoTag: {
-    backgroundColor: '#241e12',
-    borderWidth: 1,
-    borderColor: '#e8c872',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 3,
-  },
-  autoTagText: {
-    color: '#e8c872',
-    fontSize: 8,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  autoPeopleSub: {
-    color: '#777777',
-    fontSize: 9,
-    marginTop: 2,
-    fontWeight: '600',
-  },
-  autoPeopleBoxReserved: {
-    backgroundColor: '#1b1212',
-    borderColor: '#4d2020',
-  },
-  autoPeopleValReserved: {
-    color: '#e05a47',
-  },
-  autoTagReserved: {
-    backgroundColor: '#2b1212',
-    borderColor: '#4d2020',
-  },
-  autoTagTextReserved: {
-    color: '#e05a47',
-  },
-  durationRow: {
-    flexDirection: 'row',
-  },
-  durationBtn: {
     flex: 1,
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#2e2e2e',
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 4,
     marginRight: 6,
+    letterSpacing: 0.5,
   },
-  durationBtnSelected: {
-    borderColor: '#e8c872',
-    backgroundColor: '#1f1b13',
+  jamInstrumentNameSelected: {
+    color: '#FFFFFF',
   },
-  durationBtnText: {
-    color: '#888888',
-    fontSize: 10,
+  bandTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  bandTagPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    backgroundColor: '#0E0E14',
+  },
+  bandTagPillText: {
+    fontSize: 9,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.6,
   },
-  durationBtnTextSelected: {
-    color: '#e8c872',
-  },
-  confirmBtn: {
-    backgroundColor: '#f7f4ea',
-    paddingVertical: 14,
-    borderRadius: 4,
-    alignItems: 'center',
-    marginTop: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  confirmBtnDisabled: {
-    backgroundColor: '#555555',
-  },
-  confirmBtnText: {
-    color: '#111111',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-  },
-  ticketCard: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#3ddc97',
-    borderRadius: 8,
-    padding: 22,
-    alignItems: 'center',
-  },
-  ticketBadge: {
-    backgroundColor: '#0f241e',
-    borderWidth: 1,
-    borderColor: '#255e4e',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginBottom: 12,
-  },
-  autoAssignBanner: {
-    backgroundColor: '#161512',
-    borderWidth: 1,
-    borderColor: '#3d321b',
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 16,
-  },
-  autoAssignTitle: {
-    color: '#e8c872',
+  soloCategoryText: {
+    color: '#8A8FA0',
     fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1,
-    marginBottom: 4,
+    fontWeight: '700',
+    letterSpacing: 0.6,
   },
-  autoAssignText: {
-    color: '#888888',
+  selectedCheckBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectedCheckText: {
+    color: '#FFFFFF',
     fontSize: 11,
-    lineHeight: 16,
+    fontWeight: '900',
   },
-  soloPickerContainer: {
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  soloInstrumentCard: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#282828',
-    borderRadius: 6,
-    padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  soloInstrumentCardSelected: {
-    borderColor: '#e8c872',
-    backgroundColor: '#1c1913',
-  },
-  soloRadioRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  radioCircle: {
+  unselectedRadioCircle: {
     width: 18,
     height: 18,
     borderRadius: 9,
-    borderWidth: 2,
-    borderColor: '#555555',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+    borderWidth: 1.5,
+    borderColor: '#4A4A5A',
   },
-  radioCircleSelected: {
-    borderColor: '#e8c872',
-  },
-  radioDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#e8c872',
-  },
-  soloTextCol: {
-    flex: 1,
-  },
-  soloInstrumentName: {
-    color: '#cccccc',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  soloInstrumentNameSelected: {
-    color: '#e8c872',
-  },
-  soloInstrumentCategory: {
-    color: '#777777',
-    fontSize: 10,
-    marginTop: 2,
-  },
-  selectedBadge: {
-    backgroundColor: '#2b2313',
-    borderWidth: 1,
-    borderColor: '#e8c872',
+  selectedStatusStrip: {
+    backgroundColor: '#1C1926',
+    paddingVertical: 4,
     paddingHorizontal: 8,
-    paddingVertical: 3,
     borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#383850',
   },
-  selectedBadgeText: {
-    color: '#e8c872',
+  selectedStatusStripText: {
+    color: '#E2E8F0',
     fontSize: 9,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
-  ticketBadgeText: {
-    color: '#52b79a',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+
+  /* Stepper controls */
+  jamStepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#0D0D12',
+    borderRadius: 8,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#242436',
   },
-  ticketTitle: {
-    color: '#f4ede4',
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-    marginBottom: 4,
-  },
-  ticketSession: {
-    color: '#e8c872',
-    fontSize: 15,
-    fontWeight: '800',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  ticketGrid: {
-    width: '100%',
-    backgroundColor: '#121212',
+  jamStepBtn: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#1E1E2A',
     borderRadius: 6,
-    padding: 14,
-    marginBottom: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333348',
   },
-  ticketField: {
+  jamStepBtnDisabled: {
+    opacity: 0.35,
+    backgroundColor: '#141418',
+    borderColor: '#202026',
+  },
+  jamStepBtnText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    lineHeight: 20,
+  },
+  jamStepBtnTextDisabled: {
+    color: '#555566',
+  },
+  jamQtyBox: {
+    minWidth: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 6,
+    paddingHorizontal: 4,
+  },
+  jamQtyBoxSelected: {
+    backgroundColor: '#EF4444',
+    borderRadius: 6,
+  },
+  jamQtyText: {
+    color: '#8A8FA0',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  jamQtyTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+  },
+
+  /* Solo instrument cards */
+  soloInstrumentCard: {
+    width: 240,
+    backgroundColor: '#14141B',
+    borderWidth: 1.5,
+    borderColor: '#252538',
+    borderRadius: 12,
+    padding: 16,
+    marginRight: 12,
+    justifyContent: 'space-between',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  soloInstrumentCardSelected: {
+    borderColor: '#EF4444',
+    backgroundColor: '#1A1A24',
+    borderWidth: 2,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  soloCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  ticketLabel: {
-    color: '#777777',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  ticketVal: {
-    color: '#f4ede4',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  ticketDivider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: '#262626',
-    marginBottom: 14,
-  },
-  pushNote: {
-    color: '#888888',
-    fontSize: 11,
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 16,
-  },
-  doneBtn: {
-    backgroundColor: '#f7f4ea',
-    width: '100%',
-    paddingVertical: 12,
-    borderRadius: 4,
     alignItems: 'center',
+    marginBottom: 8,
   },
-  doneBtnText: {
-    color: '#111111',
-    fontSize: 12,
+  soloInstrumentName: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '900',
-    letterSpacing: 1.2,
+    flex: 1,
+    marginRight: 6,
+    letterSpacing: 0.5,
+  },
+  soloInstrumentNameSelected: {
+    color: '#FFFFFF',
+  },
+
+  /* ========================================================= */
+  /* DATE & TIME SLOT DROPDOWN                                 */
+  /* ========================================================= */
+  textInput: {
+    backgroundColor: '#14141B',
+    borderWidth: 1.5,
+    borderColor: '#262638',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
+    letterSpacing: 0.6,
+    fontWeight: '700',
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
   quickDateRow: {
     flexDirection: 'row',
-    marginTop: 6,
-    gap: 6,
+    marginTop: 8,
+    gap: 8,
   },
   quickDateBtn: {
     flex: 1,
-    backgroundColor: '#1c1c1c',
-    borderWidth: 1,
-    borderColor: '#2e2e2e',
-    borderRadius: 4,
-    paddingVertical: 5,
+    backgroundColor: '#14141B',
+    borderWidth: 1.5,
+    borderColor: '#242436',
+    borderRadius: 8,
+    paddingVertical: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  quickDateBtnSelected: {
-    borderColor: '#e8c872',
-    backgroundColor: '#262013',
+  quickDateBtnTodaySelected: {
+    borderColor: '#EF4444',
+    backgroundColor: '#1D1216',
+    borderWidth: 2,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
+  quickDateBtnTomorrowSelected: {
+    borderColor: '#38BDF8',
+    backgroundColor: '#101724',
+    borderWidth: 2,
+    shadowColor: '#38BDF8',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
+  quickDateInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   quickDateBtnText: {
-    color: '#888888',
-    fontSize: 9,
+    color: '#8A8FA0',
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
   },
   quickDateBtnTextSelected: {
-    color: '#e8c872',
+    color: '#FFFFFF',
+    fontWeight: '900',
+  },
+  quickDateBtnTomorrowTextSelected: {
+    color: '#38BDF8',
+    fontWeight: '900',
   },
   timeDropdownHeader: {
     flexDirection: 'row',
@@ -1887,9 +2325,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   loadingSlotsText: {
-    color: '#e8c872',
-    fontSize: 9,
-    fontWeight: '800',
+    color: '#8A8FA0',
+    fontSize: 10,
+    fontWeight: '700',
     letterSpacing: 0.8,
   },
   dropdownContainer: {
@@ -1897,21 +2335,21 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   dropdownTrigger: {
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#2e2e2e',
-    borderRadius: 6,
+    backgroundColor: '#14141B',
+    borderWidth: 1.5,
+    borderColor: '#262638',
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 48,
+    minHeight: 54,
   },
   dropdownTriggerOpen: {
-    borderColor: '#e8c872',
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
+    borderColor: '#38BDF8',
   },
   dropdownLeft: {
     flexDirection: 'row',
@@ -1927,21 +2365,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dropdownActiveSessionSub: {
-    color: '#e8c872',
-    fontSize: 9,
-    fontWeight: '800',
+    color: '#8A8FA0',
+    fontSize: 10,
+    fontWeight: '700',
     marginTop: 2,
-    letterSpacing: 0.8,
+    letterSpacing: 0.6,
   },
   dropdownValueText: {
-    color: '#f4ede4',
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '800',
-    letterSpacing: 0.6,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    letterSpacing: 0.5,
   },
   dropdownPlaceholderText: {
-    color: '#666666',
+    color: '#6A6560',
     fontStyle: 'italic',
   },
   dropdownRight: {
@@ -1950,23 +2387,23 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dropdownChevron: {
-    color: '#888888',
+    color: '#8A8FA0',
     fontSize: 10,
     marginLeft: 4,
   },
   dropdownMenu: {
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: '#e8c872',
+    backgroundColor: '#14141B',
+    borderWidth: 1.5,
+    borderColor: '#2E3548',
     borderTopWidth: 0,
-    borderBottomLeftRadius: 6,
-    borderBottomRightRadius: 6,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
     maxHeight: 220,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.7,
+    shadowRadius: 10,
     elevation: 8,
   },
   dropdownScroll: {
@@ -1977,254 +2414,212 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#1f1f1f',
+    borderBottomColor: '#20202C',
   },
   dropdownItemLeft: {
     flex: 1,
     marginRight: 8,
   },
   dropdownItemSelected: {
-    backgroundColor: '#241e13',
+    backgroundColor: '#1E1418',
   },
   dropdownItemReserved: {
-    backgroundColor: '#171212',
-    opacity: 0.65,
+    backgroundColor: '#0F0F12',
+    opacity: 0.55,
   },
   dropdownItemText: {
-    color: '#cccccc',
+    color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 0.5,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   dropdownItemTextSelected: {
-    color: '#e8c872',
+    color: '#FFFFFF',
     fontWeight: '900',
   },
   dropdownItemTextReserved: {
-    color: '#775555',
+    color: '#6A6560',
     textDecorationLine: 'line-through',
   },
   dropdownBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
   },
   dropdownBadgeAvailable: {
-    backgroundColor: '#0e241b',
-    borderWidth: 1,
-    borderColor: '#1d4d3a',
+    backgroundColor: '#0F261C',
+    borderColor: '#10B981',
   },
   dropdownBadgeSelected: {
-    backgroundColor: '#382b14',
-    borderWidth: 1,
-    borderColor: '#e8c872',
+    backgroundColor: '#261217',
+    borderColor: '#EF4444',
   },
   dropdownBadgeReserved: {
-    backgroundColor: '#2b1212',
-    borderWidth: 1,
-    borderColor: '#4d2020',
+    backgroundColor: '#181822',
+    borderColor: '#2E2E40',
   },
   dropdownBadgeText: {
-    fontSize: 8,
-    fontWeight: '900',
+    fontSize: 9,
+    fontWeight: '800',
     letterSpacing: 0.6,
   },
   dropdownBadgeTextAvailable: {
-    color: '#52b79a',
+    color: '#10B981',
   },
   dropdownBadgeTextSelected: {
-    color: '#e8c872',
+    color: '#EF4444',
   },
   dropdownBadgeTextReserved: {
-    color: '#e05a47',
+    color: '#71717A',
   },
   dropdownEmpty: {
     padding: 16,
     alignItems: 'center',
   },
   dropdownEmptyText: {
-    color: '#888888',
-    fontSize: 11,
+    color: '#8A8FA0',
+    fontSize: 12,
     fontStyle: 'italic',
   },
   timeSlotHelper: {
-    color: '#777777',
-    fontSize: 10,
+    color: '#8A8FA0',
+    fontSize: 11,
     marginTop: 6,
     letterSpacing: 0.4,
-    lineHeight: 14,
+    lineHeight: 15,
   },
   activeSlotCallout: {
-    backgroundColor: '#1b1710',
+    backgroundColor: '#101420',
     borderWidth: 1,
-    borderColor: '#3d321b',
-    borderRadius: 6,
-    padding: 10,
+    borderColor: '#1E2B40',
+    borderRadius: 8,
+    padding: 12,
     marginTop: 8,
   },
   activeSlotCalloutTitle: {
-    color: '#e8c872',
-    fontSize: 9,
-    fontWeight: '900',
+    color: '#38BDF8',
+    fontSize: 10,
+    fontWeight: '800',
     letterSpacing: 0.8,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   activeSlotCalloutText: {
-    color: '#cccccc',
+    color: '#CBD5E1',
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   dropdownSlotInstruments: {
-    color: '#e8c872',
-    fontSize: 9,
+    color: '#8A8FA0',
+    fontSize: 10,
     marginTop: 3,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   slotActiveSessionRow: {
     marginTop: 2,
   },
   slotActiveSessionText: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  slotActiveSessionTextActive: {
+    color: '#FFFFFF',
+  },
+  slotActiveSessionTextOpen: {
+    color: '#8A8FA0',
+  },
+
+  /* ========================================================= */
+  /* DYNAMIC PEOPLE IN ROOM TELEMETRY BOX                      */
+  /* ========================================================= */
+  autoPeopleBox: {
+    backgroundColor: '#14141B',
+    borderWidth: 1.5,
+    borderColor: '#262638',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    justifyContent: 'center',
+  },
+  autoPeopleBoxReserved: {
+    backgroundColor: '#1C1316',
+    borderColor: '#6B2026',
+  },
+  autoPeopleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  autoPeopleVal: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+  },
+  autoPeopleValReserved: {
+    color: '#FFFFFF',
+  },
+  autoTag: {
+    backgroundColor: '#101A24',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#203A50',
+  },
+  autoTagText: {
+    color: '#38BDF8',
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.6,
   },
-  slotActiveSessionTextActive: {
-    color: '#e8c872',
+  autoTagReserved: {
+    backgroundColor: '#261015',
+    borderColor: '#EF4444',
   },
-  slotActiveSessionTextOpen: {
-    color: '#52b79a',
+  autoTagTextReserved: {
+    color: '#EF4444',
   },
-  jamCounterBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#181510',
-    borderWidth: 1,
-    borderColor: '#3d3319',
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 12,
-  },
-  jamCounterLeft: {
-    flex: 1,
-  },
-  jamCounterLabel: {
-    color: '#888888',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  jamCounterValue: {
-    color: '#e8c872',
-    fontSize: 16,
-    fontWeight: '900',
-    marginTop: 2,
-  },
-  jamCounterBadge: {
-    backgroundColor: '#262013',
-    borderWidth: 1,
-    borderColor: '#5e4e20',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
-  },
-  jamCounterBadgeFull: {
-    backgroundColor: '#3d1f1f',
-    borderColor: '#803333',
-  },
-  jamCounterBadgeText: {
-    color: '#e8c872',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  jamListContainer: {
-    marginBottom: 14,
-  },
-  jamInstrumentCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: '#222222',
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 8,
-  },
-  jamInstrumentCardSelected: {
-    borderColor: '#e8c872',
-    backgroundColor: '#1a1811',
-  },
-  jamInstrumentInfo: {
-    flex: 1,
-    marginRight: 10,
-  },
-  jamInstrumentName: {
-    color: '#cccccc',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  jamInstrumentNameSelected: {
-    color: '#ffffff',
-  },
-  jamInstrumentCategory: {
-    color: '#777777',
+  autoPeopleSub: {
+    color: '#8A8FA0',
     fontSize: 11,
-    marginTop: 2,
+    marginTop: 4,
+    lineHeight: 15,
   },
-  jamStepperRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+
+  /* ========================================================= */
+  /* MEETING SESSION CONFIG                                    */
+  /* ========================================================= */
+  meetingConfigBox: {
+    gap: 12,
   },
-  jamStepBtn: {
-    width: 32,
-    height: 32,
-    backgroundColor: '#222222',
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333333',
+  meetingContextCard: {
+    backgroundColor: '#14141A',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#262638',
+    padding: 16,
   },
-  jamStepBtnDisabled: {
-    opacity: 0.35,
-    borderColor: '#1f1f1f',
-    backgroundColor: '#181818',
+  meetingContextInput: {
+    backgroundColor: '#0E0E12',
+    borderWidth: 1.5,
+    borderColor: '#262638',
+    borderRadius: 8,
+    color: '#FFFFFF',
+    fontSize: 13,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 8,
+    fontWeight: '600',
   },
-  jamStepBtnText: {
-    color: '#e8c872',
-    fontSize: 18,
-    fontWeight: '800',
-    lineHeight: 20,
-  },
-  jamStepBtnTextDisabled: {
-    color: '#555555',
-  },
-  jamQtyBox: {
-    minWidth: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 6,
-    paddingHorizontal: 4,
-  },
-  jamQtyBoxSelected: {
-    backgroundColor: '#2a2312',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#e8c872',
-  },
-  jamQtyText: {
-    color: '#777777',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  jamQtyTextSelected: {
-    color: '#e8c872',
-    fontWeight: '800',
+  meetingContextHelper: {
+    color: '#8A8FA0',
+    fontSize: 11,
+    marginTop: 6,
+    fontStyle: 'italic',
   },
   meetingInputRow: {
     flexDirection: 'row',
@@ -2241,51 +2636,208 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   meetingSmallInput: {
-    backgroundColor: '#1a1813',
-    borderWidth: 1,
-    borderColor: '#e8c872',
-    borderRadius: 6,
-    color: '#e8c872',
+    backgroundColor: '#0D0D10',
+    borderWidth: 1.5,
+    borderColor: '#EF4444',
+    borderRadius: 8,
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '900',
     textAlign: 'center',
     paddingVertical: 6,
     paddingHorizontal: 8,
     width: 60,
-    height: 38,
+    height: 40,
   },
   meetingInputLimitTag: {
-    color: '#888888',
+    color: '#8A8580',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
-  meetingConfigBox: {
-    gap: 12,
-  },
-  meetingContextCard: {
-    backgroundColor: '#16140e',
+
+  /* ========================================================= */
+  /* CONFIRM RESERVATION BUTTON                                */
+  /* ========================================================= */
+  confirmBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 15,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3a321a',
-    padding: 14,
+    alignItems: 'center',
+    marginTop: 18,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
   },
-  meetingContextInput: {
-    backgroundColor: '#1e1c14',
+  confirmBtnDisabled: {
+    backgroundColor: '#262635',
+    borderColor: '#3A3A4E',
+  },
+  confirmBtnText: {
+    color: '#0D0D10',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+
+  /* ========================================================= */
+  /* SUCCESS PASS LAMINATE TICKET                              */
+  /* ========================================================= */
+  ticketCard: {
+    backgroundColor: '#15151A',
+    borderWidth: 2,
+    borderColor: '#82191F',
+    borderRadius: 14,
+    padding: 22,
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#82191F',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 6,
+  },
+  ticketWatermark: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: '60%',
+    opacity: 0.12,
+    borderTopRightRadius: 14,
+    borderBottomRightRadius: 14,
+  },
+  ticketLanyardSlot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#240C10',
     borderWidth: 1,
-    borderColor: '#e8c872',
-    borderRadius: 6,
-    color: '#ffffff',
-    fontSize: 14,
-    paddingVertical: 10,
+    borderColor: '#7D1D22',
     paddingHorizontal: 12,
-    marginTop: 8,
-    fontWeight: '500',
+    paddingVertical: 5,
+    borderRadius: 4,
+    marginBottom: 14,
   },
-  meetingContextHelper: {
-    color: '#888888',
+  ticketHole: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#0D0D10',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#7D1D22',
+  },
+  ticketLanyardText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+  },
+  ticketBadge: {
+    backgroundColor: '#200B0E',
+    borderWidth: 1,
+    borderColor: '#7D1D22',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    marginBottom: 10,
+  },
+  ticketBadgeText: {
+    color: '#F6F2EB',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  ticketTitle: {
+    color: '#F6F2EB',
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginBottom: 4,
+  },
+  ticketSession: {
+    color: '#9E9891',
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  ticketSoundwaveWrap: {
+    width: '100%',
+    marginVertical: 10,
+    paddingVertical: 4,
+  },
+  ticketGrid: {
+    width: '100%',
+    backgroundColor: '#0D0D10',
+    borderWidth: 1.5,
+    borderColor: '#262635',
+    borderRadius: 8,
+    padding: 14,
+    marginBottom: 16,
+  },
+  ticketField: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  ticketLabel: {
+    color: '#9E9891',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  ticketVal: {
+    color: '#F6F2EB',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  ticketPerforatedLine: {
+    width: '100%',
+    height: 1,
+    borderWidth: 1,
+    borderColor: '#3D1C24',
+    borderStyle: 'dashed',
+    marginBottom: 14,
+  },
+  ticketDivider: {
+    width: '100%',
+    height: 1,
+    backgroundColor: '#262635',
+    marginBottom: 14,
+  },
+  pushNote: {
+    color: '#9E9891',
     fontSize: 11,
-    marginTop: 6,
-    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 16,
+  },
+  doneBtn: {
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  doneBtnText: {
+    color: '#0D0D10',
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 1.1,
   },
 });

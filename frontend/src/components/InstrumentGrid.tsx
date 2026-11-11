@@ -1,6 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { Instrument } from '../api/client';
+import { AnimatedPressable } from './AnimatedPressable';
+import { RockTextureOverlay } from './RockTextureOverlay';
+import { LightningSvg } from './LightningSvg';
 
 interface InstrumentGridProps {
   instruments: Instrument[];
@@ -61,6 +64,9 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
       return '⚠️ Session B Acoustic Policy: Collaborative Practice only. Drums and electric guitar are prohibited.';
     }
     if (sName.includes('SESSION A')) {
+      if (pMode === 'FULL BAND REHEARSAL') {
+        return '🥁 Session A Full Band: Reserved exclusively for your band. No individual instruments needed.';
+      }
       return pMode === 'SOLO PRACTICE'
         ? '🎸 Session A Solo Policy: Practice drums or guitar alone in the room.'
         : '⚡ Session A Collaborative: Practice with other electric guitarists and drummers.';
@@ -71,62 +77,99 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
     return '⚡ Rehearsal Space: Select gear for instrumentalists (vocalists do not require instruments).';
   };
 
+  const getBandColor = (band?: string) => {
+    const b = (band || '').toUpperCase();
+    if (b.includes('LOW') || b.includes('SUB') || b.includes('BASS')) return '#EF4444';
+    if (b.includes('HI') || b.includes('TREBLE')) return '#00E5FF';
+    return '#FFFFFF';
+  };
+
   return (
     <View style={styles.container}>
       {/* Session Filter Badge */}
       <View style={styles.filterBanner}>
-        <Text style={styles.filterTitle}>{getFilterBannerText()}</Text>
+        <View style={styles.filterHeaderRow}>
+          <LightningSvg color="#FFFFFF" size={13} style={{ marginRight: 6 }} />
+          <Text style={styles.filterTitle}>{getFilterBannerText()}</Text>
+        </View>
       </View>
 
       {/* Search Input */}
       <TextInput
         style={styles.searchInput}
         placeholder="SEARCH INSTRUMENTS..."
-        placeholderTextColor="#666666"
+        placeholderTextColor="#707070"
         value={searchQuery}
         onChangeText={setSearchQuery}
       />
 
-      {/* Instruments Grid */}
-      <View style={styles.grid}>
+      {/* Instruments Horizontal Carousel */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        decelerationRate="fast"
+        snapToInterval={242}
+        contentContainerStyle={styles.horizontalScroll}
+      >
         {filteredInstruments.map((inst) => {
           const qty = selectedQuantities[inst.id] || 0;
           const isSelected = qty > 0;
+          const bandColor = getBandColor(inst.frequency_band);
 
           return (
-            <View key={inst.id} style={[styles.chip, isSelected && styles.selectedChip]}>
+            <View
+              key={inst.id}
+              style={[
+                styles.chip,
+                isSelected && [styles.selectedChip, { borderColor: bandColor }],
+              ]}
+            >
+              <RockTextureOverlay pattern="mesh" opacity={isSelected ? 0.08 : 0.04} />
               <View style={styles.chipHeader}>
-                <Text style={styles.instName}>{inst.name}</Text>
+                <Text style={styles.instName}>{inst.name.toUpperCase()}</Text>
+                {isSelected && (
+                  <View style={[styles.checkBadge, { backgroundColor: bandColor }]}>
+                    <Text style={[styles.checkText, { color: bandColor === '#00E5FF' || bandColor === '#FFFFFF' ? '#0D0D10' : '#FFFFFF' }]}>✓</Text>
+                  </View>
+                )}
               </View>
 
               <View style={styles.chipMeta}>
-                <Text style={styles.metaBadge}>{inst.category || 'General'}</Text>
-                <Text style={[styles.metaBadge, styles.freqBadge]}>{inst.frequency_band || 'Mid'}</Text>
+                <View style={styles.metaPill}>
+                  <Text style={styles.metaBadge}>{inst.category || 'Gear'}</Text>
+                </View>
+                <View style={[styles.metaPill, { borderColor: bandColor, borderWidth: 1 }]}>
+                  <Text style={[styles.metaBadge, { color: bandColor, fontWeight: '900' }]}>
+                    {inst.frequency_band || 'Mid'}
+                  </Text>
+                </View>
               </View>
 
               {/* Quantity Stepper */}
               <View style={styles.stepperRow}>
-                <TouchableOpacity
+                <AnimatedPressable
                   style={[styles.stepBtn, qty === 0 && styles.stepBtnDisabled]}
                   onPress={() => onQuantityChange(inst.id, Math.max(0, qty - 1))}
                   disabled={qty === 0}
+                  scaleTo={0.88}
                 >
-                  <Text style={styles.stepBtnText}>-</Text>
-                </TouchableOpacity>
+                  <Text style={styles.stepBtnText}>−</Text>
+                </AnimatedPressable>
 
-                <Text style={styles.qtyText}>{qty}</Text>
+                <Text style={[styles.qtyText, isSelected && { color: bandColor }]}>{qty}</Text>
 
-                <TouchableOpacity
-                  style={styles.stepBtn}
+                <AnimatedPressable
+                  style={[styles.stepBtn, styles.stepBtnAdd]}
                   onPress={() => onQuantityChange(inst.id, qty + 1)}
+                  scaleTo={0.88}
                 >
-                  <Text style={styles.stepBtnText}>+</Text>
-                </TouchableOpacity>
+                  <Text style={styles.stepBtnAddText}>+</Text>
+                </AnimatedPressable>
               </View>
             </View>
           );
         })}
-      </View>
+      </ScrollView>
     </View>
   );
 };
@@ -136,117 +179,142 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   filterBanner: {
-    backgroundColor: '#1b1812',
-    borderWidth: 1,
-    borderColor: '#42371e',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 4,
-    marginBottom: 12,
-  },
-  filterTitle: {
-    color: '#e8c872',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  searchInput: {
-    backgroundColor: '#181818',
-    borderWidth: 1,
-    borderColor: '#2e2e2e',
-    borderRadius: 6,
+    backgroundColor: '#200B0E',
+    borderWidth: 1.5,
+    borderColor: '#7D1D22',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    color: '#f4ede4',
-    fontSize: 12,
-    letterSpacing: 1,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    borderRadius: 8,
     marginBottom: 14,
   },
-  grid: {
+  filterHeaderRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  filterTitle: {
+    color: '#F6F2EB',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    flex: 1,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
+  },
+  searchInput: {
+    backgroundColor: '#15151A',
+    borderWidth: 1.5,
+    borderColor: '#261C20',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: '#F6F2EB',
+    fontSize: 12,
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
+    marginBottom: 14,
+  },
+  horizontalScroll: {
+    paddingVertical: 4,
+    paddingRight: 16,
   },
   chip: {
-    width: '48%',
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#262626',
-    borderRadius: 6,
-    padding: 12,
-    marginBottom: 12,
+    width: 230,
+    backgroundColor: '#15151A',
+    borderWidth: 2,
+    borderColor: '#261C20',
+    borderRadius: 10,
+    padding: 16,
+    marginRight: 12,
+    justifyContent: 'space-between',
+    position: 'relative',
+    overflow: 'hidden',
   },
   selectedChip: {
-    borderColor: '#e8c872',
-    backgroundColor: '#1c1a14',
+    borderColor: '#82191F',
+    backgroundColor: '#2A0E13',
   },
   chipHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   instName: {
-    color: '#f4ede4',
-    fontSize: 12,
-    fontWeight: '700',
+    color: '#F6F2EB',
+    fontSize: 14,
+    fontWeight: '900',
+    letterSpacing: 0.8,
     flex: 1,
-    marginRight: 4,
+    marginRight: 6,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
-  instDb: {
-    color: '#e8c872',
+  checkBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#82191F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkText: {
+    color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   chipMeta: {
     flexDirection: 'row',
-    marginBottom: 10,
+    gap: 6,
+    marginBottom: 14,
+  },
+  metaPill: {
+    backgroundColor: '#22222A',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
   metaBadge: {
-    color: '#888888',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    marginRight: 6,
-    backgroundColor: '#222222',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  freqBadge: {
-    color: '#52b79a',
-    backgroundColor: '#10241e',
+    color: '#9E9891',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
   },
   stepperRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#111111',
-    borderRadius: 4,
+    backgroundColor: '#0D0D10',
+    borderRadius: 6,
+    padding: 4,
     borderWidth: 1,
-    borderColor: '#2a2a2a',
-    padding: 2,
+    borderColor: '#261C20',
   },
   stepBtn: {
-    width: 28,
-    height: 28,
-    backgroundColor: '#262626',
-    borderRadius: 3,
+    width: 32,
+    height: 32,
+    backgroundColor: '#22222A',
+    borderRadius: 4,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepBtnDisabled: {
-    backgroundColor: '#1a1a1a',
+    opacity: 0.35,
+    backgroundColor: '#15151A',
   },
   stepBtnText: {
-    color: '#f4ede4',
-    fontSize: 14,
+    color: '#F6F2EB',
+    fontSize: 16,
     fontWeight: 'bold',
   },
+  stepBtnAdd: {
+    backgroundColor: '#FFFFFF',
+  },
+  stepBtnAddText: {
+    color: '#0D0D10',
+    fontSize: 16,
+    fontWeight: '900',
+  },
   qtyText: {
-    color: '#f4ede4',
-    fontSize: 12,
-    fontWeight: '800',
+    color: '#F6F2EB',
+    fontSize: 13,
+    fontWeight: '900',
   },
 });

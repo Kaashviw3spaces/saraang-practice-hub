@@ -334,7 +334,7 @@ def validate_session_policy(
 
     # 2. Session A
     if s_name == "session a":
-        valid_modes = ["solo practice", "collaborative practice", "collaborative jam", "full band rehearsal"]
+        valid_modes = ["solo practice", "collaborative practice", "collaborative jam", "full band rehearsal", "band rehearsal"]
         if mode_lower not in valid_modes:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -342,12 +342,12 @@ def validate_session_policy(
                     "message": f"Invalid practice mode '{mode}' for Session A.",
                     "ai_acoustics": {
                         "compatible": False,
-                        "reason": "Session A only supports Solo Practice or Collaborative Practice.",
+                        "reason": "Session A only supports Solo Practice, Collaborative Practice, or Full Band Rehearsal.",
                     },
                 },
             )
 
-        if mode_lower == "full band rehearsal":
+        if mode_lower in ["full band rehearsal", "band rehearsal"]:
             return
 
         # Both Solo Practice and Collaborative Practice in Session A strictly require Drums or Electric Guitar
@@ -864,6 +864,34 @@ async def get_session_slots_availability(
             )
             continue
 
+        # Check if this slot is reserved by a Full Band Rehearsal:
+        # Full Band Rehearsal is strictly reserved for Session A and is NOT a collaborative practice.
+        # No one else can join it from the slots.
+        is_full_band_in_slot = any(
+            "full band" in (b["practice_mode"] or "").lower()
+            or "band rehearsal" in (b["practice_mode"] or "").lower()
+            for b in slot_bookings
+        )
+        if is_full_band_in_slot:
+            total_slot_p = sum(b["participant_count"] for b in slot_bookings)
+            slots.append(
+                SlotAvailability(
+                    start_time=str(start_t),
+                    end_time=str(end_t),
+                    label=label,
+                    is_available=False,
+                    status="Reserved (Full Band Rehearsal)",
+                    current_participants=total_slot_p,
+                    max_participants=11,
+                    instruments_summary=[f"Full Band ({total_slot_p} participants)"],
+                    collaborative_open=False,
+                    has_solo=True,
+                    booked_session_name="Session A",
+                    active_session_name="Full Band Rehearsal",
+                )
+            )
+            continue
+
         # Check if this slot is reserved by a Jam Session:
         # A Jam Session slot strictly belongs to Jam Session and is NEVER joinable by Session A or B.
         is_jam_in_slot = any(
@@ -1139,7 +1167,7 @@ async def check_acoustic_compatibility(
         candidate_rooms = all_rooms
 
     s_name_lower = session_rules.name.lower()
-    is_bypassed = s_name_lower == "meeting session" or (s_name_lower == "session a" and p_mode_lower == "full band rehearsal")
+    is_bypassed = s_name_lower == "meeting session" or (s_name_lower == "session a" and p_mode_lower in ["full band rehearsal", "band rehearsal"])
 
     first_room = candidate_rooms[0] if candidate_rooms else {"max_decibel_threshold": 115, "echo_factor": 1.0}
     if is_bypassed:
@@ -1248,10 +1276,14 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
     if not session_row:
         raise HTTPException(status_code=404, detail="Session type not found")
 
-    if booking.participant_count > session_row["participant_limit"]:
+    p_mode_lower = (booking.practice_mode or "Solo Practice").strip().lower()
+    is_full_band = session_row["name"].lower() == "session a" and p_mode_lower in ["full band rehearsal", "band rehearsal"]
+    effective_limit = 11 if is_full_band else session_row["participant_limit"]
+
+    if booking.participant_count > effective_limit:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Participant count ({booking.participant_count}) exceeds limit ({session_row['participant_limit']}) for session '{session_row['name']}'.",
+            detail=f"Participant count ({booking.participant_count}) exceeds limit ({effective_limit}) for session '{session_row['name']}'.",
         )
 
     # ---------------------------------------------------------
@@ -1323,6 +1355,12 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
                 detail=f"Constraint For Recording Session Max: 4. Requested participant count ({booking.participant_count}) exceeds the maximum constraint of 4.",
             )
 
+    if p_mode_lower in ["full band rehearsal", "band rehearsal"] and session_row["name"].lower() != "session a":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Full Band Rehearsal is strictly reserved for Session A only.",
+        )
+
     if existing_slot_bookings:
         # Check 1: Recording Session Complete Isolation
         is_recording_in_slot = any(
@@ -1388,6 +1426,24 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
                 detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is already booked for {other_name}. Only {session_row['name']} instrumentalists can play in this slot.",
             )
 
+        # Check: Full Band Rehearsal Exclusivity
+        is_full_band_in_slot = any(
+            "full band" in (b["practice_mode"] or "").lower()
+            or "band rehearsal" in (b["practice_mode"] or "").lower()
+            for b in existing_slot_bookings
+        )
+        if is_full_band_in_slot:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Collision Violation: Slot {booking.start_time} - {booking.end_time} is reserved for Full Band Rehearsal. Full Band Rehearsal is an exclusive practice mode and no other musicians can join this slot.",
+            )
+
+        if p_mode_lower in ["full band rehearsal", "band rehearsal"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Collision Violation: Full Band Rehearsal requires an empty room. Slot {booking.start_time} - {booking.end_time} already has active bookings.",
+            )
+
         # Check 3: Solo Exclusivity
         has_solo_in_slot = any(
             b["practice_mode"].lower() in ["solo practice", "solo recording", "solo", "record solo instrument"]
@@ -1444,7 +1500,8 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
 
         # Capacity check: room must be able to accommodate requested participants
         s_name_lower = session_row["name"].lower()
-        if s_name_lower == "meeting session":
+        is_full_band_req = s_name_lower == "session a" and p_mode_lower in ["full band rehearsal", "band rehearsal"]
+        if s_name_lower == "meeting session" or is_full_band_req:
             candidate_rooms = sorted(available_rooms, key=lambda r: r["base_capacity"], reverse=True)
             if candidate_rooms and booking.participant_count > candidate_rooms[0]["base_capacity"]:
                 candidate_rooms = [candidate_rooms[0]]
@@ -1465,7 +1522,7 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
             )
 
         s_name_lower = session_row["name"].lower()
-        is_bypassed = s_name_lower == "meeting session" or (s_name_lower == "session a" and p_mode_lower == "full band rehearsal")
+        is_bypassed = s_name_lower == "meeting session" or (s_name_lower == "session a" and p_mode_lower in ["full band rehearsal", "band rehearsal"])
         session_rules = SessionTypeRules(**dict(session_row))
 
         chosen_evaluation = None

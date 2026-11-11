@@ -467,6 +467,150 @@ async def test_session_a_full_band_policy(client):
 
 
 @pytest.mark.asyncio
+async def test_session_a_full_band_exclusivity_and_slots(client):
+    """
+    Session A Full Band Rehearsal Exclusivity & Slots Verification:
+    - User books Full Band Rehearsal with manual participant count (e.g. 6) and no instruments.
+    - Slots query for Session A returns the slot as Reserved (Full Band Rehearsal) with is_available: false, collaborative_open: false.
+    - Another user attempting to book Collaborative Practice in that slot is rejected with 400.
+    - Another user attempting to book Solo Practice in that slot is rejected with 400.
+    - Attempting to book Full Band Rehearsal in a slot already occupied by collaborative practice is rejected (empty room required).
+    - Full Band Rehearsal is reserved strictly for Session A (rejected in Session B or Jam Session).
+    """
+    u1 = (await client.post("/api/users", json={"name": "Band Leader", "email": f"leader_{uuid.uuid4().hex[:8]}@test.com"})).json()
+    u2 = (await client.post("/api/users", json={"name": "Collab Musician", "email": f"musician_{uuid.uuid4().hex[:8]}@test.com"})).json()
+    test_date = get_unique_test_date()
+
+    # 1. Book Full Band Rehearsal in Session A (10:00 - 11:00) with 11 participants (Full Band Cap)
+    fb_resp = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u1["id"],
+            "session_type_id": 1,
+            "practice_mode": "Full Band Rehearsal",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 11,
+            "instruments": [],
+        },
+    )
+    assert fb_resp.status_code == 201
+    assert fb_resp.json()["practice_mode"] == "Full Band Rehearsal"
+    assert fb_resp.json()["participant_count"] == 11
+
+    # 1b. Exceeding 11 participants for Full Band (e.g. 12) -> MUST FAIL (400)
+    fb_over = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u1["id"],
+            "session_type_id": 1,
+            "practice_mode": "Full Band Rehearsal",
+            "booking_date": test_date,
+            "start_time": "11:00:00",
+            "end_time": "12:00:00",
+            "participant_count": 12,
+            "instruments": [],
+        },
+    )
+    assert fb_over.status_code == 400
+    assert "exceeds limit (11)" in fb_over.json()["detail"]
+
+    # 2. Check slots availability for Session A on this date
+    slots_resp = await client.get(f"/api/sessions/1/slots?date={test_date}")
+    assert slots_resp.status_code == 200
+    slot_10am = next(s for s in slots_resp.json()["slots"] if s["start_time"] == "10:00:00")
+    assert slot_10am["is_available"] is False
+    assert slot_10am["collaborative_open"] is False
+    assert slot_10am["status"] == "Reserved (Full Band Rehearsal)"
+    assert slot_10am["active_session_name"] == "Full Band Rehearsal"
+    assert slot_10am["max_participants"] == 11
+    assert slot_10am["current_participants"] == 11
+
+    # 3. Another user attempts to join that slot with Session A Collaborative Practice -> REJECTED (400)
+    collab_resp = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u2["id"],
+            "session_type_id": 1,
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 1, "quantity": 1}],
+        },
+    )
+    assert collab_resp.status_code == 400
+    assert "reserved for Full Band Rehearsal" in collab_resp.json()["detail"]
+
+    # 4. Another user attempts to book Solo Practice in that slot -> REJECTED (400)
+    solo_resp = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u2["id"],
+            "session_type_id": 1,
+            "practice_mode": "Solo Practice",
+            "booking_date": test_date,
+            "start_time": "10:00:00",
+            "end_time": "11:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 3, "quantity": 1}],
+        },
+    )
+    assert solo_resp.status_code == 400
+
+    # 5. Collab user books a DIFFERENT slot (14:00 - 15:00)
+    collab_14 = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u2["id"],
+            "session_type_id": 1,
+            "practice_mode": "Collaborative Practice",
+            "booking_date": test_date,
+            "start_time": "14:00:00",
+            "end_time": "15:00:00",
+            "participant_count": 1,
+            "instruments": [{"instrument_id": 1, "quantity": 1}],
+        },
+    )
+    assert collab_14.status_code == 201
+
+    # 6. Attempting to book Full Band Rehearsal in 14:00 - 15:00 -> REJECTED (empty room required)
+    fb_fail = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u1["id"],
+            "session_type_id": 1,
+            "practice_mode": "Full Band Rehearsal",
+            "booking_date": test_date,
+            "start_time": "14:00:00",
+            "end_time": "15:00:00",
+            "participant_count": 4,
+            "instruments": [],
+        },
+    )
+    assert fb_fail.status_code == 400
+    assert "Full Band Rehearsal requires an empty room" in fb_fail.json()["detail"]
+
+    # 7. Attempting to book Full Band Rehearsal under Session B -> REJECTED (Session A only)
+    fb_b = await client.post(
+        "/api/bookings",
+        json={
+            "user_id": u1["id"],
+            "session_type_id": 2,
+            "practice_mode": "Full Band Rehearsal",
+            "booking_date": test_date,
+            "start_time": "16:00:00",
+            "end_time": "17:00:00",
+            "participant_count": 4,
+            "instruments": [],
+        },
+    )
+    assert fb_b.status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_session_b_acoustic_policy(client):
     """
     Session B:

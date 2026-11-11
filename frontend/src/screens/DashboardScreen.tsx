@@ -1,8 +1,13 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator, Platform, Image, Animated, Easing } from 'react-native';
 import { api, LiveSession } from '../api/client';
 import { useStore } from '../store/useStore';
 import { LiveSessionCard } from '../components/LiveSessionCard';
+import { AnimatedPressable } from '../components/AnimatedPressable';
+import { EqualizerBars } from '../components/EqualizerBars';
+import { SoundwaveSvg } from '../components/SoundwaveSvg';
+import { RockTextureOverlay } from '../components/RockTextureOverlay';
+import { LightningSvg } from '../components/LightningSvg';
 
 interface DashboardScreenProps {
   onNavigateToBooking: () => void;
@@ -13,6 +18,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [todayBookingsCount, setTodayBookingsCount] = useState(0);
+
+  const heroFade = useRef(new Animated.Value(0)).current;
+  const heroSlide = useRef(new Animated.Value(14)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(heroFade, {
+        toValue: 1,
+        duration: 350,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.spring(heroSlide, {
+        toValue: 0,
+        friction: 8,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [heroFade, heroSlide]);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -60,49 +85,113 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchSessions(); }} tintColor="#e8c872" />
+        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchSessions(); }} tintColor="#FFFFFF" />
       }
     >
-      {/* Top Banner with Rock Stencil Aesthetic */}
-      <View style={styles.heroSection}>
-        <View style={styles.liveHeaderRow}>
-          <Text style={styles.liveIndicator}>((•)) LIVE NOW PLAYING</Text>
-          <Text style={styles.pollTag}>POLLING: 30S</Text>
+      {/* Top Banner with Rock Stencil & Soundwave Aesthetic */}
+      <Animated.View
+        style={[
+          styles.heroSection,
+          {
+            opacity: heroFade,
+            transform: [{ translateY: heroSlide }],
+          },
+        ]}
+      >
+        {/* Subtle Amplifier / Poster Texture Overlay */}
+        <RockTextureOverlay pattern="mesh" opacity={0.07} />
+
+        {/* Ambient Club Badge & Band Aesthetic Badges */}
+        <View style={styles.ambientTopRow}>
+          <View style={styles.ambientBadgeWrap}>
+            <Image
+              source={require('../../assets/saarang_logo.png')}
+              style={styles.ambientBadgeImg}
+              resizeMode="contain"
+            />
+            <View style={styles.ambientBadgeTextCol}>
+              <Text style={styles.ambientClubTitle}>SAARANG</Text>
+              <Text style={styles.ambientClubSub}>THE MUSIC CLUB</Text>
+            </View>
+          </View>
+
+          <View style={styles.bandBadgesRow}>
+            <View style={styles.lightningBadge}>
+              <LightningSvg color="#FFFFFF" size={11} style={{ marginRight: 3 }} />
+              <Text style={styles.lightningBadgeText}>HIGH VOLTAGE</Text>
+            </View>
+            <View style={styles.toneBadge}>
+              <Text style={styles.toneBadgeText}>GAIN: 11</Text>
+            </View>
+            <View style={styles.tourYearBadge}>
+              <Text style={styles.tourYearText}>TOUR 2026</Text>
+            </View>
+          </View>
         </View>
+
+        <View style={styles.liveHeaderRow}>
+          <View style={styles.liveIndicatorRow}>
+            {activeCount > 0 && <EqualizerBars active={true} color="#00E5FF" size={11} />}
+            <Text style={styles.liveIndicator}>((•)) LIVE SOUND ROOM TELEMETRY</Text>
+          </View>
+          <View style={styles.syncPill}>
+            <Text style={styles.pollTag}>SYNC: 30S</Text>
+          </View>
+        </View>
+
         <Text style={styles.heroTitle}>REHEARSAL TELEMETRY</Text>
         <Text style={styles.heroSubtitle}>
-          REAL-TIME SESSION TELEMETRY & CATEGORY STATUS.
+          REAL-TIME STUDIO MONITORING • ACOUSTIC HEADROOM • CATEGORY STATUS
         </Text>
 
-        {/* Status Quota Bar */}
+        {/* Arctic Monkeys AM & Metallica Ride the Lightning Soundwave */}
+        <View style={styles.soundwaveWrap}>
+          <SoundwaveSvg
+            color="#EF4444"
+            secondaryColor="#00E5FF"
+            height={26}
+            variant="metallica"
+          />
+        </View>
+
+        {/* Status Quota Bar styled as dual-channel audio telemetry */}
         <View style={styles.quotaBar}>
           <View style={styles.quotaItem}>
-            <Text style={styles.quotaLabel}>ACTIVE SESSIONS</Text>
-            <Text style={styles.quotaValue}>{activeCount} / {liveSessions.length} SESSIONS</Text>
+            <View style={styles.quotaHeaderRow}>
+              <Text style={[styles.quotaLabel, { color: '#38BDF8' }]}>ACTIVE SOUND ROOMS</Text>
+              <View style={styles.cyanDot} />
+            </View>
+            <Text style={[styles.quotaValue, { color: '#00E5FF' }]}>{activeCount} / {liveSessions.length} LIVE</Text>
           </View>
           <View style={styles.quotaDivider} />
           <View style={styles.quotaItem}>
-            <Text style={styles.quotaLabel}>DAILY QUOTA</Text>
+            <View style={styles.quotaHeaderRow}>
+              <Text style={[styles.quotaLabel, { color: '#FFFFFF' }]}>DAILY QUOTA LIMIT</Text>
+              <LightningSvg color="#FFFFFF" size={11} />
+            </View>
             <Text style={[styles.quotaValue, todayBookingsCount >= 3 ? styles.quotaDanger : styles.quotaSafe]}>
               {todayBookingsCount} / 3 BOOKED TODAY
             </Text>
           </View>
         </View>
 
-        {/* Primary Booking Action */}
-        <TouchableOpacity
+        {/* Primary Booking Action with AC/DC High-Voltage Spring Press */}
+        <AnimatedPressable
           style={styles.heroBookBtn}
-          activeOpacity={0.8}
           onPress={onNavigateToBooking}
+          scaleTo={0.97}
         >
-          <Text style={styles.heroBookBtnText}>⚡ BOOK REHEARSAL SLOT →</Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.heroBtnContentRow}>
+            <LightningSvg color="#0D0D10" size={16} style={{ marginRight: 6 }} />
+            <Text style={styles.heroBookBtnText}>BOOK REHEARSAL SLOT →</Text>
+          </View>
+        </AnimatedPressable>
+      </Animated.View>
 
       {/* Session Categories List */}
       <View style={styles.sessionsList}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>REHEARSAL SESSION CATEGORIES</Text>
+          <Text style={styles.sectionTitle}>ROOM ROSTER // SESSION CATEGORIES</Text>
           <TouchableOpacity onPress={onNavigateToBooking}>
             <Text style={styles.newBookingLink}>+ BOOK NEW SLOT</Text>
           </TouchableOpacity>
@@ -110,7 +199,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
 
         {loading && !refreshing ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#e8c872" />
+            <ActivityIndicator size="large" color="#FFFFFF" />
             <Text style={styles.loadingText}>CALIBRATING SESSION TELEMETRY...</Text>
           </View>
         ) : (
@@ -130,19 +219,112 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0d0d0d',
+    backgroundColor: '#0D0D10',
   },
   content: {
     padding: 16,
     paddingBottom: 40,
   },
   heroSection: {
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: '#242424',
-    borderRadius: 8,
-    padding: 18,
+    backgroundColor: '#15151A',
+    borderWidth: 1.5,
+    borderColor: '#262635',
+    borderRadius: 14,
+    padding: 20,
     marginBottom: 20,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  ambientTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  ambientBadgeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#101015',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#262635',
+  },
+  ambientBadgeImg: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    marginRight: 7,
+  },
+  ambientBadgeTextCol: {
+    marginRight: 4,
+  },
+  ambientClubTitle: {
+    color: '#F6F2EB',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.9,
+  },
+  ambientClubSub: {
+    color: '#9E9891',
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  bandBadgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  lightningBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#181822',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#3D3D4E',
+  },
+  lightningBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  toneBadge: {
+    backgroundColor: '#181822',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#3D3D4E',
+  },
+  toneBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  tourYearBadge: {
+    backgroundColor: '#1C1215',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#4A1C24',
+  },
+  tourYearText: {
+    color: '#9E9891',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1,
   },
   liveHeaderRow: {
     flexDirection: 'row',
@@ -150,83 +332,121 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  liveIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   liveIndicator: {
-    color: '#e05a47',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#00E5FF',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    marginLeft: 6,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
+  },
+  syncPill: {
+    backgroundColor: '#121218',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#262635',
   },
   pollTag: {
-    color: '#555555',
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 1,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#38BDF8',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
   heroTitle: {
-    color: '#f4ede4',
+    color: '#F6F2EB',
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 1,
     marginBottom: 4,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
   heroSubtitle: {
-    color: '#888888',
+    color: '#A8A29E',
     fontSize: 11,
-    letterSpacing: 1,
+    letterSpacing: 0.6,
     lineHeight: 16,
-    marginBottom: 16,
+    marginBottom: 10,
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
+  },
+  soundwaveWrap: {
+    marginVertical: 10,
+    paddingVertical: 4,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#2D161C',
   },
   quotaBar: {
     flexDirection: 'row',
-    backgroundColor: '#1b1b1b',
-    borderRadius: 6,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#2a2a2a',
+    backgroundColor: '#0D0D10',
+    borderRadius: 8,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#2D1B22',
   },
   quotaItem: {
     flex: 1,
   },
-  quotaLabel: {
-    color: '#777777',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1,
+  quotaHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 4,
   },
+  cyanDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#00E5FF',
+  },
+  quotaLabel: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.9,
+  },
   quotaValue: {
-    color: '#f4ede4',
-    fontSize: 13,
-    fontWeight: '800',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 14,
+    fontWeight: '900',
+    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
   },
   quotaSafe: {
-    color: '#52b79a',
+    color: '#FFFFFF',
   },
   quotaDanger: {
-    color: '#e05a47',
+    color: '#EF4444',
   },
   quotaDivider: {
     width: 1,
-    backgroundColor: '#2a2a2a',
+    backgroundColor: '#2D1B22',
     marginHorizontal: 12,
   },
   heroBookBtn: {
-    backgroundColor: '#f7f4ea',
-    borderRadius: 6,
-    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    marginTop: 16,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  heroBtnContentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   heroBookBtnText: {
-    color: '#111111',
+    color: '#0D0D10',
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1.2,
@@ -241,16 +461,16 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   sectionTitle: {
-    color: '#e8c872',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+    color: '#F6F2EB',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   newBookingLink: {
-    color: '#f7f4ea',
+    color: '#9E9891',
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   loadingBox: {
     padding: 40,
@@ -258,10 +478,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   loadingText: {
-    color: '#888888',
+    color: '#9E9891',
     fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
+    fontWeight: '800',
+    letterSpacing: 1,
     marginTop: 12,
   },
 });
