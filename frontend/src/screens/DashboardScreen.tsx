@@ -199,10 +199,11 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     color: '#BCE83A',
-    fontSize: 10,
-    letterSpacing: 1.5,
+    fontSize: 10.5,
+    letterSpacing: 1.8,
     fontWeight: '900',
-    marginBottom: 4,
+    marginBottom: 6,
+    textAlign: 'center',
     fontFamily: Platform.select({
       web: '"Space Mono", monospace',
       default: 'monospace',
@@ -210,9 +211,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: '#EFECE6',
-    fontSize: 28,
+    fontSize: 36,
     fontWeight: '900',
-    letterSpacing: 1.2,
+    letterSpacing: 1.5,
+    textAlign: 'center',
     fontFamily: Platform.select({
       web: '"Anton", "Oswald", "Arial Black", sans-serif',
       default: 'sans-serif',
