@@ -113,8 +113,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
           },
         ]}
       >
-        {/* Subtitle: REHEARSAL TELEMETRY (styled like PASSES & ACTIVE WINDOWS) */}
-        <Text style={styles.headerSubtitle}>REHEARSAL TELEMETRY</Text>
+        {/* Subtitle: CLAIM YOUR RIG */}
+        <Text style={styles.headerSubtitle}>CLAIM YOUR RIG</Text>
 
         {/* Display Title: READY TO ROCK? */}
         <Text style={styles.headerTitle}>READY TO ROCK?</Text>
