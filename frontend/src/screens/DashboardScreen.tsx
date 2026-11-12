@@ -120,9 +120,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
 
         {/* Section Title */}
         <Text style={styles.heroTitle}>REHEARSAL TELEMETRY</Text>
-        <Text style={styles.heroSubtitle}>
-          REAL-TIME STUDIO MONITORING • ACOUSTIC HEADROOM • CATEGORY STATUS
-        </Text>
 
         {/* Jagged High-Gain Oscilloscope Screen */}
         <OscilloscopeWaveform activeCount={activeCount} totalRooms={liveSessions.length || 5} />
@@ -209,18 +206,7 @@ const styles = StyleSheet.create({
       default: 'sans-serif',
     }),
     lineHeight: 30,
-    marginBottom: 4,
-  },
-  heroSubtitle: {
-    color: '#A1A1AA',
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 14,
-    fontFamily: Platform.select({
-      web: '"Space Mono", "JetBrains Mono", monospace',
-      default: 'monospace',
-    }),
+    marginBottom: 10,
   },
   quotaLimitDeck: {
     backgroundColor: '#121212',
