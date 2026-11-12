@@ -104,41 +104,50 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         />
       }
     >
-      {/* Hero Section: Minimal Rehearsal Telemetry Panel */}
+      {/* Rehearsal Telemetry Header: Unboxed, matching screenshot */}
       <Animated.View
         style={[
-          styles.heroSection,
+          styles.headerBox,
           {
             opacity: heroFade,
             transform: [{ translateY: heroSlide }],
           },
         ]}
       >
-        {/* Subtle Mesh Texture */}
-        <RockTextureOverlay pattern="mesh" opacity={0.04} />
+        {/* Subtitle: REHEARSAL TELEMETRY (styled like PASSES & ACTIVE WINDOWS) */}
+        <Text style={styles.headerSubtitle}>REHEARSAL TELEMETRY</Text>
 
-        {/* Section Header Row */}
-        <View style={styles.heroHeaderRow}>
-          <View style={styles.heroTitleGroup}>
-            <View style={styles.liveIndicatorPip} />
-            <Text style={styles.heroTitle}>REHEARSAL TELEMETRY</Text>
-          </View>
-          <Text style={styles.heroStatusBadge}>AUDIO ENGINE // ACTIVE</Text>
-        </View>
+        {/* Display Title: READY TO PLAY? (styled like MY REHEARSALS) */}
+        <Text style={styles.headerTitle}>READY TO PLAY?</Text>
 
-        {/* Jagged High-Gain Oscilloscope Screen */}
+        {/* Jagged High-Gain Oscilloscope Soundwave */}
         <OscilloscopeWaveform activeCount={activeCount} totalRooms={liveSessions.length || 5} />
 
-        {/* Daily Quota Limit Bar */}
-        <View style={styles.quotaLimitDeck}>
-          <View style={styles.quotaLimitHeader}>
-            <Text style={styles.quotaLimitTitle}>DAILY REHEARSAL QUOTA LIMIT</Text>
-            <Text style={styles.quotaLimitCounter}>
-              <Text style={{ color: todayBookingsCount >= 3 ? '#D9383A' : '#BCE83A' }}>
-                {todayBookingsCount}/3
-              </Text>{' '}
-              SLOTS USED
+        {/* Quota Indicator Banner (matching screenshot) */}
+        <View style={styles.quotaBanner}>
+          <View style={styles.quotaRow}>
+            <Text style={styles.quotaTitle}>DAILY REHEARSAL LIMIT:</Text>
+            <Text
+              style={[
+                styles.quotaNum,
+                todayBookingsCount >= 3 ? styles.quotaDanger : styles.quotaSafe,
+              ]}
+            >
+              {todayBookingsCount} / 3 SLOTS USED
             </Text>
+          </View>
+          <View style={styles.quotaTrack}>
+            <View
+              style={[
+                styles.quotaFill,
+                { width: `${Math.min(100, Math.round((todayBookingsCount / 3) * 100))}%` },
+                todayBookingsCount >= 3
+                  ? styles.fillDanger
+                  : todayBookingsCount === 2
+                  ? styles.fillWarning
+                  : styles.fillSafe,
+              ]}
+            />
           </View>
         </View>
       </Animated.View>
@@ -183,93 +192,89 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 48,
   },
-  heroSection: {
-    backgroundColor: 'rgba(26, 26, 29, 0.85)',
-    borderWidth: 1,
-    borderColor: 'rgba(239, 236, 230, 0.12)',
-    borderRadius: 6,
-    padding: 16,
-    marginBottom: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
-    position: 'relative',
-    overflow: 'hidden',
+  headerBox: {
+    marginBottom: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: '#27272A',
+    paddingBottom: 16,
   },
-  heroHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  headerSubtitle: {
+    color: '#BCE83A',
+    fontSize: 10,
+    letterSpacing: 1.5,
+    fontWeight: '900',
     marginBottom: 4,
-  },
-  heroTitleGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  liveIndicatorPip: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#BCE83A',
-    marginRight: 8,
-    shadowColor: '#BCE83A',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.9,
-    shadowRadius: 4,
-  },
-  heroTitle: {
-    color: '#EFECE6',
-    fontSize: 12.5,
-    fontWeight: '800',
-    letterSpacing: 2,
-    fontFamily: Platform.select({
-      web: '"Space Mono", "JetBrains Mono", monospace',
-      default: 'monospace',
-    }),
-    textTransform: 'uppercase',
-  },
-  heroStatusBadge: {
-    color: '#71717A',
-    fontSize: 9.5,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    fontFamily: Platform.select({
-      web: '"Space Mono", "JetBrains Mono", monospace',
-      default: 'monospace',
-    }),
-  },
-  quotaLimitDeck: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(239, 236, 230, 0.08)',
-    paddingTop: 10,
-    marginTop: 6,
-  },
-  quotaLimitHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  quotaLimitTitle: {
-    color: '#71717A',
-    fontSize: 9.5,
-    fontWeight: '700',
-    letterSpacing: 1.2,
     fontFamily: Platform.select({
       web: '"Space Mono", monospace',
       default: 'monospace',
     }),
   },
-  quotaLimitCounter: {
+  headerTitle: {
     color: '#EFECE6',
+    fontSize: 28,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    fontFamily: Platform.select({
+      web: '"Anton", "Oswald", "Arial Black", sans-serif',
+      default: 'sans-serif',
+    }),
+  },
+  quotaBanner: {
+    backgroundColor: '#15151A',
+    borderWidth: 1.5,
+    borderColor: '#261C20',
+    borderRadius: 10,
+    padding: 14,
+    marginTop: 8,
+  },
+  quotaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  quotaTitle: {
+    color: '#9E9891',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
+    flexShrink: 1,
+  },
+  quotaNum: {
+    fontSize: 11,
+    fontWeight: '900',
     fontFamily: Platform.select({
-      web: '"Space Mono", monospace',
-      default: 'monospace',
+      ios: 'System',
+      android: 'sans-serif',
+      default: 'sans-serif',
     }),
+    flexShrink: 0,
+    marginLeft: 8,
+  },
+  quotaSafe: {
+    color: '#F6F2EB',
+  },
+  quotaDanger: {
+    color: '#F87171',
+  },
+  quotaTrack: {
+    height: 4,
+    backgroundColor: '#0D0D10',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  quotaFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  fillSafe: {
+    backgroundColor: '#BCE83A',
+  },
+  fillWarning: {
+    backgroundColor: '#F59E0B',
+  },
+  fillDanger: {
+    backgroundColor: '#F87171',
   },
   sessionsList: {
     marginTop: 4,
