@@ -411,9 +411,11 @@ const FloatingNoteItem: React.FC<{
   });
 
   // Tilt oscillation
+  const rot = Math.abs(config.rotationRange);
+  const rotDir = config.rotationRange >= 0 ? 1 : -1;
   const rotate = animProgress.interpolate({
     inputRange: [0, 0.33, 0.66, 1],
-    outputRange: ['0deg', `${config.rotationRange}deg`, `-${config.rotationRange}deg`, '0deg'],
+    outputRange: ['0deg', `${rotDir * rot}deg`, `${-rotDir * rot}deg`, '0deg'],
   });
 
   // Subtle breathing scale
