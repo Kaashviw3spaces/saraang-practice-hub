@@ -5,7 +5,6 @@ import {
   Animated,
   Easing,
   useWindowDimensions,
-  Platform,
 } from 'react-native';
 import Svg, {
   Path,
@@ -15,7 +14,6 @@ import Svg, {
   LinearGradient,
   Stop,
 } from 'react-native-svg';
-import { Music, Music2, Music3, Music4 } from 'lucide-react-native';
 
 export type NoteType =
   | 'double_eighth'
@@ -24,8 +22,7 @@ export type NoteType =
   | 'sixteenth'
   | 'treble_clef'
   | 'bass_clef'
-  | 'sharp'
-  | 'wave';
+  | 'sharp';
 
 export interface FloatingNoteConfig {
   id: number;
@@ -56,7 +53,7 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     id: 1,
     type: 'double_eighth',
     xPercent: 8,
-    size: 28,
+    size: 26,
     color: PALE_COLORS.amber,
     baseOpacity: 0.15,
     duration: 19000,
@@ -69,7 +66,7 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     id: 2,
     type: 'treble_clef',
     xPercent: 84,
-    size: 34,
+    size: 32,
     color: PALE_COLORS.rose,
     baseOpacity: 0.16,
     duration: 23000,
@@ -95,7 +92,7 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     id: 4,
     type: 'quarter',
     xPercent: 64,
-    size: 22,
+    size: 20,
     color: PALE_COLORS.lavender,
     baseOpacity: 0.13,
     duration: 17500,
@@ -108,7 +105,7 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     id: 5,
     type: 'bass_clef',
     xPercent: 14,
-    size: 26,
+    size: 24,
     color: PALE_COLORS.cyan,
     baseOpacity: 0.14,
     duration: 22000,
@@ -121,7 +118,7 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     id: 6,
     type: 'sixteenth',
     xPercent: 46,
-    size: 24,
+    size: 22,
     color: PALE_COLORS.amber,
     baseOpacity: 0.13,
     duration: 15000,
@@ -147,7 +144,7 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     id: 8,
     type: 'treble_clef',
     xPercent: 36,
-    size: 36,
+    size: 34,
     color: PALE_COLORS.moonlight,
     baseOpacity: 0.15,
     duration: 25000,
@@ -160,7 +157,7 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     id: 9,
     type: 'sharp',
     xPercent: 92,
-    size: 20,
+    size: 18,
     color: PALE_COLORS.lavender,
     baseOpacity: 0.11,
     duration: 16500,
@@ -199,7 +196,7 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     id: 12,
     type: 'double_eighth',
     xPercent: 30,
-    size: 30,
+    size: 28,
     color: PALE_COLORS.amber,
     baseOpacity: 0.15,
     duration: 21000,
@@ -249,7 +246,58 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
   },
 ];
 
-// Vector Treble Clef Component
+// Vector Double Beamed Eighth Notes (♫)
+const DoubleEighthSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
+  size,
+  color,
+  strokeWidth = 1.8,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M9 18V5l12-2v13" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    <Circle cx="6" cy="18" r="3" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
+    <Circle cx="18" cy="16" r="3" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
+  </Svg>
+);
+
+// Vector Single Eighth Note with curved flag (♪)
+const SingleEighthSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
+  size,
+  color,
+  strokeWidth = 1.8,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="8" cy="18" r="3.5" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
+    <Path d="M11.5 18V3C14 5 18 5 19 8" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+// Vector Quarter Note (♩)
+const QuarterSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
+  size,
+  color,
+  strokeWidth = 1.8,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="8" cy="18" r="3.5" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
+    <Line x1="11.5" y1="18" x2="11.5" y2="3" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+  </Svg>
+);
+
+// Vector Sixteenth Note with double beam (♬)
+const SixteenthSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
+  size,
+  color,
+  strokeWidth = 1.8,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M9 18V5l12-2v13" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M9 9.5l12-2" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    <Circle cx="6" cy="18" r="3" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
+    <Circle cx="18" cy="16" r="3" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
+  </Svg>
+);
+
+// Vector Treble Clef Component (𝄞)
 const TrebleClefSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
   size,
   color,
@@ -269,7 +317,7 @@ const TrebleClefSvg: React.FC<{ size: number; color: string; strokeWidth?: numbe
   );
 };
 
-// Vector Bass Clef Component
+// Vector Bass Clef Component (𝄢)
 const BassClefSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
   size,
   color,
@@ -298,10 +346,8 @@ const SharpSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> 
 }) => {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      {/* Vertical tilted stems */}
       <Line x1="9" y1="3" x2="8" y2="21" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
       <Line x1="16" y1="3" x2="15" y2="21" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
-      {/* Horizontal slanted crossbars */}
       <Line x1="4" y1="9" x2="20" y2="7" stroke={color} strokeWidth={strokeWidth + 0.4} strokeLinecap="round" />
       <Line x1="4" y1="16" x2="20" y2="14" stroke={color} strokeWidth={strokeWidth + 0.4} strokeLinecap="round" />
     </Svg>
@@ -318,7 +364,7 @@ const FloatingNoteItem: React.FC<{
 
   useEffect(() => {
     // First run from initialOffset to 1 over remaining proportional duration
-    const firstDuration = config.duration * (1 - config.initialOffset);
+    const firstDuration = Math.max(100, Math.round(config.duration * (1 - config.initialOffset)));
     let animationRef: Animated.CompositeAnimation | null = null;
 
     const startContinuousLoop = () => {
@@ -389,18 +435,18 @@ const FloatingNoteItem: React.FC<{
   });
 
   // Compute horizontal pixel coordinate
-  const leftPos = (config.xPercent / 100) * screenWidth;
+  const leftPos = Math.round((config.xPercent / 100) * screenWidth);
 
   const renderGlyph = () => {
     switch (config.type) {
       case 'double_eighth':
-        return <Music size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
+        return <DoubleEighthSvg size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
       case 'eighth':
-        return <Music2 size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
+        return <SingleEighthSvg size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
       case 'quarter':
-        return <Music3 size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
+        return <QuarterSvg size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
       case 'sixteenth':
-        return <Music4 size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
+        return <SixteenthSvg size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
       case 'treble_clef':
         return <TrebleClefSvg size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
       case 'bass_clef':
@@ -408,7 +454,7 @@ const FloatingNoteItem: React.FC<{
       case 'sharp':
         return <SharpSvg size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
       default:
-        return <Music size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
+        return <DoubleEighthSvg size={config.size} color={config.color} strokeWidth={config.strokeWidth} />;
     }
   };
 
@@ -432,17 +478,9 @@ const FloatingNoteItem: React.FC<{
       <View
         style={[
           styles.glowWrap,
-          Platform.select({
-            web: {
-              filter: `drop-shadow(0 0 6px ${config.color}33)`,
-            } as any,
-            default: {
-              shadowColor: config.color,
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.45,
-              shadowRadius: 6,
-            },
-          }),
+          {
+            shadowColor: config.color,
+          },
         ]}
       >
         {renderGlyph()}
@@ -507,7 +545,9 @@ export const MusicalNotesBackground: React.FC<MusicalNotesBackgroundProps> = ({
   showStaveLines = true,
   notes = DEFAULT_NOTES,
 }) => {
-  const { width, height } = useWindowDimensions();
+  const { width: winW, height: winH } = useWindowDimensions();
+  const screenWidth = winW && winW > 0 ? winW : 400;
+  const screenHeight = winH && winH > 0 ? winH : 800;
 
   // Memoize note items to avoid unnecessary re-renders
   const renderedNotes = useMemo(() => {
@@ -515,17 +555,17 @@ export const MusicalNotesBackground: React.FC<MusicalNotesBackgroundProps> = ({
       <FloatingNoteItem
         key={`floating-note-${note.id}`}
         config={note}
-        screenHeight={height || 800}
-        screenWidth={width || 400}
+        screenHeight={screenHeight}
+        screenWidth={screenWidth}
       />
     ));
-  }, [notes, height, width]);
+  }, [notes, screenHeight, screenWidth]);
 
   return (
     <View style={styles.container} pointerEvents="none">
       {/* Background Stave Lines */}
       {showStaveLines && (
-        <AmbientStaveLines screenWidth={width || 400} screenHeight={height || 800} />
+        <AmbientStaveLines screenWidth={screenWidth} screenHeight={screenHeight} />
       )}
 
       {/* Floating Pale Musical Notes */}
@@ -549,5 +589,8 @@ const styles = StyleSheet.create({
   glowWrap: {
     alignItems: 'center',
     justifyContent: 'center',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
   },
 });
