@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Animated,
   Image,
   Pressable,
+  Easing,
 } from 'react-native';
 import { LiveSession } from '../api/client';
 import Svg, { Rect, Line, Circle } from 'react-native-svg';
@@ -38,14 +39,37 @@ const TicketBarcodeSvg: React.FC<{ height?: number }> = ({ height = 75 }) => {
 export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBookSession }) => {
   const isOccupied = session.is_occupied;
   const hoverAnim = useRef(new Animated.Value(0)).current;
+  const stampPulseAnim = useRef(new Animated.Value(1)).current;
   const [isHovered, setIsHovered] = useState(false);
+
+  useEffect(() => {
+    // Subtle breathing pulse for live room status stamp
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(stampPulseAnim, {
+          toValue: 1.035,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: false,
+        }),
+        Animated.timing(stampPulseAnim, {
+          toValue: 1.0,
+          duration: 1200,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: false,
+        }),
+      ])
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, [stampPulseAnim]);
 
   const handlePressIn = () => {
     Animated.spring(hoverAnim, {
       toValue: 1,
       friction: 5,
       tension: 100,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   };
 
@@ -54,7 +78,7 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
       toValue: 0,
       friction: 6,
       tension: 80,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   };
 
@@ -194,10 +218,16 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
         <Text style={styles.descriptionText}>{getSessionDescription(session.name)}</Text>
 
         {/* Diagonally Stamped Rubber Badge: AMPS WARMED (Acid-Lime) or LIVE ON STAGE (Crimson) */}
-        <View
+        <Animated.View
           style={[
             styles.rubberStampBox,
             isOccupied ? styles.stampCrimson : styles.stampAcidLime,
+            {
+              transform: [
+                { rotate: '-10deg' },
+                { scale: stampPulseAnim },
+              ],
+            },
           ]}
         >
           <Text
@@ -208,7 +238,7 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
           >
             {isOccupied ? '⚡ LIVE ON STAGE' : '⚡ AMPS WARMED'}
           </Text>
-        </View>
+        </Animated.View>
 
         {/* Ticket CTA Footswitch Stub */}
         <Pressable
@@ -376,7 +406,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     right: 8,
-    transform: [{ rotate: '-10deg' }],
     borderWidth: 1.6,
     borderStyle: 'dashed',
     paddingHorizontal: 7,

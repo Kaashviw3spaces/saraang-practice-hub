@@ -21,6 +21,45 @@ interface DashboardScreenProps {
   onNavigateToBooking: () => void;
 }
 
+// Staggered Entrance Animation for Room Roster Tickets
+const StaggeredCard: React.FC<{ index: number; children: React.ReactNode }> = ({
+  index,
+  children,
+}) => {
+  const cardFade = useRef(new Animated.Value(0)).current;
+  const cardSlide = useRef(new Animated.Value(14)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(cardFade, {
+        toValue: 1,
+        duration: 320,
+        delay: Math.min(index * 50, 200),
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+      Animated.timing(cardSlide, {
+        toValue: 0,
+        duration: 320,
+        delay: Math.min(index * 50, 200),
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
+      }),
+    ]).start();
+  }, [cardFade, cardSlide, index]);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: cardFade,
+        transform: [{ translateY: cardSlide }],
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
+};
+
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBooking }) => {
   const { liveSessions, setLiveSessions, currentUser, selectSession } = useStore();
   const [loading, setLoading] = useState(true);
@@ -29,6 +68,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
 
   const heroFade = useRef(new Animated.Value(0)).current;
   const heroSlide = useRef(new Animated.Value(14)).current;
+  const quotaAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -36,16 +76,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         toValue: 1,
         duration: 350,
         easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
-      Animated.spring(heroSlide, {
+      Animated.timing(heroSlide, {
         toValue: 0,
-        friction: 8,
-        tension: 80,
-        useNativeDriver: true,
+        duration: 350,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false,
       }),
     ]).start();
   }, [heroFade, heroSlide]);
+
+  useEffect(() => {
+    const targetPct = Math.min(100, Math.round((todayBookingsCount / 3) * 100));
+    Animated.timing(quotaAnim, {
+      toValue: targetPct,
+      duration: 650,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+  }, [todayBookingsCount, quotaAnim]);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -136,10 +186,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
             </Text>
           </View>
           <View style={styles.quotaTrack}>
-            <View
+            <Animated.View
               style={[
                 styles.quotaFill,
-                { width: `${Math.min(100, Math.round((todayBookingsCount / 3) * 100))}%` },
+                {
+                  width: quotaAnim.interpolate({
+                    inputRange: [0, 100],
+                    outputRange: ['0%', '100%'],
+                  }),
+                },
                 todayBookingsCount >= 3
                   ? styles.fillDanger
                   : todayBookingsCount === 2
@@ -169,12 +224,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
             <Text style={styles.loadingText}>CALIBRATING TELEMETRY...</Text>
           </View>
         ) : (
-          liveSessions.map((session) => (
-            <LiveSessionCard
-              key={session.id}
-              session={session}
-              onBookSession={handleBookSession}
-            />
+          liveSessions.map((session, index) => (
+            <StaggeredCard key={session.id} index={index}>
+              <LiveSessionCard
+                session={session}
+                onBookSession={handleBookSession}
+              />
+            </StaggeredCard>
           ))
         )}
       </View>
