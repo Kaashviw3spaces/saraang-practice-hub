@@ -1,57 +1,72 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Animated, Image } from 'react-native';
+import React, { useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Platform,
+  Animated,
+  Image,
+  Pressable,
+} from 'react-native';
 import { LiveSession } from '../api/client';
-import { EqualizerBars } from './EqualizerBars';
-import { AnimatedPressable } from './AnimatedPressable';
+import Svg, { Rect, Line, Circle } from 'react-native-svg';
 import { RockTextureOverlay } from './RockTextureOverlay';
-import { LightningSvg } from './LightningSvg';
 
 interface LiveSessionCardProps {
   session: LiveSession;
   onBookSession: (session: LiveSession) => void;
 }
 
+// Vertical Barcode Graphic Component
+const TicketBarcodeSvg: React.FC<{ height?: number }> = ({ height = 75 }) => {
+  return (
+    <View style={styles.barcodeWrap}>
+      <Svg width="22" height={height} viewBox="0 0 22 75">
+        <Rect x="1" y="0" width="2" height="75" fill="#121212" />
+        <Rect x="4" y="0" width="1" height="75" fill="#121212" />
+        <Rect x="6" y="0" width="3" height="75" fill="#121212" />
+        <Rect x="10" y="0" width="1" height="75" fill="#121212" />
+        <Rect x="12" y="0" width="2" height="75" fill="#121212" />
+        <Rect x="15" y="0" width="1" height="75" fill="#121212" />
+        <Rect x="17" y="0" width="3" height="75" fill="#121212" />
+        <Rect x="21" y="0" width="1" height="75" fill="#121212" />
+      </Svg>
+    </View>
+  );
+};
+
 export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBookSession }) => {
   const isOccupied = session.is_occupied;
-  const pulseAnim = useRef(new Animated.Value(0.4)).current;
-  const btnScaleAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 900,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.35,
-          duration: 900,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulseLoop.start();
-    return () => pulseLoop.stop();
-  }, [pulseAnim]);
+  const hoverAnim = useRef(new Animated.Value(0)).current;
+  const [isHovered, setIsHovered] = useState(false);
 
   const handlePressIn = () => {
-    Animated.spring(btnScaleAnim, {
-      toValue: 0.96,
-      friction: 8,
+    Animated.spring(hoverAnim, {
+      toValue: 1,
+      friction: 5,
       tension: 100,
       useNativeDriver: true,
     }).start();
   };
 
   const handlePressOut = () => {
-    Animated.spring(btnScaleAnim, {
-      toValue: 1,
-      friction: 5,
-      tension: 70,
+    Animated.spring(hoverAnim, {
+      toValue: 0,
+      friction: 6,
+      tension: 80,
       useNativeDriver: true,
     }).start();
   };
+
+  const cardRotate = hoverAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '0.6deg'],
+  });
+
+  const cardTranslateY = hoverAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -3],
+  });
 
   const getSessionDescription = (name: string): string => {
     const n = (name || '').toUpperCase();
@@ -78,34 +93,34 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
     if (n.includes('SESSION A')) {
       return {
         label: 'AC/DC // HIGH VOLTAGE RIG',
-        color: '#EF4444',
+        serial: 'SN-0826-A',
         watermark: require('../../assets/band6.jpg'),
       };
     }
     if (n.includes('SESSION B')) {
       return {
         label: 'THE BEATLES // ABBEY ROAD',
-        color: '#FFFFFF',
+        serial: 'SN-1969-B',
         watermark: require('../../assets/band1.jpg'),
       };
     }
     if (n.includes('JAM SESSION')) {
       return {
         label: 'ARENA ROCK // LIVE ENSEMBLE',
-        color: '#A855F7',
+        serial: 'SN-9021-JAM',
         watermark: require('../../assets/band4.avif'),
       };
     }
     if (n.includes('RECORDING')) {
       return {
         label: 'METALLICA // RIDE THE LIGHTNING',
-        color: '#00E5FF',
+        serial: 'SN-1984-REC',
         watermark: require('../../assets/band3.jpg'),
       };
     }
     return {
       label: 'BACKSTAGE // SETLIST LOUNGE',
-      color: '#FFFFFF',
+      serial: 'SN-2026-MTG',
       watermark: require('../../assets/band2.jpg'),
     };
   };
@@ -113,264 +128,310 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
   const bandMeta = getSessionBandTag(session.name);
 
   return (
-    <View style={[styles.card, isOccupied && styles.occupiedCard]}>
-      {/* Subtle Amplifier / Room Texture */}
-      <RockTextureOverlay pattern="mesh" opacity={0.05} />
+    <Animated.View
+      style={[
+        styles.ticketCard,
+        {
+          transform: [
+            { translateY: cardTranslateY },
+            { rotate: cardRotate },
+          ],
+        },
+      ]}
+    >
+      {/* Semi-circular Ticket Punch Notches on Perforation Ends */}
+      <View style={[styles.punchNotch, styles.notchTopLeft]} />
+      <View style={[styles.punchNotch, styles.notchBottomLeft]} />
 
-      {/* Authentic Rock Band Watermark */}
-      {bandMeta.watermark && (
-        <Image
-          source={bandMeta.watermark}
-          style={styles.cardWatermark}
-          resizeMode="cover"
-        />
-      )}
+      {/* Left Perforated Tear-off Stub */}
+      <View style={styles.leftTearStub}>
+        <TicketBarcodeSvg height={80} />
+        <Text style={styles.stubSerialText}>{bandMeta.serial}</Text>
+        <Text style={styles.stubPassText}>PASS</Text>
+      </View>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.sessionName}>{session.name.toUpperCase()}</Text>
-          <Text style={styles.subText}>
+      {/* Perforated Dashed Tear Line */}
+      <View style={styles.perforationLine} />
+
+      {/* Main Ticket Surface (Warm Aged Zine Paper) */}
+      <View style={styles.ticketMain}>
+        {/* Subtle Halftone Print Texture */}
+        <RockTextureOverlay pattern="dots" opacity={0.03} />
+
+        {/* High-Contrast Halftone Band Silhouette on Right */}
+        {bandMeta.watermark && (
+          <View style={styles.bandPhotoCutoutWrap}>
+            <Image
+              source={bandMeta.watermark}
+              style={[
+                styles.bandSilhouettePhoto,
+                Platform.select({
+                  web: {
+                    filter: 'grayscale(100%) contrast(160%) brightness(0.9)',
+                  } as any,
+                }),
+              ]}
+              resizeMode="cover"
+            />
+            {/* Halftone print overlay over photo */}
+            <RockTextureOverlay pattern="mesh" opacity={0.08} />
+          </View>
+        )}
+
+        {/* Ticket Header & Metadata */}
+        <View style={styles.ticketHeader}>
+          <View style={styles.dymoRigTag}>
+            <Text style={styles.dymoRigText}>{bandMeta.label}</Text>
+          </View>
+          <Text style={styles.sessionTitle}>{session.name.toUpperCase()}</Text>
+          <Text style={styles.capacityMonospace}>
             CAPACITY // UP TO {session.participant_limit} MUSICIANS
           </Text>
         </View>
 
-        <View style={[styles.statusBadge, isOccupied ? styles.occupiedBadge : styles.availableBadge]}>
-          {isOccupied ? (
-            <EqualizerBars active={true} color="#EF4444" size={12} />
-          ) : (
-            <Animated.View
-              style={[
-                styles.statusDot,
-                {
-                  backgroundColor: '#10B981',
-                  opacity: pulseAnim,
-                },
-              ]}
-            />
-          )}
-          <Text style={[styles.statusText, { color: isOccupied ? '#FCA5A5' : '#10B981' }]}>
-            {isOccupied ? '🔴 ON AIR' : '⚡ ROOM READY'}
+        {/* Copy / Description */}
+        <Text style={styles.descriptionText}>{getSessionDescription(session.name)}</Text>
+
+        {/* Diagonally Stamped Rubber Badge: AMPS WARMED (Acid-Lime) or LIVE ON STAGE (Crimson) */}
+        <View
+          style={[
+            styles.rubberStampBox,
+            isOccupied ? styles.stampCrimson : styles.stampAcidLime,
+          ]}
+        >
+          <Text
+            style={[
+              styles.stampText,
+              isOccupied ? styles.stampTextCrimson : styles.stampTextLime,
+            ]}
+          >
+            {isOccupied ? '⚡ LIVE ON STAGE' : '⚡ AMPS WARMED'}
           </Text>
         </View>
-      </View>
 
-      {/* Description / Rules */}
-      <Text style={styles.descText}>{getSessionDescription(session.name)}</Text>
-
-      {/* Current Active Session Info or Availability Banner */}
-      {isOccupied && session.current_session ? (
-        <View style={styles.sessionBox}>
-          <View style={styles.sessionRow}>
-            <Text style={styles.sessionLabel}>CURRENT REHEARSAL:</Text>
-            <Text style={styles.sessionVal}>{session.current_session.practice_mode || 'Rehearsal'}</Text>
-          </View>
-          <View style={styles.sessionRow}>
-            <Text style={styles.sessionLabel}>ROOM LEAD:</Text>
-            <Text style={styles.sessionVal}>{session.current_session.user_name}</Text>
-          </View>
-          <View style={styles.sessionRow}>
-            <Text style={styles.sessionLabel}>LIVE WINDOW:</Text>
-            <Text style={styles.sessionVal}>
-              {session.current_session.start_time} - {session.current_session.end_time}
-            </Text>
-          </View>
-          <View style={styles.sessionRow}>
-            <Text style={styles.sessionLabel}>LINEUP:</Text>
-            <Text style={styles.sessionVal}>{session.current_session.participant_count} Musicians Active</Text>
-          </View>
-        </View>
-      ) : (
-        <View style={styles.vacantBox}>
-          <Text style={styles.vacantText}>⚡ Book room for immediate rehearsal reservation.</Text>
-        </View>
-      )}
-
-      {/* Action Button: Book this Session */}
-      <AnimatedPressable
-        style={styles.actionBtn}
-        onPress={() => onBookSession(session)}
-        scaleTo={0.97}
-      >
-        <View style={styles.actionBtnRow}>
-          <LightningSvg color="#0D0D10" size={14} style={{ marginRight: 6 }} />
-          <Text style={styles.actionBtnText}>
+        {/* Ticket CTA Footswitch Stub */}
+        <Pressable
+          onPress={() => onBookSession(session)}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={({ pressed }) => [
+            styles.bookTicketBtn,
+            pressed && styles.bookTicketBtnPressed,
+          ]}
+        >
+          <Text style={styles.bookTicketBtnText}>
             BOOK {session.name.toUpperCase()} →
           </Text>
-        </View>
-      </AnimatedPressable>
-    </View>
+        </Pressable>
+      </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#15151A',
-    borderWidth: 2,
-    borderColor: '#261C20',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 3,
+  ticketCard: {
+    backgroundColor: '#EFECE6',
+    borderWidth: 2.5,
+    borderColor: '#121212',
+    borderRadius: 0,
+    marginBottom: 20,
+    flexDirection: 'row',
     position: 'relative',
     overflow: 'hidden',
+    shadowColor: '#FF1E27',
+    shadowOffset: { width: 5, height: 5 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 5,
   },
-  occupiedCard: {
-    borderColor: '#7D1D22',
-    backgroundColor: '#181215',
-    shadowColor: '#7D1D22',
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
+  leftTearStub: {
+    width: 44,
+    backgroundColor: '#E5E1D8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
   },
-  cardWatermark: {
+  barcodeWrap: {
+    transform: [{ rotate: '90deg' }],
+    marginVertical: 12,
+  },
+  stubSerialText: {
+    color: '#121212',
+    fontSize: 7.5,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginTop: 18,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  stubPassText: {
+    color: '#FF1E27',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginTop: 4,
+  },
+  perforationLine: {
+    width: 0,
+    borderRightWidth: 2,
+    borderRightColor: '#8C857B',
+    borderStyle: 'dashed',
+  },
+  punchNotch: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#121212',
+    zIndex: 10,
+  },
+  notchTopLeft: {
+    top: -7,
+    left: 37,
+  },
+  notchBottomLeft: {
+    bottom: -7,
+    left: 37,
+  },
+  ticketMain: {
+    flex: 1,
+    padding: 16,
+    position: 'relative',
+    backgroundColor: '#EFECE6',
+  },
+  bandPhotoCutoutWrap: {
     position: 'absolute',
     top: 0,
     right: 0,
     bottom: 0,
-    width: '45%',
-    opacity: 0.08,
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
+    width: '42%',
+    overflow: 'hidden',
+    borderLeftWidth: 1.5,
+    borderLeftColor: 'rgba(18, 18, 18, 0.15)',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+  bandSilhouettePhoto: {
+    width: '100%',
+    height: '100%',
+    opacity: 0.22,
   },
-  titleContainer: {
-    flex: 1,
-    paddingRight: 10,
+  ticketHeader: {
+    marginBottom: 8,
+    maxWidth: '65%',
   },
-  bandTagBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  dymoRigTag: {
     alignSelf: 'flex-start',
-    backgroundColor: '#0D0D10',
-    borderWidth: 1,
-    paddingHorizontal: 7,
+    backgroundColor: '#121212',
+    paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
-    marginBottom: 6,
-  },
-  bandTagText: {
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.9,
-  },
-  sessionName: {
-    color: '#F6F2EB',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 0.9,
     marginBottom: 4,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
-  },
-  subText: {
-    color: '#9E9891',
-    fontSize: 11,
-    letterSpacing: 0.8,
-    fontWeight: '700',
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
     borderWidth: 1,
+    borderColor: '#3F3F46',
   },
-  availableBadge: {
-    borderColor: '#32282C',
-    backgroundColor: '#0D0D10',
-  },
-  occupiedBadge: {
-    borderColor: '#7D1D22',
-    backgroundColor: '#2A0E12',
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.9,
-  },
-  descText: {
-    color: '#9E9891',
-    fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 16,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
-  },
-  sessionBox: {
-    backgroundColor: '#240C10',
-    borderWidth: 1.5,
-    borderColor: '#7D1D22',
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 16,
-  },
-  sessionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-  sessionLabel: {
-    color: '#9E9891',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  sessionVal: {
-    color: '#F6F2EB',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  vacantBox: {
-    backgroundColor: '#0D0D10',
-    borderWidth: 1,
-    borderColor: '#261C20',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  vacantText: {
-    color: '#9E9891',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  actionBtn: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 13,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  actionBtnRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionBtnText: {
-    color: '#0D0D10',
-    fontSize: 12,
+  dymoRigText: {
+    color: '#FFFFFF',
+    fontSize: 8.5,
     fontWeight: '900',
     letterSpacing: 1.1,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  sessionTitle: {
+    color: '#121212',
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Anton", "Impact", "Arial Black", sans-serif',
+      default: 'sans-serif',
+    }),
+    lineHeight: 28,
+  },
+  capacityMonospace: {
+    color: '#524E48',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginTop: 2,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  descriptionText: {
+    color: '#262422',
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 15,
+    marginBottom: 14,
+    maxWidth: '65%',
+  },
+  rubberStampBox: {
+    position: 'absolute',
+    top: 10,
+    right: 8,
+    transform: [{ rotate: '-12deg' }],
+    borderWidth: 1.8,
+    borderStyle: 'dashed',
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    zIndex: 5,
+    shadowColor: '#000000',
+    shadowOffset: { width: 1, height: 1.5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 1,
+  },
+  stampAcidLime: {
+    backgroundColor: '#CCFF00',
+    borderColor: '#121212',
+  },
+  stampCrimson: {
+    backgroundColor: '#FF1E27',
+    borderColor: '#FFFFFF',
+  },
+  stampText: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", "JetBrains Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  stampTextLime: {
+    color: '#121212',
+  },
+  stampTextCrimson: {
+    color: '#FFFFFF',
+  },
+  bookTicketBtn: {
+    backgroundColor: '#121212',
+    borderWidth: 2,
+    borderColor: '#121212',
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    alignSelf: 'flex-start',
+    shadowColor: '#FF1E27',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 3,
+  },
+  bookTicketBtnPressed: {
+    transform: [{ translateX: 2 }, { translateY: 2 }],
+    shadowOffset: { width: 1, height: 1 },
+  },
+  bookTicketBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    fontFamily: Platform.select({
+      web: '"Oswald", "Space Mono", sans-serif',
+      default: 'sans-serif',
+    }),
   },
 });

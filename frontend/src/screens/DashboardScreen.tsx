@@ -1,13 +1,26 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, ActivityIndicator, Platform, Image, Animated, Easing } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+  Image,
+  Animated,
+  Easing,
+} from 'react-native';
 import { api, LiveSession } from '../api/client';
 import { useStore } from '../store/useStore';
 import { LiveSessionCard } from '../components/LiveSessionCard';
-import { AnimatedPressable } from '../components/AnimatedPressable';
-import { EqualizerBars } from '../components/EqualizerBars';
-import { SoundwaveSvg } from '../components/SoundwaveSvg';
 import { RockTextureOverlay } from '../components/RockTextureOverlay';
-import { LightningSvg } from '../components/LightningSvg';
+import { DymoTape } from '../components/DymoTape';
+import { VuMeter } from '../components/VuMeter';
+import { OscilloscopeWaveform } from '../components/OscilloscopeWaveform';
+import { StompboxButton } from '../components/StompboxButton';
+import { HazardTapeDivider } from '../components/HazardTapeDivider';
 
 interface DashboardScreenProps {
   onNavigateToBooking: () => void;
@@ -85,10 +98,20 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchSessions(); }} tintColor="#FFFFFF" />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={() => {
+            setRefreshing(true);
+            fetchSessions();
+          }}
+          tintColor="#EFECE6"
+        />
       }
     >
-      {/* Top Banner with Rock Stencil & Soundwave Aesthetic */}
+      {/* Film Grain Texture across Viewport */}
+      <RockTextureOverlay pattern="dots" opacity={0.025} />
+
+      {/* Hero Section: "Rehearsal Telemetry" Brutalist Control Panel */}
       <Animated.View
         style={[
           styles.heroSection,
@@ -98,109 +121,65 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
           },
         ]}
       >
-        {/* Subtle Amplifier / Poster Texture Overlay */}
-        <RockTextureOverlay pattern="mesh" opacity={0.07} />
+        {/* Halftone / Mesh Print Texture */}
+        <RockTextureOverlay pattern="mesh" opacity={0.06} />
 
-        {/* Ambient Club Badge & Band Aesthetic Badges */}
-        <View style={styles.ambientTopRow}>
-          <View style={styles.ambientBadgeWrap}>
-            <Image
-              source={require('../../assets/saarang_logo.png')}
-              style={styles.ambientBadgeImg}
-              resizeMode="contain"
-            />
-            <View style={styles.ambientBadgeTextCol}>
-              <Text style={styles.ambientClubTitle}>SAARANG</Text>
-              <Text style={styles.ambientClubSub}>THE MUSIC CLUB</Text>
-            </View>
+        {/* Top Control Deck: 3D Embossed Dymo Label Tape Strips */}
+        <View style={styles.controlDeckTopBar}>
+          <View style={styles.dymoBadgesRow}>
+            <DymoTape text="HIGH VOLTAGE" angle={-1.5} color="black" size="sm" />
+            <DymoTape text="GAIN: 11" angle={1} color="red" size="sm" />
+            <DymoTape text="TOUR 2026" angle={2} color="black" size="sm" />
           </View>
-
-          <View style={styles.bandBadgesRow}>
-            <View style={styles.lightningBadge}>
-              <LightningSvg color="#FFFFFF" size={11} style={{ marginRight: 3 }} />
-              <Text style={styles.lightningBadgeText}>HIGH VOLTAGE</Text>
-            </View>
-            <View style={styles.toneBadge}>
-              <Text style={styles.toneBadgeText}>GAIN: 11</Text>
-            </View>
-            <View style={styles.tourYearBadge}>
-              <Text style={styles.tourYearText}>TOUR 2026</Text>
-            </View>
+          <View style={styles.syncBadge}>
+            <Text style={styles.syncText}>SYNC: 30S</Text>
           </View>
         </View>
 
-        <View style={styles.liveHeaderRow}>
-          <View style={styles.liveIndicatorRow}>
-            {activeCount > 0 && <EqualizerBars active={true} color="#00E5FF" size={11} />}
-            <Text style={styles.liveIndicator}>((•)) LIVE SOUND ROOM TELEMETRY</Text>
-          </View>
-          <View style={styles.syncPill}>
-            <Text style={styles.pollTag}>SYNC: 30S</Text>
-          </View>
-        </View>
-
+        {/* Section Title */}
         <Text style={styles.heroTitle}>REHEARSAL TELEMETRY</Text>
         <Text style={styles.heroSubtitle}>
           REAL-TIME STUDIO MONITORING • ACOUSTIC HEADROOM • CATEGORY STATUS
         </Text>
 
-        {/* Arctic Monkeys AM & Metallica Ride the Lightning Soundwave */}
-        <View style={styles.soundwaveWrap}>
-          <SoundwaveSvg
-            color="#EF4444"
-            secondaryColor="#00E5FF"
-            height={26}
-            variant="metallica"
+        {/* Jagged High-Gain Oscilloscope Screen */}
+        <OscilloscopeWaveform activeCount={activeCount} totalRooms={liveSessions.length || 5} />
+
+        {/* Analog VU Meter & Quota Deck */}
+        <View style={styles.vuMeterDeck}>
+          <VuMeter
+            value={todayBookingsCount}
+            label={`${todayBookingsCount}/3 BOOKED TODAY`}
+            sublabel="DAILY REHEARSAL QUOTA"
           />
         </View>
 
-        {/* Status Quota Bar styled as dual-channel audio telemetry */}
-        <View style={styles.quotaBar}>
-          <View style={styles.quotaItem}>
-            <View style={styles.quotaHeaderRow}>
-              <Text style={[styles.quotaLabel, { color: '#38BDF8' }]}>ACTIVE SOUND ROOMS</Text>
-              <View style={styles.cyanDot} />
-            </View>
-            <Text style={[styles.quotaValue, { color: '#00E5FF' }]}>{activeCount} / {liveSessions.length} LIVE</Text>
-          </View>
-          <View style={styles.quotaDivider} />
-          <View style={styles.quotaItem}>
-            <View style={styles.quotaHeaderRow}>
-              <Text style={[styles.quotaLabel, { color: '#FFFFFF' }]}>DAILY QUOTA LIMIT</Text>
-              <LightningSvg color="#FFFFFF" size={11} />
-            </View>
-            <Text style={[styles.quotaValue, todayBookingsCount >= 3 ? styles.quotaDanger : styles.quotaSafe]}>
-              {todayBookingsCount} / 3 BOOKED TODAY
-            </Text>
-          </View>
-        </View>
-
-        {/* Primary Booking Action with AC/DC High-Voltage Spring Press */}
-        <AnimatedPressable
-          style={styles.heroBookBtn}
+        {/* Heavy-Duty Stompbox Footswitch CTA Button */}
+        <StompboxButton
+          label="BOOK REHEARSAL SLOT →"
           onPress={onNavigateToBooking}
-          scaleTo={0.97}
-        >
-          <View style={styles.heroBtnContentRow}>
-            <LightningSvg color="#0D0D10" size={16} style={{ marginRight: 6 }} />
-            <Text style={styles.heroBookBtnText}>BOOK REHEARSAL SLOT →</Text>
-          </View>
-        </AnimatedPressable>
+        />
       </Animated.View>
 
-      {/* Session Categories List */}
+      {/* Section Divider: Ripped Paper Edge Layered Over Diagonal Hazard Stripes */}
+      <HazardTapeDivider />
+
+      {/* Room Roster: Concert Ticket Stub Cards */}
       <View style={styles.sessionsList}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>ROOM ROSTER // SESSION CATEGORIES</Text>
-          <TouchableOpacity onPress={onNavigateToBooking}>
-            <Text style={styles.newBookingLink}>+ BOOK NEW SLOT</Text>
+          <View>
+            <Text style={styles.sectionTitle}>ROOM ROSTER // CONCERT TICKET STUBS</Text>
+            <Text style={styles.sectionSubtitle}>SELECT A PERFORATED PASS TO ENTER REHEARSAL</Text>
+          </View>
+          <TouchableOpacity onPress={onNavigateToBooking} style={styles.quickBookBtn}>
+            <Text style={styles.newBookingLink}>+ NEW PASS</Text>
           </TouchableOpacity>
         </View>
 
         {loading && !refreshing ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.loadingText}>CALIBRATING SESSION TELEMETRY...</Text>
+            <ActivityIndicator size="large" color="#EFECE6" />
+            <Text style={styles.loadingText}>CALIBRATING TELEMETRY...</Text>
           </View>
         ) : (
           liveSessions.map((session) => (
@@ -219,237 +198,88 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D10',
+    backgroundColor: '#121212',
   },
   content: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 48,
   },
   heroSection: {
-    backgroundColor: '#15151A',
-    borderWidth: 1.5,
-    borderColor: '#262635',
-    borderRadius: 14,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
+    backgroundColor: '#1E1E20',
+    borderWidth: 3,
+    borderColor: '#EFECE6',
+    borderRadius: 0,
+    padding: 18,
+    marginBottom: 4,
+    shadowColor: '#FF1E27',
+    shadowOffset: { width: 6, height: 6 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 8,
     position: 'relative',
     overflow: 'hidden',
   },
-  ambientTopRow: {
+  controlDeckTopBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
-  ambientBadgeWrap: {
+  dymoBadgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#101015',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  syncBadge: {
+    backgroundColor: '#09090C',
     borderWidth: 1,
-    borderColor: '#262635',
-  },
-  ambientBadgeImg: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    marginRight: 7,
-  },
-  ambientBadgeTextCol: {
-    marginRight: 4,
-  },
-  ambientClubTitle: {
-    color: '#F6F2EB',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.9,
-  },
-  ambientClubSub: {
-    color: '#9E9891',
-    fontSize: 8,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-  },
-  bandBadgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  lightningBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#181822',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#3D3D4E',
-  },
-  lightningBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  toneBadge: {
-    backgroundColor: '#181822',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#3D3D4E',
-  },
-  toneBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-  tourYearBadge: {
-    backgroundColor: '#1C1215',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#4A1C24',
-  },
-  tourYearText: {
-    color: '#9E9891',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  liveHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  liveIndicatorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  liveIndicator: {
-    color: '#00E5FF',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    marginLeft: 6,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
-  },
-  syncPill: {
-    backgroundColor: '#121218',
+    borderColor: '#3F3F46',
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#262635',
   },
-  pollTag: {
-    color: '#38BDF8',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
-  },
-  heroTitle: {
-    color: '#F6F2EB',
-    fontSize: 24,
+  syncText: {
+    color: '#CCFF00',
+    fontSize: 8.5,
     fontWeight: '900',
     letterSpacing: 1,
-    marginBottom: 4,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
-  heroSubtitle: {
-    color: '#A8A29E',
-    fontSize: 11,
-    letterSpacing: 0.6,
-    lineHeight: 16,
-    marginBottom: 10,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
-  },
-  soundwaveWrap: {
-    marginVertical: 10,
-    paddingVertical: 4,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#2D161C',
-  },
-  quotaBar: {
-    flexDirection: 'row',
-    backgroundColor: '#0D0D10',
-    borderRadius: 8,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: '#2D1B22',
-  },
-  quotaItem: {
-    flex: 1,
-  },
-  quotaHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  cyanDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#00E5FF',
-  },
-  quotaLabel: {
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.9,
-  },
-  quotaValue: {
-    fontSize: 14,
-    fontWeight: '900',
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
-  },
-  quotaSafe: {
-    color: '#FFFFFF',
-  },
-  quotaDanger: {
-    color: '#EF4444',
-  },
-  quotaDivider: {
-    width: 1,
-    backgroundColor: '#2D1B22',
-    marginHorizontal: 12,
-  },
-  heroBookBtn: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 16,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  heroBtnContentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroBookBtnText: {
-    color: '#0D0D10',
-    fontSize: 12,
+  heroTitle: {
+    color: '#EFECE6',
+    fontSize: 26,
     fontWeight: '900',
     letterSpacing: 1.2,
+    fontFamily: Platform.select({
+      web: '"Anton", "Impact", "Arial Black", sans-serif',
+      default: 'sans-serif',
+    }),
+    lineHeight: 30,
+    marginBottom: 4,
+  },
+  heroSubtitle: {
+    color: '#A1A1AA',
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 14,
+    fontFamily: Platform.select({
+      web: '"Space Mono", "JetBrains Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  vuMeterDeck: {
+    backgroundColor: '#121212',
+    borderWidth: 1.5,
+    borderColor: '#27272A',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    marginVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sessionsList: {
     marginTop: 4,
@@ -457,31 +287,67 @@ const styles = StyleSheet.create({
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
+    alignItems: 'flex-end',
+    marginBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: '#3F3F46',
+    paddingBottom: 8,
   },
   sectionTitle: {
-    color: '#F6F2EB',
-    fontSize: 13,
+    color: '#EFECE6',
+    fontSize: 18,
     fontWeight: '900',
     letterSpacing: 1,
+    fontFamily: Platform.select({
+      web: '"Anton", "Oswald", "Arial Black", sans-serif',
+      default: 'sans-serif',
+    }),
   },
-  newBookingLink: {
+  sectionSubtitle: {
     color: '#9E9891',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  loadingBox: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    color: '#9E9891',
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: '800',
     letterSpacing: 1,
+    marginTop: 2,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  quickBookBtn: {
+    backgroundColor: '#FF1E27',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: '#EFECE6',
+  },
+  newBookingLink: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '900',
+    letterSpacing: 1,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  loadingBox: {
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#18181B',
+    borderWidth: 2,
+    borderColor: '#3F3F46',
+  },
+  loadingText: {
+    color: '#EFECE6',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.2,
     marginTop: 12,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
 });

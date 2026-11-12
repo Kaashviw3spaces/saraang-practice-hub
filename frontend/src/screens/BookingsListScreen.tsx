@@ -255,7 +255,7 @@ export const BookingsListScreen: React.FC<BookingsListScreenProps> = ({ onNaviga
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D10',
+    backgroundColor: '#121212',
   },
   content: {
     padding: 16,
@@ -263,22 +263,30 @@ const styles = StyleSheet.create({
   },
   headerBox: {
     marginBottom: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: '#27272A',
+    paddingBottom: 12,
   },
   headerSubtitle: {
-    color: '#9E9891',
-    fontSize: 11,
-    letterSpacing: 1.2,
-    fontWeight: '800',
+    color: '#CCFF00',
+    fontSize: 10,
+    letterSpacing: 1.5,
+    fontWeight: '900',
     marginBottom: 4,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   headerTitle: {
-    color: '#F6F2EB',
-    fontSize: 24,
+    color: '#EFECE6',
+    fontSize: 26,
     fontWeight: '900',
-    letterSpacing: 0.8,
-    marginBottom: 14,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
+    letterSpacing: 1.2,
+    fontFamily: Platform.select({
+      web: '"Anton", "Oswald", "Arial Black", sans-serif',
+      default: 'sans-serif',
+    }),
   },
   quotaBanner: {
     backgroundColor: '#15151A',
