@@ -48,7 +48,11 @@ Notifications.setNotificationHandler({
 
 type Tab = 'dashboard' | 'booking' | 'bookings' | 'profile';
 
-const TABS: Tab[] = ['dashboard', 'booking', 'bookings', 'profile'];
+const getTabIndicatorIndex = (tab: Tab): number => {
+  if (tab === 'dashboard' || tab === 'booking') return 0;
+  if (tab === 'bookings') return 1;
+  return 2;
+};
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
@@ -60,7 +64,7 @@ export default function App() {
   const screenSlide = useRef(new Animated.Value(0)).current;
 
   const switchTab = (tab: Tab) => {
-    const targetIdx = TABS.indexOf(tab);
+    const targetIdx = getTabIndicatorIndex(tab);
     Animated.spring(tabIndicatorAnim, {
       toValue: targetIdx,
       friction: 8,
@@ -89,7 +93,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    const targetIdx = TABS.indexOf(activeTab);
+    const targetIdx = getTabIndicatorIndex(activeTab);
     Animated.spring(tabIndicatorAnim, {
       toValue: targetIdx,
       friction: 8,
@@ -169,8 +173,7 @@ export default function App() {
           <AnimatedPressable
             style={styles.joinBtn}
             onPress={() => {
-              setWizardStep(1);
-              switchTab('booking');
+              switchTab('dashboard');
             }}
             scaleTo={0.96}
           >
@@ -192,17 +195,12 @@ export default function App() {
           activeOpacity={0.7}
           onPress={() => switchTab('dashboard')}
         >
-          <Text style={[styles.tabText, activeTab === 'dashboard' && styles.tabTextActive]}>
-            NOW PLAYING
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.tabItem}
-          activeOpacity={0.7}
-          onPress={() => switchTab('booking')}
-        >
-          <Text style={[styles.tabText, activeTab === 'booking' && styles.tabTextActive]}>
+          <Text
+            style={[
+              styles.tabText,
+              (activeTab === 'dashboard' || activeTab === 'booking') && styles.tabTextActive,
+            ]}
+          >
             BOOK SLOT
           </Text>
         </TouchableOpacity>
@@ -232,12 +230,12 @@ export default function App() {
             style={[
               styles.slidingIndicator,
               {
-                width: barWidth / 4,
+                width: barWidth / 3,
                 transform: [
                   {
                     translateX: tabIndicatorAnim.interpolate({
-                      inputRange: [0, 1, 2, 3],
-                      outputRange: [0, barWidth * 0.25, barWidth * 0.5, barWidth * 0.75],
+                      inputRange: [0, 1, 2],
+                      outputRange: [0, barWidth / 3, (barWidth * 2) / 3],
                     }),
                   },
                 ],

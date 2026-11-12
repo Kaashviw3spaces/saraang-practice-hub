@@ -15,7 +15,6 @@ import {
 import { api, LiveSession } from '../api/client';
 import { useStore } from '../store/useStore';
 import { LiveSessionCard } from '../components/LiveSessionCard';
-import { OscilloscopeWaveform } from '../components/OscilloscopeWaveform';
 import { GarageRockHeadline } from '../components/GarageRockHeadline';
 
 interface DashboardScreenProps {
@@ -164,47 +163,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
           },
         ]}
       >
-        {/* Subtitle: CLAIM YOUR RIG */}
-        <Text style={styles.headerSubtitle}>CLAIM YOUR RIG</Text>
-
         {/* Display Title: READY TO ROCK? with Garage Rock Animation */}
         <GarageRockHeadline title="READY TO ROCK?" />
-
-        {/* Jagged High-Gain Oscilloscope Soundwave */}
-        <OscilloscopeWaveform activeCount={activeCount} totalRooms={liveSessions.length || 5} />
-
-        {/* Quota Indicator Banner (matching screenshot) */}
-        <View style={styles.quotaBanner}>
-          <View style={styles.quotaRow}>
-            <Text style={styles.quotaTitle}>DAILY REHEARSAL LIMIT:</Text>
-            <Text
-              style={[
-                styles.quotaNum,
-                todayBookingsCount >= 3 ? styles.quotaDanger : styles.quotaSafe,
-              ]}
-            >
-              {todayBookingsCount} / 3 SLOTS USED
-            </Text>
-          </View>
-          <View style={styles.quotaTrack}>
-            <Animated.View
-              style={[
-                styles.quotaFill,
-                {
-                  width: quotaAnim.interpolate({
-                    inputRange: [0, 100],
-                    outputRange: ['0%', '100%'],
-                  }),
-                },
-                todayBookingsCount >= 3
-                  ? styles.fillDanger
-                  : todayBookingsCount === 2
-                  ? styles.fillWarning
-                  : styles.fillSafe,
-              ]}
-            />
-          </View>
-        </View>
       </Animated.View>
 
       {/* Room Roster: Concert Ticket Stub Cards */}
