@@ -163,8 +163,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
           },
         ]}
       >
-        {/* Display Title: READY TO ROCK? with Garage Rock Animation */}
-        <GarageRockHeadline title="READY TO ROCK?" />
+        {/* Subtitle: CLAIM YOUR RIG */}
+        <Text style={styles.headerSubtitle}>CLAIM YOUR RIG</Text>
+
+        {/* Display Title: BOOK YOUR SLOT with Garage Rock Animation */}
+        <GarageRockHeadline title="BOOK YOUR SLOT" align="left" />
       </Animated.View>
 
       {/* Room Roster: Concert Ticket Stub Cards */}
@@ -220,7 +223,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
     fontWeight: '900',
     marginBottom: 6,
-    textAlign: 'center',
+    textAlign: 'left',
     fontFamily: Platform.select({
       web: '"Space Mono", monospace',
       default: 'monospace',

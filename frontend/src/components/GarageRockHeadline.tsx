@@ -10,10 +10,12 @@ import {
 
 interface GarageRockHeadlineProps {
   title?: string;
+  align?: 'left' | 'center';
 }
 
 export const GarageRockHeadline: React.FC<GarageRockHeadlineProps> = ({
-  title = 'READY TO ROCK?',
+  title = 'BOOK YOUR SLOT',
+  align = 'left',
 }) => {
   // Motion primitives for garage rock aesthetic
   const jitterX = useRef(new Animated.Value(0)).current;
@@ -355,18 +357,25 @@ export const GarageRockHeadline: React.FC<GarageRockHeadlineProps> = ({
       {...(Platform.OS === 'web'
         ? {
             onMouseEnter: handleStrum,
-            style: { cursor: 'pointer' } as any,
+            style: { cursor: 'pointer', alignSelf: align === 'left' ? 'flex-start' : 'center' } as any,
           }
-        : {})}
+        : { style: { alignSelf: align === 'left' ? 'flex-start' : 'center' } })}
       accessibilityRole="header"
       accessibilityLabel={title}
     >
-      <View style={styles.titleContainer}>
+      <View
+        style={[
+          styles.titleContainer,
+          align === 'left' ? styles.containerLeft : styles.containerCenter,
+        ]}
+      >
         {/* Layer 1: Crimson Red Silkscreen / Chromatic Misprint Shadow (#C93032) */}
         <Animated.Text
           style={[
             styles.baseTitleText,
+            align === 'left' ? styles.textLeft : styles.textCenter,
             styles.redLayer,
+            align === 'left' ? styles.layerLeft : styles.layerCenter,
             {
               transform: [
                 { translateX: redTranslateX },
@@ -386,7 +395,9 @@ export const GarageRockHeadline: React.FC<GarageRockHeadlineProps> = ({
         <Animated.Text
           style={[
             styles.baseTitleText,
+            align === 'left' ? styles.textLeft : styles.textCenter,
             styles.limeLayer,
+            align === 'left' ? styles.layerLeft : styles.layerCenter,
             {
               transform: [
                 { translateX: limeTranslateX },
@@ -406,6 +417,7 @@ export const GarageRockHeadline: React.FC<GarageRockHeadlineProps> = ({
         <Animated.Text
           style={[
             styles.baseTitleText,
+            align === 'left' ? styles.textLeft : styles.textCenter,
             styles.mainLayer,
             {
               transform: [
@@ -428,8 +440,6 @@ export const GarageRockHeadline: React.FC<GarageRockHeadlineProps> = ({
 const styles = StyleSheet.create({
   titleContainer: {
     position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginVertical: 2,
     ...(Platform.OS === 'web'
       ? ({
@@ -437,15 +447,30 @@ const styles = StyleSheet.create({
         } as any)
       : {}),
   },
+  containerLeft: {
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    alignSelf: 'flex-start',
+  },
+  containerCenter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
   baseTitleText: {
     fontSize: 36,
     fontWeight: '900',
     letterSpacing: 1.5,
-    textAlign: 'center',
     fontFamily: Platform.select({
       web: '"Anton", "Oswald", "Arial Black", sans-serif',
       default: 'sans-serif',
     }),
+  },
+  textLeft: {
+    textAlign: 'left',
+  },
+  textCenter: {
+    textAlign: 'center',
   },
   mainLayer: {
     color: '#EFECE6',
@@ -453,13 +478,20 @@ const styles = StyleSheet.create({
   redLayer: {
     position: 'absolute',
     color: '#C93032',
-    left: 0,
-    right: 0,
-    textAlign: 'center',
+    top: 0,
+    bottom: 0,
   },
   limeLayer: {
     position: 'absolute',
     color: '#B0DA30',
+    top: 0,
+    bottom: 0,
+  },
+  layerLeft: {
+    left: 0,
+    textAlign: 'left',
+  },
+  layerCenter: {
     left: 0,
     right: 0,
     textAlign: 'center',
