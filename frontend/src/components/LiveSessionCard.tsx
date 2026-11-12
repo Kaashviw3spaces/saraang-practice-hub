@@ -191,7 +191,7 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
                 styles.bandSilhouettePhoto,
                 Platform.select({
                   web: {
-                    filter: 'grayscale(100%) contrast(190%) brightness(0.55)',
+                    filter: 'grayscale(100%) contrast(250%) brightness(1.02)',
                     mixBlendMode: 'multiply',
                   } as any,
                 }),
@@ -262,8 +262,8 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
 const styles = StyleSheet.create({
   ticketCard: {
     backgroundColor: '#EAE6DD',
-    borderWidth: 1.8,
-    borderColor: '#242220',
+    borderWidth: 2,
+    borderColor: '#181715',
     borderRadius: 2,
     marginBottom: 18,
     flexDirection: 'row',
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   perforationLine: {
     width: 0,
     borderRightWidth: 1.8,
-    borderRightColor: '#6B655D',
+    borderRightColor: '#242220',
     borderStyle: 'dashed',
   },
   punchNotch: {
@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#121214',
     zIndex: 10,
     borderWidth: 1.5,
-    borderColor: '#242220',
+    borderColor: '#181715',
   },
   notchTopLeft: {
     top: -7,
@@ -342,12 +342,12 @@ const styles = StyleSheet.create({
     width: '42%',
     overflow: 'hidden',
     borderLeftWidth: 1.2,
-    borderLeftColor: 'rgba(36, 34, 32, 0.15)',
+    borderLeftColor: 'rgba(36, 34, 32, 0.4)',
   },
   bandSilhouettePhoto: {
     width: '100%',
     height: '100%',
-    opacity: 0.72,
+    opacity: 0.45,
   },
   ticketHeader: {
     marginBottom: 8,
