@@ -133,7 +133,7 @@ export const ProfileScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D0D10',
+    backgroundColor: 'transparent',
   },
   content: {
     padding: 16,

@@ -23,6 +23,7 @@ import { BookingsListScreen } from './src/screens/BookingsListScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { AnimatedPressable } from './src/components/AnimatedPressable';
 import { LightningSvg } from './src/components/LightningSvg';
+import { MusicalNotesBackground } from './src/components/MusicalNotesBackground';
 
 // Configure foreground notification presentation handler
 Notifications.setNotificationHandler({
@@ -139,6 +140,9 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0D0D10" />
+
+      {/* Atmospheric Pale Musical Notes Ambient Background */}
+      <MusicalNotesBackground />
 
       {/* Global Foreground Notification Banner */}
       <NotificationBanner />
@@ -283,9 +287,10 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#0D0D10',
+    position: 'relative',
   },
   header: {
-    backgroundColor: '#0D0D10',
+    backgroundColor: 'rgba(13, 13, 16, 0.90)',
     borderBottomWidth: 1,
     borderBottomColor: '#1A1A22',
     paddingHorizontal: 16,
@@ -349,7 +354,7 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#0D0D10',
+    backgroundColor: 'rgba(13, 13, 16, 0.93)',
     borderBottomWidth: 1,
     borderBottomColor: '#1A1A22',
     position: 'relative',
@@ -387,6 +392,6 @@ const styles = StyleSheet.create({
   },
   screenContainer: {
     flex: 1,
-    backgroundColor: '#0D0D10',
+    backgroundColor: 'transparent',
   },
 });
