@@ -16,10 +16,7 @@ import { api, LiveSession } from '../api/client';
 import { useStore } from '../store/useStore';
 import { LiveSessionCard } from '../components/LiveSessionCard';
 import { RockTextureOverlay } from '../components/RockTextureOverlay';
-import { DymoTape } from '../components/DymoTape';
-import { VuMeter } from '../components/VuMeter';
 import { OscilloscopeWaveform } from '../components/OscilloscopeWaveform';
-import { StompboxButton } from '../components/StompboxButton';
 import { HazardTapeDivider } from '../components/HazardTapeDivider';
 
 interface DashboardScreenProps {
@@ -121,43 +118,22 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
           },
         ]}
       >
-        {/* Halftone / Mesh Print Texture */}
-        <RockTextureOverlay pattern="mesh" opacity={0.06} />
-
-        {/* Top Control Deck: 3D Embossed Dymo Label Tape Strips */}
-        <View style={styles.controlDeckTopBar}>
-          <View style={styles.dymoBadgesRow}>
-            <DymoTape text="HIGH VOLTAGE" angle={-1.5} color="black" size="sm" />
-            <DymoTape text="GAIN: 11" angle={1} color="red" size="sm" />
-            <DymoTape text="TOUR 2026" angle={2} color="black" size="sm" />
-          </View>
-          <View style={styles.syncBadge}>
-            <Text style={styles.syncText}>SYNC: 30S</Text>
-          </View>
-        </View>
+        {/* Gritty Noise / Mesh Print Texture */}
+        <RockTextureOverlay pattern="grit" opacity={0.05} color="#FFFFFF" />
 
         {/* Section Title */}
-        <Text style={styles.heroTitle}>REHEARSAL TELEMETRY</Text>
-        <Text style={styles.heroSubtitle}>
-          REAL-TIME STUDIO MONITORING • ACOUSTIC HEADROOM • CATEGORY STATUS
-        </Text>
-
-        {/* Jagged High-Gain Oscilloscope Screen */}
-        <OscilloscopeWaveform activeCount={activeCount} totalRooms={liveSessions.length || 5} />
-
-        {/* Analog VU Meter & Quota Deck */}
-        <View style={styles.vuMeterDeck}>
-          <VuMeter
-            value={todayBookingsCount}
-            label={`${todayBookingsCount}/3 BOOKED TODAY`}
-            sublabel="DAILY REHEARSAL QUOTA"
-          />
+        <View style={styles.heroHeaderWrap}>
+          <Text style={styles.heroTitle}>REHEARSAL TELEMETRY</Text>
+          <Text style={styles.heroSubtitle}>
+            REAL-TIME STUDIO MONITORING • ACOUSTIC HEADROOM • CATEGORY STATUS
+          </Text>
         </View>
 
-        {/* Heavy-Duty Stompbox Footswitch CTA Button */}
-        <StompboxButton
-          label="BOOK REHEARSAL SLOT →"
-          onPress={onNavigateToBooking}
+        {/* Jagged High-Gain Oscilloscope Screen showing Daily Rehearsal Quota */}
+        <OscilloscopeWaveform
+          activeCount={activeCount}
+          totalRooms={liveSessions.length || 5}
+          todayBookingsCount={todayBookingsCount}
         />
       </Animated.View>
 
@@ -205,81 +181,47 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   heroSection: {
-    backgroundColor: '#1E1E20',
-    borderWidth: 3,
-    borderColor: '#EFECE6',
-    borderRadius: 0,
-    padding: 18,
+    backgroundColor: '#151518',
+    borderWidth: 1.5,
+    borderColor: '#2E2E38',
+    borderRadius: 2,
+    padding: 16,
     marginBottom: 4,
-    shadowColor: '#FF1E27',
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
+    shadowColor: '#000000',
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 0.7,
     shadowRadius: 0,
-    elevation: 8,
+    elevation: 4,
     position: 'relative',
     overflow: 'hidden',
   },
-  controlDeckTopBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+  heroHeaderWrap: {
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#22222A',
+    paddingBottom: 6,
   },
-  dymoBadgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  syncBadge: {
-    backgroundColor: '#09090C',
-    borderWidth: 1,
-    borderColor: '#3F3F46',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  syncText: {
-    color: '#CCFF00',
-    fontSize: 8.5,
+  heroTitle: {
+    color: '#EAE6DC',
+    fontSize: 22,
     fontWeight: '900',
+    letterSpacing: 1.5,
+    fontFamily: Platform.select({
+      web: '"Anton", "Impact", "Oswald", sans-serif',
+      default: 'sans-serif',
+    }),
+    lineHeight: 25,
+    marginBottom: 3,
+  },
+  heroSubtitle: {
+    color: '#8A867E',
+    fontSize: 8.5,
+    fontWeight: '800',
     letterSpacing: 1,
     fontFamily: Platform.select({
       web: '"Space Mono", monospace',
       default: 'monospace',
     }),
-  },
-  heroTitle: {
-    color: '#EFECE6',
-    fontSize: 26,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    fontFamily: Platform.select({
-      web: '"Anton", "Impact", "Arial Black", sans-serif',
-      default: 'sans-serif',
-    }),
-    lineHeight: 30,
-    marginBottom: 4,
-  },
-  heroSubtitle: {
-    color: '#A1A1AA',
-    fontSize: 9.5,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 14,
-    fontFamily: Platform.select({
-      web: '"Space Mono", "JetBrains Mono", monospace',
-      default: 'monospace',
-    }),
-  },
-  vuMeterDeck: {
-    backgroundColor: '#121212',
-    borderWidth: 1.5,
-    borderColor: '#27272A',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    marginVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   sessionsList: {
     marginTop: 4,
@@ -315,15 +257,16 @@ const styles = StyleSheet.create({
     }),
   },
   quickBookBtn: {
-    backgroundColor: '#FF1E27',
-    paddingHorizontal: 8,
+    backgroundColor: '#222228',
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderWidth: 1,
-    borderColor: '#EFECE6',
+    borderColor: '#3D3D47',
+    borderRadius: 2,
   },
   newBookingLink: {
-    color: '#FFFFFF',
-    fontSize: 9.5,
+    color: '#EAE6DC',
+    fontSize: 9,
     fontWeight: '900',
     letterSpacing: 1,
     fontFamily: Platform.select({

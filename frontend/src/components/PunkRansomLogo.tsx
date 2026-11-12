@@ -1,64 +1,38 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import { RockTextureOverlay } from './RockTextureOverlay';
 
 export const PunkRansomLogo: React.FC = () => {
-  const letters = [
-    { char: 'S', bg: '#121212', text: '#FFFFFF', border: '#EFECE6', rot: -2.5, width: 22 },
-    { char: 'A', bg: '#EFECE6', text: '#121212', border: '#121212', rot: 1.8, width: 20 },
-    { char: 'A', bg: '#FF1E27', text: '#FFFFFF', border: '#EFECE6', rot: -1.0, width: 20 },
-    { char: 'R', bg: '#EFECE6', text: '#121212', border: '#121212', rot: 2.2, width: 20 },
-    { char: 'A', bg: '#121212', text: '#FFFFFF', border: '#EFECE6', rot: -1.8, width: 20 },
-    { char: 'N', bg: '#EFECE6', text: '#121212', border: '#121212', rot: 1.5, width: 21 },
-    { char: 'G', bg: '#CCFF00', text: '#121212', border: '#121212', rot: -2.0, width: 23 },
-  ];
-
   return (
     <View style={styles.outerContainer}>
-      {/* Ransom Note Letter Scraps Row */}
-      <View style={styles.lettersRow}>
-        {letters.map((item, idx) => (
-          <View
-            key={`ransom-${idx}`}
-            style={[
-              styles.letterScrap,
-              {
-                backgroundColor: item.bg,
-                borderColor: item.border,
-                transform: [{ rotate: `${item.rot}deg` }],
-                width: item.width,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.ransomLetterText,
-                {
-                  color: item.text,
-                },
-              ]}
-            >
-              {item.char}
-            </Text>
+      <View style={styles.mastheadFrame}>
+        {/* Gritty Film Grain Texture Overlay */}
+        <RockTextureOverlay pattern="grit" opacity={0.06} color="#FFFFFF" />
+
+        {/* Top Mechanical Index Bar */}
+        <View style={styles.indexBar}>
+          <View style={styles.statusIndicator}>
+            <View style={styles.statusLed} />
+            <Text style={styles.indexMonoText}>EST. 2026 // AUDIO ARCHIVE</Text>
           </View>
-        ))}
-      </View>
+          <Text style={styles.indexChamberText}>CH. 01</Text>
+        </View>
 
-      {/* Sub-tag row with Hand-drawn Punk Arrow and "THE MUSIC CLUB" */}
-      <View style={styles.subTagRow}>
-        {/* Bold Hand-drawn Punk Arrow SVG */}
-        <Svg width="26" height="14" viewBox="0 0 26 14" fill="none" style={styles.arrowSvg}>
-          <Path
-            d="M 2 7 L 22 7 M 16 2 L 23 7 L 16 12"
-            stroke="#FF1E27"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </Svg>
+        {/* Main Brand Title: Heavy, Pale Bone Condensed Letterforms with Gritty Shadow */}
+        <View style={styles.titleRow}>
+          <Text style={styles.brandTitle}>SAARANG</Text>
+          <View style={styles.ampDotStamp}>
+            <Text style={styles.ampDotText}>⚡</Text>
+          </View>
+        </View>
 
-        <View style={styles.musicClubTape}>
-          <Text style={styles.musicClubText}>THE MUSIC CLUB</Text>
+        {/* Subtitle Bar: Gritty Monospace Music Club Tag */}
+        <View style={styles.subBar}>
+          <View style={styles.clubPill}>
+            <Text style={styles.clubPillText}>THE MUSIC CLUB</Text>
+          </View>
+          <Text style={styles.subDivider}>•</Text>
+          <Text style={styles.hubMonoText}>PRACTICE HUB</Text>
         </View>
       </View>
     </View>
@@ -67,67 +41,130 @@ export const PunkRansomLogo: React.FC = () => {
 
 const styles = StyleSheet.create({
   outerContainer: {
-    transform: [{ rotate: '-2deg' }],
     alignSelf: 'flex-start',
   },
-  lettersRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    marginBottom: 4,
-  },
-  letterScrap: {
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
+  mastheadFrame: {
+    backgroundColor: '#161619',
     borderWidth: 1.5,
-    borderRadius: 1,
+    borderColor: '#2F2F36',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 2,
+    position: 'relative',
+    overflow: 'hidden',
     shadowColor: '#000000',
-    shadowOffset: { width: 1.5, height: 2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 1,
+    shadowOffset: { width: 2, height: 3 },
+    shadowOpacity: 0.7,
+    shadowRadius: 0,
     elevation: 3,
   },
-  ransomLetterText: {
-    fontSize: 18,
-    fontWeight: '900',
-    fontFamily: Platform.select({
-      web: '"Anton", "Impact", "Arial Black", sans-serif',
-      default: 'sans-serif',
-    }),
-    letterSpacing: -0.5,
-    marginTop: -2,
+  indexBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#24242B',
+    paddingBottom: 3,
   },
-  subTagRow: {
+  statusIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 4,
-    gap: 6,
   },
-  arrowSvg: {
-    marginRight: 2,
+  statusLed: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#C83838',
+    marginRight: 5,
   },
-  musicClubTape: {
-    backgroundColor: '#EFECE6',
-    borderWidth: 1.5,
-    borderColor: '#121212',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 1,
-    shadowColor: '#FF1E27',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 2,
+  indexMonoText: {
+    color: '#8A867E',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 1,
+    fontFamily: Platform.select({
+      web: '"Space Mono", "JetBrains Mono", monospace',
+      default: 'monospace',
+    }),
   },
-  musicClubText: {
-    color: '#121212',
+  indexChamberText: {
+    color: '#B0AAA0',
+    fontSize: 8.5,
+    fontWeight: '900',
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+    letterSpacing: 0.8,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  brandTitle: {
+    color: '#EAE6DC',
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: 2.5,
+    fontFamily: Platform.select({
+      web: '"Anton", "Impact", "Oswald", sans-serif',
+      default: 'sans-serif',
+    }),
+    lineHeight: 26,
+    textShadowColor: 'rgba(0, 0, 0, 0.9)',
+    textShadowOffset: { width: 1.5, height: 1.5 },
+    textShadowRadius: 0,
+  },
+  ampDotStamp: {
+    marginLeft: 6,
+    backgroundColor: '#26262E',
+    borderWidth: 1,
+    borderColor: '#3D3D47',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 2,
+  },
+  ampDotText: {
+    color: '#E0A96D',
     fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 1.4,
+  },
+  subBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 3,
+  },
+  clubPill: {
+    backgroundColor: '#EAE6DC',
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 1,
+  },
+  clubPillText: {
+    color: '#121214',
+    fontSize: 8.5,
+    fontWeight: '900',
+    letterSpacing: 1.1,
     fontFamily: Platform.select({
-      web: '"Oswald", "Space Mono", sans-serif',
-      default: 'sans-serif',
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  subDivider: {
+    color: '#C83838',
+    fontSize: 9,
+    marginHorizontal: 5,
+    fontWeight: '900',
+  },
+  hubMonoText: {
+    color: '#A8A49C',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 1,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
     }),
   },
 });
