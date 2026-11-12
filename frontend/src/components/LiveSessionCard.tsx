@@ -387,12 +387,12 @@ const styles = StyleSheet.create({
     shadowRadius: 1,
   },
   stampAcidLime: {
-    backgroundColor: '#DFE7DC',
-    borderColor: '#4A6546',
+    backgroundColor: '#CCFF00',
+    borderColor: '#121212',
   },
   stampCrimson: {
-    backgroundColor: '#EBD8D8',
-    borderColor: '#9E3232',
+    backgroundColor: '#FF1E27',
+    borderColor: '#FFFFFF',
   },
   stampText: {
     fontSize: 8.5,
@@ -404,10 +404,10 @@ const styles = StyleSheet.create({
     }),
   },
   stampTextLime: {
-    color: '#344D30',
+    color: '#121212',
   },
   stampTextCrimson: {
-    color: '#8E2828',
+    color: '#FFFFFF',
   },
   bookTicketBtn: {
     backgroundColor: '#1A1A1E',

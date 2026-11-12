@@ -23,6 +23,7 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { AnimatedPressable } from './src/components/AnimatedPressable';
 import { LightningSvg } from './src/components/LightningSvg';
 import { PunkRansomLogo } from './src/components/PunkRansomLogo';
+import { DymoTape } from './src/components/DymoTape';
 
 // Dynamically inject Google Fonts on Web
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -156,8 +157,9 @@ export default function App() {
 
       {/* Gritty Punk Zine Brutalist Header */}
       <View style={styles.header}>
-        {/* Top Header Row: Masthead + Stamped CTA */}
+        {/* Top Header Row: Ransom Logo + Stamped CTA */}
         <View style={styles.headerTopBar}>
+          {/* Wheat-pasted Ransom-Note Logo Cutout */}
           <PunkRansomLogo />
 
           {/* Book Slot Stamped Action Button */}
@@ -170,10 +172,18 @@ export default function App() {
             scaleTo={0.96}
           >
             <View style={styles.joinBtnRow}>
-              <LightningSvg color="#121214" size={12} style={{ marginRight: 6 }} />
+              <LightningSvg color="#121212" size={12} style={{ marginRight: 4 }} />
               <Text style={styles.joinBtnText}>BOOK SLOT</Text>
             </View>
           </AnimatedPressable>
+        </View>
+
+        {/* Second Row: 3D Embossed Dymo Metadata Tape Strips */}
+        <View style={styles.dymoBadgesGroup}>
+          <DymoTape text="HIGH VOLTAGE" angle={-1.5} color="black" size="sm" />
+          <DymoTape text="GAIN: 11" angle={1} color="red" size="sm" />
+          <DymoTape text="TOUR 2026" angle={2} color="black" size="sm" />
+          <DymoTape text="LIVE HUB" angle={-1} color="lime" size="sm" />
         </View>
       </View>
 
@@ -286,78 +296,85 @@ const styles = StyleSheet.create({
     backgroundColor: '#121212',
   },
   header: {
-    backgroundColor: '#121214',
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#26262B',
+    backgroundColor: '#121212',
+    borderBottomWidth: 2.5,
+    borderBottomColor: '#27272A',
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 10,
+    paddingTop: 12,
+    paddingBottom: 14,
   },
   headerTopBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  dymoBadgesGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
   },
   joinBtn: {
-    backgroundColor: '#EAE6DC',
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 2,
-    borderWidth: 1.5,
-    borderColor: '#36363D',
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.8,
+    backgroundColor: '#CCFF00',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 0,
+    borderWidth: 2,
+    borderColor: '#121212',
+    shadowColor: '#FF1E27',
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 1,
     shadowRadius: 0,
-    elevation: 3,
+    elevation: 4,
   },
   joinBtnRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   joinBtnText: {
-    color: '#141416',
+    color: '#121212',
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 1.2,
     fontFamily: Platform.select({
-      web: '"Space Mono", monospace',
+      web: '"Space Mono", "Oswald", monospace',
       default: 'monospace',
     }),
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#161619',
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#26262B',
+    backgroundColor: '#161618',
+    borderBottomWidth: 2,
+    borderBottomColor: '#27272A',
     position: 'relative',
   },
   tabItem: {
     flex: 1,
-    paddingVertical: 13,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabText: {
-    color: '#8A867E',
+    color: '#A1A1AA',
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1.2,
     fontFamily: Platform.select({
-      web: '"Oswald", "Anton", sans-serif',
+      web: '"Oswald", "Anton", "Arial Black", sans-serif',
       default: 'sans-serif',
     }),
   },
   tabTextActive: {
-    color: '#EAE6DC',
+    color: '#EFECE6',
     fontWeight: '900',
   },
   slidingIndicator: {
     position: 'absolute',
     bottom: 0,
     left: 0,
-    height: 3,
-    backgroundColor: '#C83838',
+    height: 3.5,
+    backgroundColor: '#FF1E27',
     borderRadius: 0,
     shadowColor: '#FF1E27',
     shadowOffset: { width: 0, height: -1 },
