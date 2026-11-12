@@ -16,6 +16,7 @@ import { api, LiveSession } from '../api/client';
 import { useStore } from '../store/useStore';
 import { LiveSessionCard } from '../components/LiveSessionCard';
 import { OscilloscopeWaveform } from '../components/OscilloscopeWaveform';
+import { GarageRockHeadline } from '../components/GarageRockHeadline';
 
 interface DashboardScreenProps {
   onNavigateToBooking: () => void;
@@ -166,8 +167,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         {/* Subtitle: CLAIM YOUR RIG */}
         <Text style={styles.headerSubtitle}>CLAIM YOUR RIG</Text>
 
-        {/* Display Title: READY TO ROCK? */}
-        <Text style={styles.headerTitle}>READY TO ROCK?</Text>
+        {/* Display Title: READY TO ROCK? with Garage Rock Animation */}
+        <GarageRockHeadline title="READY TO ROCK?" />
 
         {/* Jagged High-Gain Oscilloscope Soundwave */}
         <OscilloscopeWaveform activeCount={activeCount} totalRooms={liveSessions.length || 5} />
