@@ -16,10 +16,7 @@ import { api, LiveSession } from '../api/client';
 import { useStore } from '../store/useStore';
 import { LiveSessionCard } from '../components/LiveSessionCard';
 import { RockTextureOverlay } from '../components/RockTextureOverlay';
-import { DymoTape } from '../components/DymoTape';
-import { VuMeter } from '../components/VuMeter';
 import { OscilloscopeWaveform } from '../components/OscilloscopeWaveform';
-import { StompboxButton } from '../components/StompboxButton';
 import { HazardTapeDivider } from '../components/HazardTapeDivider';
 
 interface DashboardScreenProps {
@@ -124,13 +121,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         {/* Halftone / Mesh Print Texture */}
         <RockTextureOverlay pattern="mesh" opacity={0.06} />
 
-        {/* Top Control Deck: 3D Embossed Dymo Label Tape Strips */}
+        {/* Top Control Deck: SYNC indicator */}
         <View style={styles.controlDeckTopBar}>
-          <View style={styles.dymoBadgesRow}>
-            <DymoTape text="HIGH VOLTAGE" angle={-1.5} color="black" size="sm" />
-            <DymoTape text="GAIN: 11" angle={1} color="red" size="sm" />
-            <DymoTape text="TOUR 2026" angle={2} color="black" size="sm" />
-          </View>
           <View style={styles.syncBadge}>
             <Text style={styles.syncText}>SYNC: 30S</Text>
           </View>
@@ -144,21 +136,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
 
         {/* Jagged High-Gain Oscilloscope Screen */}
         <OscilloscopeWaveform activeCount={activeCount} totalRooms={liveSessions.length || 5} />
-
-        {/* Analog VU Meter & Quota Deck */}
-        <View style={styles.vuMeterDeck}>
-          <VuMeter
-            value={todayBookingsCount}
-            label={`${todayBookingsCount}/3 BOOKED TODAY`}
-            sublabel="DAILY REHEARSAL QUOTA"
-          />
-        </View>
-
-        {/* Heavy-Duty Stompbox Footswitch CTA Button */}
-        <StompboxButton
-          label="BOOK REHEARSAL SLOT →"
-          onPress={onNavigateToBooking}
-        />
       </Animated.View>
 
       {/* Section Divider: Ripped Paper Edge Layered Over Diagonal Hazard Stripes */}
@@ -221,15 +198,9 @@ const styles = StyleSheet.create({
   },
   controlDeckTopBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  dymoBadgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
+    marginBottom: 8,
   },
   syncBadge: {
     backgroundColor: '#09090C',
@@ -270,16 +241,6 @@ const styles = StyleSheet.create({
       web: '"Space Mono", "JetBrains Mono", monospace',
       default: 'monospace',
     }),
-  },
-  vuMeterDeck: {
-    backgroundColor: '#121212',
-    borderWidth: 1.5,
-    borderColor: '#27272A',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    marginVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   sessionsList: {
     marginTop: 4,

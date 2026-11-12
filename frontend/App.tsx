@@ -23,7 +23,6 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { AnimatedPressable } from './src/components/AnimatedPressable';
 import { LightningSvg } from './src/components/LightningSvg';
 import { PunkRansomLogo } from './src/components/PunkRansomLogo';
-import { DymoTape } from './src/components/DymoTape';
 
 // Dynamically inject Google Fonts on Web
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -177,14 +176,6 @@ export default function App() {
             </View>
           </AnimatedPressable>
         </View>
-
-        {/* Second Row: 3D Embossed Dymo Metadata Tape Strips */}
-        <View style={styles.dymoBadgesGroup}>
-          <DymoTape text="HIGH VOLTAGE" angle={-1.5} color="black" size="sm" />
-          <DymoTape text="GAIN: 11" angle={1} color="red" size="sm" />
-          <DymoTape text="TOUR 2026" angle={2} color="black" size="sm" />
-          <DymoTape text="LIVE HUB" angle={-1} color="lime" size="sm" />
-        </View>
       </View>
 
       {/* Navigation Tab Bar: Heavy Condensed Grotesque Typography */}
@@ -307,13 +298,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  dymoBadgesGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
   },
   joinBtn: {
     backgroundColor: '#CCFF00',

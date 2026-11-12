@@ -34,20 +34,6 @@ export const OscilloscopeWaveform: React.FC<OscilloscopeWaveformProps> = ({
 
   return (
     <View style={styles.scopeContainer}>
-      {/* Top Header Bar of Inset Cathode Scope */}
-      <View style={styles.scopeHeaderRow}>
-        <View style={styles.livePill}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveText}>LIVE ON STAGE</Text>
-        </View>
-
-        <View style={styles.counterWrap}>
-          <Text style={styles.counterText}>
-            {activeCount}/{totalRooms} <Text style={styles.counterUnit}>LIVE</Text>
-          </Text>
-        </View>
-      </View>
-
       {/* Cathode Ray Oscilloscope Screen with Grid & Jagged High-Gain Waveform */}
       <View style={styles.screenFrame}>
         <Svg width="100%" height="52" viewBox="0 0 320 52" preserveAspectRatio="none">
