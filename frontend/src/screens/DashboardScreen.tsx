@@ -148,7 +148,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         {/* Jagged High-Gain Oscilloscope Screen */}
         <OscilloscopeWaveform activeCount={activeCount} totalRooms={liveSessions.length || 5} />
 
-        {/* Daily Quota Limit Console */}
+        {/* Daily Quota Limit Bar */}
         <View style={styles.quotaLimitDeck}>
           <View style={styles.quotaLimitHeader}>
             <Text style={styles.quotaLimitTitle}>DAILY REHEARSAL QUOTA LIMIT</Text>
@@ -158,31 +158,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
               </Text>{' '}
               SLOTS USED
             </Text>
-          </View>
-
-          {/* 3-Slot Visualizer */}
-          <View style={styles.quotaSlotsRow}>
-            {[0, 1, 2].map((idx) => {
-              const isFilled = idx < todayBookingsCount;
-              return (
-                <View
-                  key={`slot-${idx}`}
-                  style={[
-                    styles.quotaSlotBox,
-                    isFilled ? styles.quotaSlotBoxFilled : styles.quotaSlotBoxEmpty,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.quotaSlotBoxText,
-                      isFilled ? styles.quotaSlotBoxTextFilled : styles.quotaSlotBoxTextEmpty,
-                    ]}
-                  >
-                    SLOT 0{idx + 1}: {isFilled ? 'RESERVED' : 'AVAILABLE'}
-                  </Text>
-                </View>
-              );
-            })}
           </View>
         </View>
       </Animated.View>
@@ -324,14 +299,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#121212',
     borderWidth: 1.5,
     borderColor: '#27272A',
-    padding: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     marginTop: 10,
   },
   quotaLimitHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
   },
   quotaLimitTitle: {
     color: '#9E9891',
@@ -352,40 +327,6 @@ const styles = StyleSheet.create({
       web: '"Space Mono", monospace',
       default: 'monospace',
     }),
-  },
-  quotaSlotsRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  quotaSlotBox: {
-    flex: 1,
-    paddingVertical: 5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  quotaSlotBoxFilled: {
-    backgroundColor: '#2A0E13',
-    borderColor: '#FF1E27',
-  },
-  quotaSlotBoxEmpty: {
-    backgroundColor: '#18181B',
-    borderColor: '#3F3F46',
-  },
-  quotaSlotBoxText: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    letterSpacing: 0.6,
-    fontFamily: Platform.select({
-      web: '"Space Mono", monospace',
-      default: 'monospace',
-    }),
-  },
-  quotaSlotBoxTextFilled: {
-    color: '#FF1E27',
-  },
-  quotaSlotBoxTextEmpty: {
-    color: '#CCFF00',
   },
   sessionsList: {
     marginTop: 4,
