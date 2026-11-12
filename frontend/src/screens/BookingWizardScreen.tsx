@@ -1694,7 +1694,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#0D0D10',
   },
   content: {
     padding: 16,
@@ -1706,7 +1706,7 @@ const styles = StyleSheet.create({
   },
   centerBox: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#0D0D10',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,

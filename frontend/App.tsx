@@ -23,7 +23,6 @@ import { BookingsListScreen } from './src/screens/BookingsListScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { AnimatedPressable } from './src/components/AnimatedPressable';
 import { LightningSvg } from './src/components/LightningSvg';
-import { MusicalNotesBackground } from './src/components/MusicalNotesBackground';
 
 // Configure foreground notification presentation handler
 Notifications.setNotificationHandler({
@@ -276,9 +275,6 @@ export default function App() {
         )}
         {activeTab === 'profile' && <ProfileScreen />}
       </Animated.View>
-
-      {/* Atmospheric Pale Musical Notes Falling Gracefully from the Very Top of the Page */}
-      <MusicalNotesBackground />
     </SafeAreaView>
   );
 }
@@ -287,10 +283,9 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#0D0D10',
-    position: 'relative',
   },
   header: {
-    backgroundColor: 'rgba(13, 13, 16, 0.90)',
+    backgroundColor: '#0D0D10',
     borderBottomWidth: 1,
     borderBottomColor: '#1A1A22',
     paddingHorizontal: 16,
@@ -354,7 +349,7 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(13, 13, 16, 0.93)',
+    backgroundColor: '#0D0D10',
     borderBottomWidth: 1,
     borderBottomColor: '#1A1A22',
     position: 'relative',
@@ -392,6 +387,6 @@ const styles = StyleSheet.create({
   },
   screenContainer: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#0D0D10',
   },
 });
