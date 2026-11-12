@@ -23,6 +23,7 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { AnimatedPressable } from './src/components/AnimatedPressable';
 import { LightningSvg } from './src/components/LightningSvg';
 import { PunkRansomLogo } from './src/components/PunkRansomLogo';
+import { RockTextureOverlay } from './src/components/RockTextureOverlay';
 
 // Dynamically inject Google Fonts on Web
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -150,6 +151,9 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#121212" />
+
+      {/* Ultra-Subtle Whispering Textured Background */}
+      <RockTextureOverlay opacity={0.03} />
 
       {/* Global Foreground Notification Banner */}
       <NotificationBanner />

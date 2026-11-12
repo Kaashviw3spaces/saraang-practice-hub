@@ -10,7 +10,7 @@ interface RockTextureOverlayProps {
 
 export const RockTextureOverlay: React.FC<RockTextureOverlayProps> = ({
   style,
-  opacity = 0.08,
+  opacity = 0.03,
   pattern = 'zineGrain',
 }) => {
   if (pattern === 'mesh') {
@@ -53,14 +53,14 @@ export const RockTextureOverlay: React.FC<RockTextureOverlayProps> = ({
         resizeMode="repeat"
       />
 
-      {/* 2. Subtle Chalk Dust & Paper Fiber Speckles */}
+      {/* 2. Ultra-Subtle Paper Fiber Speckles */}
       <Svg width="100%" height="100%" style={StyleSheet.absoluteFillObject}>
         <Defs>
-          <Pattern id="chalkDustOverlay" width="32" height="32" patternUnits="userSpaceOnUse">
-            <Circle cx="5" cy="12" r="0.7" fill="#FFFFFF" fillOpacity={opacity * 1.8} />
-            <Circle cx="22" cy="7" r="1.0" fill="#FFFFFF" fillOpacity={opacity * 2.2} />
-            <Circle cx="16" cy="24" r="0.8" fill="#FFFFFF" fillOpacity={opacity * 1.6} />
-            <Circle cx="29" cy="19" r="0.5" fill="#FFFFFF" fillOpacity={opacity * 2.0} />
+          <Pattern id="chalkDustOverlay" width="36" height="36" patternUnits="userSpaceOnUse">
+            <Circle cx="6" cy="12" r="0.6" fill="#FFFFFF" fillOpacity={opacity * 1.2} />
+            <Circle cx="24" cy="8" r="0.8" fill="#FFFFFF" fillOpacity={opacity * 1.5} />
+            <Circle cx="18" cy="26" r="0.6" fill="#FFFFFF" fillOpacity={opacity * 1.0} />
+            <Circle cx="31" cy="20" r="0.5" fill="#FFFFFF" fillOpacity={opacity * 1.2} />
           </Pattern>
         </Defs>
         <Rect width="100%" height="100%" fill="url(#chalkDustOverlay)" />
@@ -78,6 +78,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
-    opacity: 0.95,
+    opacity: 0.22,
   },
 });
