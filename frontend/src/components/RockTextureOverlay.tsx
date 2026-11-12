@@ -53,14 +53,7 @@ export const RockTextureOverlay: React.FC<RockTextureOverlayProps> = ({
         resizeMode="repeat"
       />
 
-      {/* 2. Authentic Zine Halftone Screen Print Column along Left Margin (From Screenshot) */}
-      <Image
-        source={require('../../assets/bg_halftone_left.png')}
-        style={styles.leftHalftoneStrip}
-        resizeMode="repeat"
-      />
-
-      {/* 3. Subtle Chalk Dust & Paper Fiber Speckles */}
+      {/* 2. Subtle Chalk Dust & Paper Fiber Speckles */}
       <Svg width="100%" height="100%" style={StyleSheet.absoluteFillObject}>
         <Defs>
           <Pattern id="chalkDustOverlay" width="32" height="32" patternUnits="userSpaceOnUse">
@@ -86,14 +79,5 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     opacity: 0.95,
-  },
-  leftHalftoneStrip: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: 70,
-    height: '100%',
-    opacity: 0.85,
   },
 });
