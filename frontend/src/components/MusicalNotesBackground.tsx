@@ -38,7 +38,7 @@ export interface FloatingNoteConfig {
   strokeWidth: number;
 }
 
-// Curated Pale Studio Palette: Ethereal, low-saturation, atmospheric
+// Curated Pale Studio Palette: Executive acoustic warmth, low saturation
 const PALE_COLORS = {
   amber: '#FDE68A',     // Pale vintage brass / amber
   rose: '#FCA5A5',      // Pale Saarang crimson / velvet rose
@@ -47,215 +47,234 @@ const PALE_COLORS = {
   lavender: '#DDD6FE',  // Pale harmonic lilac / violet
 };
 
-// Curated 15-note constellation for organic distribution and zero visual pop
+// Curated 16-note falling constellation (top-to-bottom gentle acoustic drift)
 const DEFAULT_NOTES: FloatingNoteConfig[] = [
   {
     id: 1,
     type: 'double_eighth',
-    xPercent: 8,
-    size: 26,
+    xPercent: 10,
+    size: 24,
     color: PALE_COLORS.amber,
-    baseOpacity: 0.15,
-    duration: 19000,
+    baseOpacity: 0.13,
+    duration: 22000,
     initialOffset: 0.08,
-    swayAmount: 26,
-    rotationRange: 12,
-    strokeWidth: 1.8,
+    swayAmount: 20,
+    rotationRange: 10,
+    strokeWidth: 1.4,
   },
   {
     id: 2,
     type: 'treble_clef',
-    xPercent: 84,
-    size: 32,
+    xPercent: 82,
+    size: 28,
     color: PALE_COLORS.rose,
-    baseOpacity: 0.16,
-    duration: 23000,
+    baseOpacity: 0.14,
+    duration: 26000,
     initialOffset: 0.22,
-    swayAmount: 22,
-    rotationRange: -14,
-    strokeWidth: 1.8,
+    swayAmount: 18,
+    rotationRange: -12,
+    strokeWidth: 1.4,
   },
   {
     id: 3,
     type: 'eighth',
-    xPercent: 24,
-    size: 20,
+    xPercent: 26,
+    size: 18,
     color: PALE_COLORS.moonlight,
-    baseOpacity: 0.12,
-    duration: 16000,
+    baseOpacity: 0.11,
+    duration: 20000,
     initialOffset: 0.45,
-    swayAmount: -28,
-    rotationRange: 16,
-    strokeWidth: 1.8,
+    swayAmount: -22,
+    rotationRange: 14,
+    strokeWidth: 1.4,
   },
   {
     id: 4,
     type: 'quarter',
-    xPercent: 64,
-    size: 20,
+    xPercent: 62,
+    size: 18,
     color: PALE_COLORS.lavender,
-    baseOpacity: 0.13,
-    duration: 17500,
+    baseOpacity: 0.12,
+    duration: 24000,
     initialOffset: 0.62,
-    swayAmount: 18,
-    rotationRange: -10,
-    strokeWidth: 1.8,
+    swayAmount: 16,
+    rotationRange: -8,
+    strokeWidth: 1.4,
   },
   {
     id: 5,
     type: 'bass_clef',
-    xPercent: 14,
-    size: 24,
+    xPercent: 16,
+    size: 22,
     color: PALE_COLORS.cyan,
-    baseOpacity: 0.14,
-    duration: 22000,
+    baseOpacity: 0.12,
+    duration: 27000,
     initialOffset: 0.35,
-    swayAmount: 32,
-    rotationRange: 12,
-    strokeWidth: 1.8,
+    swayAmount: 24,
+    rotationRange: 10,
+    strokeWidth: 1.4,
   },
   {
     id: 6,
     type: 'sixteenth',
-    xPercent: 46,
-    size: 22,
+    xPercent: 48,
+    size: 20,
     color: PALE_COLORS.amber,
-    baseOpacity: 0.13,
-    duration: 15000,
+    baseOpacity: 0.12,
+    duration: 21000,
     initialOffset: 0.78,
-    swayAmount: -22,
-    rotationRange: -15,
-    strokeWidth: 1.8,
+    swayAmount: -18,
+    rotationRange: -12,
+    strokeWidth: 1.4,
   },
   {
     id: 7,
     type: 'double_eighth',
-    xPercent: 76,
-    size: 22,
+    xPercent: 74,
+    size: 20,
     color: PALE_COLORS.rose,
-    baseOpacity: 0.14,
-    duration: 18500,
+    baseOpacity: 0.13,
+    duration: 23000,
     initialOffset: 0.15,
-    swayAmount: 24,
-    rotationRange: 10,
-    strokeWidth: 1.8,
+    swayAmount: 20,
+    rotationRange: 8,
+    strokeWidth: 1.4,
   },
   {
     id: 8,
     type: 'treble_clef',
-    xPercent: 36,
-    size: 34,
+    xPercent: 38,
+    size: 30,
     color: PALE_COLORS.moonlight,
-    baseOpacity: 0.15,
-    duration: 25000,
+    baseOpacity: 0.13,
+    duration: 29000,
     initialOffset: 0.85,
-    swayAmount: -30,
-    rotationRange: 15,
-    strokeWidth: 1.8,
+    swayAmount: -24,
+    rotationRange: 12,
+    strokeWidth: 1.4,
   },
   {
     id: 9,
     type: 'sharp',
-    xPercent: 92,
-    size: 18,
+    xPercent: 90,
+    size: 17,
     color: PALE_COLORS.lavender,
-    baseOpacity: 0.11,
-    duration: 16500,
+    baseOpacity: 0.10,
+    duration: 22000,
     initialOffset: 0.52,
-    swayAmount: 16,
-    rotationRange: -8,
-    strokeWidth: 1.8,
+    swayAmount: 14,
+    rotationRange: -6,
+    strokeWidth: 1.4,
   },
   {
     id: 10,
     type: 'eighth',
-    xPercent: 5,
-    size: 18,
+    xPercent: 6,
+    size: 17,
     color: PALE_COLORS.rose,
-    baseOpacity: 0.11,
-    duration: 14000,
+    baseOpacity: 0.10,
+    duration: 19000,
     initialOffset: 0.92,
-    swayAmount: -20,
-    rotationRange: 14,
-    strokeWidth: 1.8,
+    swayAmount: -16,
+    rotationRange: 12,
+    strokeWidth: 1.4,
   },
   {
     id: 11,
     type: 'quarter',
-    xPercent: 70,
-    size: 18,
+    xPercent: 68,
+    size: 17,
     color: PALE_COLORS.cyan,
-    baseOpacity: 0.11,
-    duration: 20500,
+    baseOpacity: 0.10,
+    duration: 25000,
     initialOffset: 0.28,
-    swayAmount: 25,
-    rotationRange: -12,
-    strokeWidth: 1.8,
+    swayAmount: 20,
+    rotationRange: -10,
+    strokeWidth: 1.4,
   },
   {
     id: 12,
     type: 'double_eighth',
-    xPercent: 30,
-    size: 28,
+    xPercent: 32,
+    size: 24,
     color: PALE_COLORS.amber,
-    baseOpacity: 0.15,
-    duration: 21000,
+    baseOpacity: 0.13,
+    duration: 24000,
     initialOffset: 0.68,
-    swayAmount: -24,
-    rotationRange: 18,
-    strokeWidth: 1.8,
+    swayAmount: -20,
+    rotationRange: 14,
+    strokeWidth: 1.4,
   },
   {
     id: 13,
     type: 'bass_clef',
     xPercent: 54,
-    size: 24,
+    size: 22,
     color: PALE_COLORS.moonlight,
-    baseOpacity: 0.12,
-    duration: 24000,
+    baseOpacity: 0.11,
+    duration: 28000,
     initialOffset: 0.40,
-    swayAmount: 20,
-    rotationRange: -14,
-    strokeWidth: 1.8,
+    swayAmount: 18,
+    rotationRange: -10,
+    strokeWidth: 1.4,
   },
   {
     id: 14,
     type: 'sixteenth',
-    xPercent: 88,
-    size: 22,
+    xPercent: 86,
+    size: 20,
     color: PALE_COLORS.amber,
-    baseOpacity: 0.13,
-    duration: 17000,
+    baseOpacity: 0.12,
+    duration: 23000,
     initialOffset: 0.03,
-    swayAmount: -18,
-    rotationRange: 11,
-    strokeWidth: 1.8,
+    swayAmount: -16,
+    rotationRange: 10,
+    strokeWidth: 1.4,
   },
   {
     id: 15,
     type: 'sharp',
     xPercent: 20,
-    size: 18,
+    size: 16,
     color: PALE_COLORS.rose,
-    baseOpacity: 0.10,
-    duration: 19500,
+    baseOpacity: 0.09,
+    duration: 26000,
     initialOffset: 0.74,
-    swayAmount: 22,
-    rotationRange: -9,
-    strokeWidth: 1.8,
+    swayAmount: 18,
+    rotationRange: -8,
+    strokeWidth: 1.4,
+  },
+  {
+    id: 16,
+    type: 'quarter',
+    xPercent: 44,
+    size: 18,
+    color: PALE_COLORS.moonlight,
+    baseOpacity: 0.11,
+    duration: 21500,
+    initialOffset: 0.18,
+    swayAmount: -14,
+    rotationRange: 8,
+    strokeWidth: 1.4,
   },
 ];
 
-// Vector Double Beamed Eighth Notes (♫)
+// Vector Double Beamed Eighth Notes (♫) - Sleek Italian engraving
 const DoubleEighthSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
   size,
   color,
-  strokeWidth = 1.8,
+  strokeWidth = 1.4,
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path d="M9 18V5l12-2v13" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
-    <Circle cx="6" cy="18" r="3" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
-    <Circle cx="18" cy="16" r="3" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
+    <Path
+      d="M9 16.5V5.5l11-2V14.5"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Circle cx="6.5" cy="16.5" r="2.7" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.65} />
+    <Circle cx="17.5" cy="14.5" r="2.7" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.65} />
   </Svg>
 );
 
@@ -263,11 +282,17 @@ const DoubleEighthSvg: React.FC<{ size: number; color: string; strokeWidth?: num
 const SingleEighthSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
   size,
   color,
-  strokeWidth = 1.8,
+  strokeWidth = 1.4,
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Circle cx="8" cy="18" r="3.5" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
-    <Path d="M11.5 18V3C14 5 18 5 19 8" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    <Circle cx="7.5" cy="16.5" r="2.7" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.65} />
+    <Path
+      d="M10.2 16.5V4c2.2 1.8 5.2 2 6.7 4.2"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
   </Svg>
 );
 
@@ -275,11 +300,11 @@ const SingleEighthSvg: React.FC<{ size: number; color: string; strokeWidth?: num
 const QuarterSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
   size,
   color,
-  strokeWidth = 1.8,
+  strokeWidth = 1.4,
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Circle cx="8" cy="18" r="3.5" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
-    <Line x1="11.5" y1="18" x2="11.5" y2="3" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    <Circle cx="8" cy="16.5" r="2.7" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.65} />
+    <Line x1="10.7" y1="16.5" x2="10.7" y2="4" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
   </Svg>
 );
 
@@ -287,23 +312,23 @@ const QuarterSvg: React.FC<{ size: number; color: string; strokeWidth?: number }
 const SixteenthSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
   size,
   color,
-  strokeWidth = 1.8,
+  strokeWidth = 1.4,
 }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-    <Path d="M9 18V5l12-2v13" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
-    <Path d="M9 9.5l12-2" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
-    <Circle cx="6" cy="18" r="3" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
-    <Circle cx="18" cy="16" r="3" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.7} />
+    <Path d="M9 16.5V5.5l11-2V14.5" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M9 9.5l11-2" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+    <Circle cx="6.5" cy="16.5" r="2.7" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.65} />
+    <Circle cx="17.5" cy="14.5" r="2.7" stroke={color} strokeWidth={strokeWidth} fill={color} fillOpacity={0.65} />
   </Svg>
 );
 
-// Vector Treble Clef Component (𝄞)
+// Vector Treble Clef Component (𝄞) - Fine classical calligraphy
 const TrebleClefSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
   size,
   color,
-  strokeWidth = 1.8,
+  strokeWidth = 1.4,
 }) => {
-  const height = size * 1.5;
+  const height = Math.round(size * 1.45);
   return (
     <Svg width={size} height={height} viewBox="0 0 32 48" fill="none">
       <Path
@@ -321,41 +346,37 @@ const TrebleClefSvg: React.FC<{ size: number; color: string; strokeWidth?: numbe
 const BassClefSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
   size,
   color,
-  strokeWidth = 1.8,
-}) => {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
-      <Path
-        d="M 10 14 C 10 11.5 12 9.5 14.5 9.5 C 17 9.5 18.5 11 18.5 13.5 C 18.5 17 14 21 11 25"
-        stroke={color}
-        strokeWidth={strokeWidth}
-        strokeLinecap="round"
-      />
-      <Circle cx="10" cy="14" r="2.5" fill={color} />
-      <Circle cx="22" cy="11" r="1.5" fill={color} />
-      <Circle cx="22" cy="17" r="1.5" fill={color} />
-    </Svg>
-  );
-};
+  strokeWidth = 1.4,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+    <Path
+      d="M 10 14 C 10 11.5 12 9.5 14.5 9.5 C 17 9.5 18.5 11 18.5 13.5 C 18.5 17 14 21 11 25"
+      stroke={color}
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+    />
+    <Circle cx="10" cy="14" r="2.2" fill={color} fillOpacity={0.75} />
+    <Circle cx="21" cy="11.5" r="1.3" fill={color} fillOpacity={0.75} />
+    <Circle cx="21" cy="16.5" r="1.3" fill={color} fillOpacity={0.75} />
+  </Svg>
+);
 
 // Vector Sharp Symbol (♯)
 const SharpSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> = ({
   size,
   color,
-  strokeWidth = 1.8,
-}) => {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Line x1="9" y1="3" x2="8" y2="21" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
-      <Line x1="16" y1="3" x2="15" y2="21" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
-      <Line x1="4" y1="9" x2="20" y2="7" stroke={color} strokeWidth={strokeWidth + 0.4} strokeLinecap="round" />
-      <Line x1="4" y1="16" x2="20" y2="14" stroke={color} strokeWidth={strokeWidth + 0.4} strokeLinecap="round" />
-    </Svg>
-  );
-};
+  strokeWidth = 1.4,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Line x1="9" y1="3" x2="8.2" y2="21" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    <Line x1="15.8" y1="3" x2="15" y2="21" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    <Line x1="4.5" y1="9.5" x2="19.5" y2="7.5" stroke={color} strokeWidth={strokeWidth + 0.3} strokeLinecap="round" />
+    <Line x1="4.5" y1="16.5" x2="19.5" y2="14.5" stroke={color} strokeWidth={strokeWidth + 0.3} strokeLinecap="round" />
+  </Svg>
+);
 
-// Individual Animated Note Component
-const FloatingNoteItem: React.FC<{
+// Individual Falling Note Component
+const FallingNoteItem: React.FC<{
   config: FloatingNoteConfig;
   screenHeight: number;
   screenWidth: number;
@@ -398,45 +419,45 @@ const FloatingNoteItem: React.FC<{
     };
   }, [config.duration, config.initialOffset, animProgress]);
 
-  // Vertical upward motion
+  // Downward motion: gentle descent from above viewport (-70) to below viewport (screenHeight + 70)
   const translateY = animProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [screenHeight + 40, -80],
+    outputRange: [-70, screenHeight + 70],
   });
 
-  // Sinusoidal horizontal sway
+  // Lateral drift: gentle aerodynamic S-curve glide
   const translateX = animProgress.interpolate({
     inputRange: [0, 0.25, 0.5, 0.75, 1],
     outputRange: [0, config.swayAmount, 0, -config.swayAmount, 0],
   });
 
-  // Tilt oscillation
+  // Synchronized tilt: leans gracefully into the lateral glide direction
   const rot = Math.abs(config.rotationRange);
   const rotDir = config.rotationRange >= 0 ? 1 : -1;
   const rotate = animProgress.interpolate({
-    inputRange: [0, 0.33, 0.66, 1],
-    outputRange: ['0deg', `${rotDir * rot}deg`, `${-rotDir * rot}deg`, '0deg'],
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: ['0deg', `${rotDir * rot}deg`, '0deg', `${-rotDir * rot}deg`, '0deg'],
   });
 
-  // Subtle breathing scale
+  // Delicate buoyancy scale oscillation
   const scale = animProgress.interpolate({
     inputRange: [0, 0.25, 0.5, 0.75, 1],
-    outputRange: [0.95, 1.06, 0.98, 1.05, 0.95],
+    outputRange: [0.96, 1.04, 0.98, 1.03, 0.96],
   });
 
-  // Pale fade lifecycle: invisible at very bottom/top, peak pale glow through body
+  // Downward fade lifecycle: enters smoothly from top, stays visible through viewport, fades gently near bottom
   const opacity = animProgress.interpolate({
-    inputRange: [0, 0.12, 0.5, 0.88, 1],
+    inputRange: [0, 0.12, 0.5, 0.86, 1],
     outputRange: [
       0,
       config.baseOpacity,
       config.baseOpacity * 0.95,
-      config.baseOpacity * 0.85,
+      config.baseOpacity * 0.80,
       0,
     ],
   });
 
-  // Compute horizontal pixel coordinate
+  // Horizontal anchor coordinate
   const leftPos = Math.round((config.xPercent / 100) * screenWidth);
 
   const renderGlyph = () => {
@@ -505,13 +526,13 @@ const AmbientStaveLines: React.FC<{ screenWidth: number; screenHeight: number }>
         <Defs>
           <LinearGradient id="staveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
             <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0" />
-            <Stop offset="25%" stopColor="#EF4444" stopOpacity="0.035" />
-            <Stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.045" />
-            <Stop offset="75%" stopColor="#F59E0B" stopOpacity="0.035" />
+            <Stop offset="25%" stopColor="#EF4444" stopOpacity="0.030" />
+            <Stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.040" />
+            <Stop offset="75%" stopColor="#F59E0B" stopOpacity="0.030" />
             <Stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
           </LinearGradient>
           <LinearGradient id="subtleAura" x1="50%" y1="0%" x2="50%" y2="100%">
-            <Stop offset="0%" stopColor="#EF4444" stopOpacity="0.03" />
+            <Stop offset="0%" stopColor="#EF4444" stopOpacity="0.025" />
             <Stop offset="100%" stopColor="#0D0D10" stopOpacity="0" />
           </LinearGradient>
         </Defs>
@@ -528,7 +549,7 @@ const AmbientStaveLines: React.FC<{ screenWidth: number; screenHeight: number }>
               key={`stave-${i}`}
               d={`M -20 ${y} Q ${screenWidth * 0.5} ${cpY} ${screenWidth + 20} ${y + 8}`}
               stroke="url(#staveGrad)"
-              strokeWidth="0.8"
+              strokeWidth="0.75"
               fill="none"
             />
           );
@@ -554,8 +575,8 @@ export const MusicalNotesBackground: React.FC<MusicalNotesBackgroundProps> = ({
   // Memoize note items to avoid unnecessary re-renders
   const renderedNotes = useMemo(() => {
     return notes.map((note) => (
-      <FloatingNoteItem
-        key={`floating-note-${note.id}`}
+      <FallingNoteItem
+        key={`falling-note-${note.id}`}
         config={note}
         screenHeight={screenHeight}
         screenWidth={screenWidth}
@@ -570,7 +591,7 @@ export const MusicalNotesBackground: React.FC<MusicalNotesBackgroundProps> = ({
         <AmbientStaveLines screenWidth={screenWidth} screenHeight={screenHeight} />
       )}
 
-      {/* Floating Pale Musical Notes */}
+      {/* Falling Pale Musical Notes */}
       {renderedNotes}
     </View>
   );
@@ -592,7 +613,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 5,
+    shadowOpacity: 0.45,
+    shadowRadius: 4,
   },
 });
