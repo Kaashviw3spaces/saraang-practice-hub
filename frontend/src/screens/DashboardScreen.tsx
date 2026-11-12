@@ -104,7 +104,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         />
       }
     >
-      {/* Hero Section: "Rehearsal Telemetry" Brutalist Control Panel */}
+      {/* Hero Section: Minimal Rehearsal Telemetry Panel */}
       <Animated.View
         style={[
           styles.heroSection,
@@ -114,11 +114,17 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
           },
         ]}
       >
-        {/* Halftone / Mesh Print Texture */}
-        <RockTextureOverlay pattern="mesh" opacity={0.06} />
+        {/* Subtle Mesh Texture */}
+        <RockTextureOverlay pattern="mesh" opacity={0.04} />
 
-        {/* Section Title */}
-        <Text style={styles.heroTitle}>REHEARSAL TELEMETRY</Text>
+        {/* Section Header Row */}
+        <View style={styles.heroHeaderRow}>
+          <View style={styles.heroTitleGroup}>
+            <View style={styles.liveIndicatorPip} />
+            <Text style={styles.heroTitle}>REHEARSAL TELEMETRY</Text>
+          </View>
+          <Text style={styles.heroStatusBadge}>AUDIO ENGINE // ACTIVE</Text>
+        </View>
 
         {/* Jagged High-Gain Oscilloscope Screen */}
         <OscilloscopeWaveform activeCount={activeCount} totalRooms={liveSessions.length || 5} />
@@ -178,39 +184,67 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   heroSection: {
-    backgroundColor: '#1E1E20',
-    borderWidth: 3,
-    borderColor: '#EFECE6',
-    borderRadius: 0,
-    padding: 18,
+    backgroundColor: 'rgba(26, 26, 29, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(239, 236, 230, 0.12)',
+    borderRadius: 6,
+    padding: 16,
     marginBottom: 24,
-    shadowColor: '#D9383A',
-    shadowOffset: { width: 6, height: 6 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 8,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
     position: 'relative',
     overflow: 'hidden',
   },
+  heroHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  heroTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  liveIndicatorPip: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#BCE83A',
+    marginRight: 8,
+    shadowColor: '#BCE83A',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.9,
+    shadowRadius: 4,
+  },
   heroTitle: {
     color: '#EFECE6',
-    fontSize: 26,
-    fontWeight: '900',
+    fontSize: 12.5,
+    fontWeight: '800',
+    letterSpacing: 2,
+    fontFamily: Platform.select({
+      web: '"Space Mono", "JetBrains Mono", monospace',
+      default: 'monospace',
+    }),
+    textTransform: 'uppercase',
+  },
+  heroStatusBadge: {
+    color: '#71717A',
+    fontSize: 9.5,
+    fontWeight: '700',
     letterSpacing: 1.2,
     fontFamily: Platform.select({
-      web: '"Anton", "Impact", "Arial Black", sans-serif',
-      default: 'sans-serif',
+      web: '"Space Mono", "JetBrains Mono", monospace',
+      default: 'monospace',
     }),
-    lineHeight: 30,
-    marginBottom: 10,
   },
   quotaLimitDeck: {
-    backgroundColor: '#121212',
-    borderWidth: 1.5,
-    borderColor: '#27272A',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(239, 236, 230, 0.08)',
+    paddingTop: 10,
+    marginTop: 6,
   },
   quotaLimitHeader: {
     flexDirection: 'row',
@@ -218,10 +252,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   quotaLimitTitle: {
-    color: '#9E9891',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1,
+    color: '#71717A',
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 1.2,
     fontFamily: Platform.select({
       web: '"Space Mono", monospace',
       default: 'monospace',
@@ -229,8 +263,8 @@ const styles = StyleSheet.create({
   },
   quotaLimitCounter: {
     color: '#EFECE6',
-    fontSize: 9.5,
-    fontWeight: '900',
+    fontSize: 10,
+    fontWeight: '800',
     letterSpacing: 0.8,
     fontFamily: Platform.select({
       web: '"Space Mono", monospace',
