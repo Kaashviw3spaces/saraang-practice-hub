@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   logoImage: {
-    width: 128,
-    height: 54,
+    width: 92,
+    height: 40,
   },
 });
