@@ -388,11 +388,11 @@ const styles = StyleSheet.create({
     shadowRadius: 1,
   },
   stampAcidLime: {
-    backgroundColor: '#BCE83A',
+    backgroundColor: '#B0DA30',
     borderColor: '#121212',
   },
   stampCrimson: {
-    backgroundColor: '#D9383A',
+    backgroundColor: '#C93032',
     borderColor: '#FFFFFF',
   },
   stampText: {

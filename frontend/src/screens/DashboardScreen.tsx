@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerSubtitle: {
-    color: '#BCE83A',
+    color: '#B0DA30',
     fontSize: 10.5,
     letterSpacing: 1.8,
     fontWeight: '900',
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   fillSafe: {
-    backgroundColor: '#BCE83A',
+    backgroundColor: '#B0DA30',
   },
   fillWarning: {
     backgroundColor: '#F59E0B',
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     }),
   },
   quickBookBtn: {
-    backgroundColor: '#D9383A',
+    backgroundColor: '#C93032',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
