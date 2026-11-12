@@ -6,11 +6,11 @@ export const PunkRansomLogo: React.FC = () => {
   const letters = [
     { char: 'S', bg: '#121212', text: '#FFFFFF', border: '#EFECE6', rot: -2.5, width: 22 },
     { char: 'A', bg: '#EFECE6', text: '#121212', border: '#121212', rot: 1.8, width: 20 },
-    { char: 'A', bg: '#FF1E27', text: '#FFFFFF', border: '#EFECE6', rot: -1.0, width: 20 },
+    { char: 'A', bg: '#D9383A', text: '#FFFFFF', border: '#EFECE6', rot: -1.0, width: 20 },
     { char: 'R', bg: '#EFECE6', text: '#121212', border: '#121212', rot: 2.2, width: 20 },
     { char: 'A', bg: '#121212', text: '#FFFFFF', border: '#EFECE6', rot: -1.8, width: 20 },
     { char: 'N', bg: '#EFECE6', text: '#121212', border: '#121212', rot: 1.5, width: 21 },
-    { char: 'G', bg: '#CCFF00', text: '#121212', border: '#121212', rot: -2.0, width: 23 },
+    { char: 'G', bg: '#BCE83A', text: '#121212', border: '#121212', rot: -2.0, width: 23 },
   ];
 
   return (
@@ -50,7 +50,7 @@ export const PunkRansomLogo: React.FC = () => {
         <Svg width="26" height="14" viewBox="0 0 26 14" fill="none" style={styles.arrowSvg}>
           <Path
             d="M 2 7 L 22 7 M 16 2 L 23 7 L 16 12"
-            stroke="#FF1E27"
+            stroke="#D9383A"
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 1,
-    shadowColor: '#FF1E27',
+    shadowColor: '#D9383A',
     shadowOffset: { width: 2, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 0,

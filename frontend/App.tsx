@@ -23,6 +23,7 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { AnimatedPressable } from './src/components/AnimatedPressable';
 import { LightningSvg } from './src/components/LightningSvg';
 import { PunkRansomLogo } from './src/components/PunkRansomLogo';
+import { RockTextureOverlay } from './src/components/RockTextureOverlay';
 
 // Dynamically inject Google Fonts on Web
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -150,6 +151,9 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#121212" />
+
+      {/* Global Rough Gritty Zine Textured Black Background */}
+      <RockTextureOverlay opacity={0.065} />
 
       {/* Global Foreground Notification Banner */}
       <NotificationBanner />
@@ -300,13 +304,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   joinBtn: {
-    backgroundColor: '#CCFF00',
+    backgroundColor: '#BCE83A',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 0,
     borderWidth: 2,
     borderColor: '#121212',
-    shadowColor: '#FF1E27',
+    shadowColor: '#D9383A',
     shadowOffset: { width: 3, height: 3 },
     shadowOpacity: 1,
     shadowRadius: 0,
@@ -358,9 +362,9 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     height: 3.5,
-    backgroundColor: '#FF1E27',
+    backgroundColor: '#D9383A',
     borderRadius: 0,
-    shadowColor: '#FF1E27',
+    shadowColor: '#D9383A',
     shadowOffset: { width: 0, height: -1 },
     shadowOpacity: 0.9,
     shadowRadius: 4,

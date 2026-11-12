@@ -105,8 +105,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         />
       }
     >
-      {/* Film Grain Texture across Viewport */}
-      <RockTextureOverlay pattern="dots" opacity={0.025} />
+      {/* Rough Gritty Film Grain & Halftone Screen Texture */}
+      <RockTextureOverlay opacity={0.06} />
 
       {/* Hero Section: "Rehearsal Telemetry" Brutalist Control Panel */}
       <Animated.View
@@ -135,7 +135,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
           <View style={styles.quotaLimitHeader}>
             <Text style={styles.quotaLimitTitle}>DAILY REHEARSAL QUOTA LIMIT</Text>
             <Text style={styles.quotaLimitCounter}>
-              <Text style={{ color: todayBookingsCount >= 3 ? '#FF1E27' : '#CCFF00' }}>
+              <Text style={{ color: todayBookingsCount >= 3 ? '#D9383A' : '#BCE83A' }}>
                 {todayBookingsCount}/3
               </Text>{' '}
               SLOTS USED
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     borderRadius: 0,
     padding: 18,
     marginBottom: 4,
-    shadowColor: '#FF1E27',
+    shadowColor: '#D9383A',
     shadowOffset: { width: 6, height: 6 },
     shadowOpacity: 1,
     shadowRadius: 0,
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     }),
   },
   quickBookBtn: {
-    backgroundColor: '#FF1E27',
+    backgroundColor: '#D9383A',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
