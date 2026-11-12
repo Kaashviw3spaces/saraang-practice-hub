@@ -15,7 +15,6 @@ import {
 import { api, LiveSession } from '../api/client';
 import { useStore } from '../store/useStore';
 import { LiveSessionCard } from '../components/LiveSessionCard';
-import { RockTextureOverlay } from '../components/RockTextureOverlay';
 import { OscilloscopeWaveform } from '../components/OscilloscopeWaveform';
 
 interface DashboardScreenProps {
