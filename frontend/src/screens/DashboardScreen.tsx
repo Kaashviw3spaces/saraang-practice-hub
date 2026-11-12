@@ -17,7 +17,6 @@ import { useStore } from '../store/useStore';
 import { LiveSessionCard } from '../components/LiveSessionCard';
 import { RockTextureOverlay } from '../components/RockTextureOverlay';
 import { OscilloscopeWaveform } from '../components/OscilloscopeWaveform';
-import { HazardTapeDivider } from '../components/HazardTapeDivider';
 
 interface DashboardScreenProps {
   onNavigateToBooking: () => void;
@@ -138,9 +137,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         </View>
       </Animated.View>
 
-      {/* Section Divider: Ripped Paper Edge Layered Over Diagonal Hazard Stripes */}
-      <HazardTapeDivider />
-
       {/* Room Roster: Concert Ticket Stub Cards */}
       <View style={styles.sessionsList}>
         <View style={styles.sectionHeader}>
@@ -187,7 +183,7 @@ const styles = StyleSheet.create({
     borderColor: '#EFECE6',
     borderRadius: 0,
     padding: 18,
-    marginBottom: 4,
+    marginBottom: 24,
     shadowColor: '#D9383A',
     shadowOffset: { width: 6, height: 6 },
     shadowOpacity: 1,

@@ -5,7 +5,7 @@ export const PunkRansomLogo: React.FC = () => {
   return (
     <View style={styles.container}>
       <Image
-        source={require('../../assets/saarang_script_logo.png')}
+        source={require('../../assets/saarang_music_club_logo.png')}
         style={styles.logoImage}
         resizeMode="contain"
       />
@@ -20,7 +20,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   logoImage: {
-    width: 140,
-    height: 44,
+    width: 128,
+    height: 54,
   },
 });
