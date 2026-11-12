@@ -116,8 +116,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         {/* Subtitle: REHEARSAL TELEMETRY (styled like PASSES & ACTIVE WINDOWS) */}
         <Text style={styles.headerSubtitle}>REHEARSAL TELEMETRY</Text>
 
-        {/* Display Title: CLAIM YOUR RIG */}
-        <Text style={styles.headerTitle}>CLAIM YOUR RIG</Text>
+        {/* Display Title: READY TO ROCK? */}
+        <Text style={styles.headerTitle}>READY TO ROCK?</Text>
 
         {/* Jagged High-Gain Oscilloscope Soundwave */}
         <OscilloscopeWaveform activeCount={activeCount} totalRooms={liveSessions.length || 5} />
