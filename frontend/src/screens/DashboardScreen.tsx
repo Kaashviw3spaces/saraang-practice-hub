@@ -105,9 +105,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         />
       }
     >
-      {/* Rough Gritty Film Grain & Halftone Screen Texture */}
-      <RockTextureOverlay opacity={0.06} />
-
       {/* Hero Section: "Rehearsal Telemetry" Brutalist Control Panel */}
       <Animated.View
         style={[
@@ -181,7 +178,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
+    backgroundColor: 'transparent',
   },
   content: {
     padding: 16,
