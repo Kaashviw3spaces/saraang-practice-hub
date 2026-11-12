@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   joinBtn: {
-    backgroundColor: '#BCE83A',
+    backgroundColor: '#C8E676',
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 0,

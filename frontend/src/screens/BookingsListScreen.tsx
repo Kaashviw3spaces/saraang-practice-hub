@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   headerSubtitle: {
-    color: '#BCE83A',
+    color: '#C8E676',
     fontSize: 10,
     letterSpacing: 1.5,
     fontWeight: '900',
