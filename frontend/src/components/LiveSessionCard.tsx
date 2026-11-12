@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
     shadowRadius: 1,
   },
   stampAcidLime: {
-    backgroundColor: '#C8E676',
+    backgroundColor: '#BCE83A',
     borderColor: '#121212',
   },
   stampCrimson: {

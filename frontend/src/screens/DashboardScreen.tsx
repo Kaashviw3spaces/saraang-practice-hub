@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerSubtitle: {
-    color: '#C8E676',
+    color: '#BCE83A',
     fontSize: 10.5,
     letterSpacing: 1.8,
     fontWeight: '900',
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   fillSafe: {
-    backgroundColor: '#C8E676',
+    backgroundColor: '#BCE83A',
   },
   fillWarning: {
     backgroundColor: '#F59E0B',

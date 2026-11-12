@@ -37,7 +37,7 @@ export const OscilloscopeWaveform: React.FC<OscilloscopeWaveformProps> = () => {
         <Path
           d="M 24 23 L 44 18 L 64 29 L 84 7 L 104 41 L 124 4 L 144 44 L 164 8 L 184 38 L 204 17 L 224 27 L 244 23 L 274 23 L 320 23"
           fill="none"
-          stroke="#C8E676"
+          stroke="#BCE83A"
           strokeWidth="1"
           opacity={0.65}
           strokeDasharray="2,3"
