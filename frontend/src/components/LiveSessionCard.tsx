@@ -167,7 +167,8 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
                 styles.bandSilhouettePhoto,
                 Platform.select({
                   web: {
-                    filter: 'grayscale(100%) contrast(160%) brightness(0.9)',
+                    filter: 'grayscale(100%) contrast(180%) brightness(0.75)',
+                    mixBlendMode: 'multiply',
                   } as any,
                 }),
               ]}
@@ -316,7 +317,7 @@ const styles = StyleSheet.create({
   bandSilhouettePhoto: {
     width: '100%',
     height: '100%',
-    opacity: 0.22,
+    opacity: 0.45,
   },
   ticketHeader: {
     marginBottom: 8,
