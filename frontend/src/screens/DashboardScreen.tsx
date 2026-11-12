@@ -121,24 +121,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         {/* Halftone / Mesh Print Texture */}
         <RockTextureOverlay pattern="mesh" opacity={0.06} />
 
-        {/* Top Control Deck: Daily Quota Limit + SYNC indicator */}
-        <View style={styles.controlDeckTopBar}>
-          <View style={styles.quotaBadge}>
-            <View
-              style={[
-                styles.quotaDot,
-                { backgroundColor: todayBookingsCount >= 3 ? '#FF1E27' : '#CCFF00' },
-              ]}
-            />
-            <Text style={styles.quotaText}>
-              DAILY QUOTA: <Text style={styles.quotaHighlight}>{todayBookingsCount}/3 BOOKED TODAY</Text>
-            </Text>
-          </View>
-          <View style={styles.syncBadge}>
-            <Text style={styles.syncText}>SYNC: 30S</Text>
-          </View>
-        </View>
-
         {/* Section Title */}
         <Text style={styles.heroTitle}>REHEARSAL TELEMETRY</Text>
         <Text style={styles.heroSubtitle}>
@@ -219,58 +201,6 @@ const styles = StyleSheet.create({
     elevation: 8,
     position: 'relative',
     overflow: 'hidden',
-  },
-  controlDeckTopBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  quotaBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#09090C',
-    borderWidth: 1,
-    borderColor: '#3F3F46',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  quotaDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 6,
-  },
-  quotaText: {
-    color: '#EFECE6',
-    fontSize: 8.5,
-    fontWeight: '800',
-    letterSpacing: 0.9,
-    fontFamily: Platform.select({
-      web: '"Space Mono", monospace',
-      default: 'monospace',
-    }),
-  },
-  quotaHighlight: {
-    color: '#CCFF00',
-    fontWeight: '900',
-  },
-  syncBadge: {
-    backgroundColor: '#09090C',
-    borderWidth: 1,
-    borderColor: '#3F3F46',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  syncText: {
-    color: '#CCFF00',
-    fontSize: 8.5,
-    fontWeight: '900',
-    letterSpacing: 1,
-    fontFamily: Platform.select({
-      web: '"Space Mono", monospace',
-      default: 'monospace',
-    }),
   },
   heroTitle: {
     color: '#EFECE6',
