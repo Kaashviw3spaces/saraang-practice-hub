@@ -1,152 +1,57 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Platform } from 'react-native';
-import Svg, { Path, Line, Rect, Defs, Pattern } from 'react-native-svg';
+import React from 'react';
+import { View, StyleSheet } from 'react-native';
+import Svg, { Path, Line } from 'react-native-svg';
 
 interface OscilloscopeWaveformProps {
-  activeCount: number;
+  activeCount?: number;
   totalRooms?: number;
 }
 
-export const OscilloscopeWaveform: React.FC<OscilloscopeWaveformProps> = ({
-  activeCount = 0,
-  totalRooms = 5,
-}) => {
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const pulseLoop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.08,
-          duration: 380,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.94,
-          duration: 380,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulseLoop.start();
-    return () => pulseLoop.stop();
-  }, [pulseAnim]);
-
+export const OscilloscopeWaveform: React.FC<OscilloscopeWaveformProps> = () => {
   return (
-    <View style={styles.scopeContainer}>
-      {/* Cathode Ray Oscilloscope Screen with Grid & Jagged High-Gain Waveform */}
-      <View style={styles.screenFrame}>
-        <Svg width="100%" height="52" viewBox="0 0 320 52" preserveAspectRatio="none">
-          <Defs>
-            {/* Oscilloscope Reticle Grid Pattern */}
-            <Pattern id="scopeGrid" width="20" height="13" patternUnits="userSpaceOnUse">
-              <Line x1="0" y1="13" x2="20" y2="13" stroke="#2A1518" strokeWidth="0.8" />
-              <Line x1="20" y1="0" x2="20" y2="13" stroke="#2A1518" strokeWidth="0.8" />
-            </Pattern>
-          </Defs>
+    <View style={styles.waveformContainer}>
+      <Svg width="100%" height="46" viewBox="0 0 320 46" preserveAspectRatio="none">
+        {/* Subtle Dashed Center Audio Baseline */}
+        <Line
+          x1="0"
+          y1="23"
+          x2="320"
+          y2="23"
+          stroke="#383842"
+          strokeWidth="1"
+          strokeDasharray="3,5"
+        />
 
-          {/* Grid Background */}
-          <Rect width="100%" height="52" fill="url(#scopeGrid)" />
-          {/* Center Voltage Baseline */}
-          <Line x1="0" y1="26" x2="320" y2="26" stroke="#45181C" strokeWidth="1" strokeDasharray="3,3" />
+        {/* Minimalistic, Gritty Overdriven Audio Waveform in Electric Crimson */}
+        <Path
+          d="M 0 23 
+             L 16 23 L 24 19 L 32 27 L 40 15 L 48 31 L 56 9 L 64 37 L 72 3 L 80 43 L 88 1 L 96 45 L 104 1 L 112 47 L 120 1 L 128 46 L 136 5 L 144 42 L 152 9 L 160 39 L 168 13 L 176 35 L 184 17 L 192 31 L 200 20 L 208 28 L 216 22 L 224 26 L 232 23 L 242 24 L 255 23 L 270 23 L 285 22 L 295 24 L 305 23 L 320 23"
+          fill="none"
+          stroke="#FF1E27"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="miter"
+        />
 
-          {/* Overdriven Jagged High-Gain Electric Crimson Waveform */}
-          <Path
-            d="M 0 26 
-               L 15 26 L 25 22 L 32 30 L 40 18 L 48 34 L 56 12 L 64 40 L 72 6 L 80 46 L 88 4 L 96 48 L 104 2 L 112 50 L 120 2 L 128 49 L 136 6 L 144 45 L 152 10 L 160 42 L 168 14 L 176 38 L 184 18 L 192 34 L 200 21 L 208 31 L 216 23 L 224 29 L 232 24 L 242 27 L 255 26 L 270 26 L 285 24 L 295 28 L 305 26 L 320 26"
-            fill="none"
-            stroke="#FF1E27"
-            strokeWidth="2.2"
-            strokeLinecap="square"
-            strokeLinejoin="miter"
-          />
-
-          {/* Secondary Harmonic Ghost Surge (Overdrive Distortion) */}
-          <Path
-            d="M 25 26 L 45 20 L 65 32 L 85 8 L 105 44 L 125 5 L 145 47 L 165 9 L 185 41 L 205 18 L 225 30 L 245 26 L 275 26 L 320 26"
-            fill="none"
-            stroke="#CCFF00"
-            strokeWidth="1"
-            opacity={0.7}
-            strokeDasharray="2,2"
-          />
-        </Svg>
-      </View>
+        {/* Raw Secondary Harmonic Distortion Line */}
+        <Path
+          d="M 24 23 L 44 18 L 64 29 L 84 7 L 104 41 L 124 4 L 144 44 L 164 8 L 184 38 L 204 17 L 224 27 L 244 23 L 274 23 L 320 23"
+          fill="none"
+          stroke="#CCFF00"
+          strokeWidth="1"
+          opacity={0.65}
+          strokeDasharray="2,3"
+        />
+      </Svg>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  scopeContainer: {
-    backgroundColor: '#09090C',
-    borderWidth: 2,
-    borderColor: '#26262B',
-    borderRadius: 0,
-    padding: 10,
-    marginVertical: 6,
-  },
-  scopeHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  livePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#1E2914',
-    borderWidth: 1.5,
-    borderColor: '#CCFF00',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 2,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#CCFF00',
-    marginRight: 6,
-    shadowColor: '#CCFF00',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 5,
-  },
-  liveText: {
-    color: '#CCFF00',
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    fontFamily: Platform.select({
-      web: '"Space Mono", "JetBrains Mono", monospace',
-      default: 'monospace',
-    }),
-  },
-  counterWrap: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 4,
-  },
-  counterText: {
-    color: '#FF1E27',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-    fontFamily: Platform.select({
-      web: '"Space Mono", "JetBrains Mono", monospace',
-      default: 'monospace',
-    }),
-  },
-  counterUnit: {
-    color: '#A1A1AA',
-    fontSize: 9,
-    fontWeight: '700',
-  },
-  screenFrame: {
+  waveformContainer: {
     width: '100%',
-    backgroundColor: '#050507',
-    borderWidth: 1,
-    borderColor: '#3F1215',
+    paddingVertical: 10,
+    marginVertical: 4,
     overflow: 'hidden',
   },
 });
