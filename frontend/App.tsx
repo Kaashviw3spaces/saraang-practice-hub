@@ -141,9 +141,6 @@ export default function App() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#0D0D10" />
 
-      {/* Atmospheric Pale Musical Notes Ambient Background */}
-      <MusicalNotesBackground />
-
       {/* Global Foreground Notification Banner */}
       <NotificationBanner />
 
@@ -279,6 +276,9 @@ export default function App() {
         )}
         {activeTab === 'profile' && <ProfileScreen />}
       </Animated.View>
+
+      {/* Atmospheric Pale Musical Notes Falling Gracefully from the Very Top of the Page */}
+      <MusicalNotesBackground />
     </SafeAreaView>
   );
 }

@@ -33,12 +33,13 @@ export interface FloatingNoteConfig {
   baseOpacity: number;
   duration: number;
   initialOffset: number;
+  delay?: number;
   swayAmount: number;
   rotationRange: number;
   strokeWidth: number;
 }
 
-// Curated Pale Studio Palette: Executive acoustic warmth, low saturation
+// Curated Pale Studio Palette: Ethereal, low-saturation, atmospheric
 const PALE_COLORS = {
   amber: '#FDE68A',     // Pale vintage brass / amber
   rose: '#FCA5A5',      // Pale Saarang crimson / velvet rose
@@ -47,17 +48,18 @@ const PALE_COLORS = {
   lavender: '#DDD6FE',  // Pale harmonic lilac / violet
 };
 
-// Curated 16-note falling constellation (top-to-bottom gentle acoustic drift)
+// Curated 16-note falling constellation (visibly cascading down from the top of the page)
 const DEFAULT_NOTES: FloatingNoteConfig[] = [
   {
     id: 1,
     type: 'double_eighth',
-    xPercent: 10,
+    xPercent: 12,
     size: 24,
     color: PALE_COLORS.amber,
-    baseOpacity: 0.13,
-    duration: 22000,
-    initialOffset: 0.08,
+    baseOpacity: 0.22,
+    duration: 18000,
+    initialOffset: 0,
+    delay: 0,
     swayAmount: 20,
     rotationRange: 10,
     strokeWidth: 1.4,
@@ -68,49 +70,53 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     xPercent: 82,
     size: 28,
     color: PALE_COLORS.rose,
-    baseOpacity: 0.14,
-    duration: 26000,
-    initialOffset: 0.22,
-    swayAmount: 18,
+    baseOpacity: 0.24,
+    duration: 22000,
+    initialOffset: 0,
+    delay: 700,
+    swayAmount: -18,
     rotationRange: -12,
     strokeWidth: 1.4,
   },
   {
     id: 3,
     type: 'eighth',
-    xPercent: 26,
+    xPercent: 28,
     size: 18,
     color: PALE_COLORS.moonlight,
-    baseOpacity: 0.11,
-    duration: 20000,
-    initialOffset: 0.45,
-    swayAmount: -22,
-    rotationRange: 14,
+    baseOpacity: 0.20,
+    duration: 16500,
+    initialOffset: 0,
+    delay: 1400,
+    swayAmount: 18,
+    rotationRange: 12,
     strokeWidth: 1.4,
   },
   {
     id: 4,
     type: 'quarter',
-    xPercent: 62,
+    xPercent: 64,
     size: 18,
     color: PALE_COLORS.lavender,
-    baseOpacity: 0.12,
-    duration: 24000,
-    initialOffset: 0.62,
-    swayAmount: 16,
+    baseOpacity: 0.21,
+    duration: 19000,
+    initialOffset: 0,
+    delay: 2100,
+    swayAmount: -16,
     rotationRange: -8,
     strokeWidth: 1.4,
   },
   {
     id: 5,
     type: 'bass_clef',
-    xPercent: 16,
+    xPercent: 18,
     size: 22,
     color: PALE_COLORS.cyan,
-    baseOpacity: 0.12,
-    duration: 27000,
-    initialOffset: 0.35,
-    swayAmount: 24,
+    baseOpacity: 0.21,
+    duration: 21000,
+    initialOffset: 0,
+    delay: 2800,
+    swayAmount: 22,
     rotationRange: 10,
     strokeWidth: 1.4,
   },
@@ -120,9 +126,10 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     xPercent: 48,
     size: 20,
     color: PALE_COLORS.amber,
-    baseOpacity: 0.12,
-    duration: 21000,
-    initialOffset: 0.78,
+    baseOpacity: 0.22,
+    duration: 17500,
+    initialOffset: 0,
+    delay: 3500,
     swayAmount: -18,
     rotationRange: -12,
     strokeWidth: 1.4,
@@ -133,9 +140,10 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     xPercent: 74,
     size: 20,
     color: PALE_COLORS.rose,
-    baseOpacity: 0.13,
-    duration: 23000,
-    initialOffset: 0.15,
+    baseOpacity: 0.22,
+    duration: 19500,
+    initialOffset: 0,
+    delay: 4200,
     swayAmount: 20,
     rotationRange: 8,
     strokeWidth: 1.4,
@@ -144,12 +152,13 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     id: 8,
     type: 'treble_clef',
     xPercent: 38,
-    size: 30,
+    size: 28,
     color: PALE_COLORS.moonlight,
-    baseOpacity: 0.13,
-    duration: 29000,
-    initialOffset: 0.85,
-    swayAmount: -24,
+    baseOpacity: 0.23,
+    duration: 23000,
+    initialOffset: 0,
+    delay: 4900,
+    swayAmount: -22,
     rotationRange: 12,
     strokeWidth: 1.4,
   },
@@ -159,9 +168,10 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     xPercent: 90,
     size: 17,
     color: PALE_COLORS.lavender,
-    baseOpacity: 0.10,
-    duration: 22000,
-    initialOffset: 0.52,
+    baseOpacity: 0.18,
+    duration: 18000,
+    initialOffset: 0,
+    delay: 5600,
     swayAmount: 14,
     rotationRange: -6,
     strokeWidth: 1.4,
@@ -172,9 +182,10 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     xPercent: 6,
     size: 17,
     color: PALE_COLORS.rose,
-    baseOpacity: 0.10,
-    duration: 19000,
-    initialOffset: 0.92,
+    baseOpacity: 0.19,
+    duration: 16000,
+    initialOffset: 0,
+    delay: 6300,
     swayAmount: -16,
     rotationRange: 12,
     strokeWidth: 1.4,
@@ -185,10 +196,11 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     xPercent: 68,
     size: 17,
     color: PALE_COLORS.cyan,
-    baseOpacity: 0.10,
-    duration: 25000,
-    initialOffset: 0.28,
-    swayAmount: 20,
+    baseOpacity: 0.19,
+    duration: 20000,
+    initialOffset: 0,
+    delay: 7000,
+    swayAmount: 18,
     rotationRange: -10,
     strokeWidth: 1.4,
   },
@@ -198,9 +210,10 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     xPercent: 32,
     size: 24,
     color: PALE_COLORS.amber,
-    baseOpacity: 0.13,
-    duration: 24000,
-    initialOffset: 0.68,
+    baseOpacity: 0.22,
+    duration: 20500,
+    initialOffset: 0,
+    delay: 7700,
     swayAmount: -20,
     rotationRange: 14,
     strokeWidth: 1.4,
@@ -211,9 +224,10 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     xPercent: 54,
     size: 22,
     color: PALE_COLORS.moonlight,
-    baseOpacity: 0.11,
-    duration: 28000,
-    initialOffset: 0.40,
+    baseOpacity: 0.20,
+    duration: 22500,
+    initialOffset: 0.35,
+    delay: 0,
     swayAmount: 18,
     rotationRange: -10,
     strokeWidth: 1.4,
@@ -224,9 +238,10 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     xPercent: 86,
     size: 20,
     color: PALE_COLORS.amber,
-    baseOpacity: 0.12,
-    duration: 23000,
-    initialOffset: 0.03,
+    baseOpacity: 0.21,
+    duration: 19000,
+    initialOffset: 0.55,
+    delay: 0,
     swayAmount: -16,
     rotationRange: 10,
     strokeWidth: 1.4,
@@ -237,9 +252,10 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     xPercent: 20,
     size: 16,
     color: PALE_COLORS.rose,
-    baseOpacity: 0.09,
-    duration: 26000,
-    initialOffset: 0.74,
+    baseOpacity: 0.18,
+    duration: 21000,
+    initialOffset: 0.70,
+    delay: 0,
     swayAmount: 18,
     rotationRange: -8,
     strokeWidth: 1.4,
@@ -250,9 +266,10 @@ const DEFAULT_NOTES: FloatingNoteConfig[] = [
     xPercent: 44,
     size: 18,
     color: PALE_COLORS.moonlight,
-    baseOpacity: 0.11,
-    duration: 21500,
-    initialOffset: 0.18,
+    baseOpacity: 0.19,
+    duration: 18500,
+    initialOffset: 0.85,
+    delay: 0,
     swayAmount: -14,
     rotationRange: 8,
     strokeWidth: 1.4,
@@ -375,20 +392,19 @@ const SharpSvg: React.FC<{ size: number; color: string; strokeWidth?: number }> 
   </Svg>
 );
 
-// Individual Falling Note Component
+// Individual Falling Note Component (spawns from the top of the page)
 const FallingNoteItem: React.FC<{
   config: FloatingNoteConfig;
   screenHeight: number;
   screenWidth: number;
 }> = ({ config, screenHeight, screenWidth }) => {
-  const animProgress = useRef(new Animated.Value(config.initialOffset)).current;
+  const animProgress = useRef(new Animated.Value(config.initialOffset || 0)).current;
 
   useEffect(() => {
-    // First run from initialOffset to 1 over remaining proportional duration
-    const firstDuration = Math.max(100, Math.round(config.duration * (1 - config.initialOffset)));
     let animationRef: Animated.CompositeAnimation | null = null;
+    let timeoutId: any = null;
 
-    const startContinuousLoop = () => {
+    const runLoop = () => {
       animProgress.setValue(0);
       animationRef = Animated.loop(
         Animated.timing(animProgress, {
@@ -401,31 +417,38 @@ const FallingNoteItem: React.FC<{
       animationRef.start();
     };
 
-    animationRef = Animated.timing(animProgress, {
-      toValue: 1,
-      duration: firstDuration,
-      easing: Easing.linear,
-      useNativeDriver: true,
-    });
-
-    animationRef.start(({ finished }) => {
-      if (finished) {
-        startContinuousLoop();
-      }
-    });
+    if (config.initialOffset && config.initialOffset > 0) {
+      // First cycle for pre-seeded notes
+      const firstDuration = Math.max(100, Math.round(config.duration * (1 - config.initialOffset)));
+      animationRef = Animated.timing(animProgress, {
+        toValue: 1,
+        duration: firstDuration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      });
+      animationRef.start(({ finished }) => {
+        if (finished) runLoop();
+      });
+    } else {
+      // Cascades visibly down from the very top of the page after its staggered delay
+      timeoutId = setTimeout(() => {
+        runLoop();
+      }, config.delay || 0);
+    }
 
     return () => {
+      if (timeoutId) clearTimeout(timeoutId);
       if (animationRef) animationRef.stop();
     };
-  }, [config.duration, config.initialOffset, animProgress]);
+  }, [config.duration, config.initialOffset, config.delay, animProgress]);
 
-  // Downward motion: gentle descent from above viewport (-70) to below viewport (screenHeight + 70)
+  // Downward motion: starts directly above the top edge (-60px) and falls past the bottom
   const translateY = animProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [-70, screenHeight + 70],
+    outputRange: [-60, screenHeight + 60],
   });
 
-  // Lateral drift: gentle aerodynamic S-curve glide
+  // Lateral drift: gentle aerodynamic S-curve glide as it descends
   const translateX = animProgress.interpolate({
     inputRange: [0, 0.25, 0.5, 0.75, 1],
     outputRange: [0, config.swayAmount, 0, -config.swayAmount, 0],
@@ -445,9 +468,9 @@ const FallingNoteItem: React.FC<{
     outputRange: [0.96, 1.04, 0.98, 1.03, 0.96],
   });
 
-  // Downward fade lifecycle: enters smoothly from top, stays visible through viewport, fades gently near bottom
+  // Downward fade lifecycle: enters smoothly from top (y=0), stays visible through viewport, fades gently near bottom
   const opacity = animProgress.interpolate({
-    inputRange: [0, 0.12, 0.5, 0.86, 1],
+    inputRange: [0, 0.08, 0.5, 0.88, 1],
     outputRange: [
       0,
       config.baseOpacity,
@@ -601,7 +624,8 @@ const styles = StyleSheet.create({
   container: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
-    zIndex: 0,
+    zIndex: 10,
+    pointerEvents: 'none',
   },
   noteWrapper: {
     position: 'absolute',
