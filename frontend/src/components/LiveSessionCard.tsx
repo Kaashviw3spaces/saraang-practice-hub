@@ -125,7 +125,7 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
       return {
         label: 'THE BEATLES // ABBEY ROAD',
         serial: 'SN-1969-B',
-        watermark: require('../../assets/jazz_band_ball.png'),
+        watermark: require('../../assets/sebs_clean.png'),
       };
     }
     if (n.includes('JAM SESSION')) {
