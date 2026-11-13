@@ -98,7 +98,7 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
       return 'Full band rehearsals, solo drums or electric guitar, collaborative jams.';
     }
     if (n.includes('SESSION B')) {
-      return 'Acoustic & low-gain focus. Acoustic guitar, keys, vocals, bass.';
+      return 'Acoustic & low-gain focus. Acoustic\nguitar, keys, vocals, bass.';
     }
     if (n.includes('JAM SESSION')) {
       return 'Multi-instrument open jams and collaborative live rehearsals.';
@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
   },
   ticketHeader: {
     marginBottom: 8,
-    maxWidth: '65%',
+    maxWidth: '55%',
   },
   dymoRigTag: {
     alignSelf: 'flex-start',
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 15,
     marginBottom: 14,
-    maxWidth: '65%',
+    maxWidth: '55%',
   },
   rubberStampBox: {
     position: 'absolute',
