@@ -174,7 +174,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
       <View style={styles.sessionsList}>
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionTitle}>ROOM ROSTER // CONCERT TICKET STUBS</Text>
+            <Text style={styles.sectionTitle}>SESSION TYPES</Text>
             <Text style={styles.sectionSubtitle}>SELECT A PERFORATED PASS TO ENTER REHEARSAL</Text>
           </View>
           <TouchableOpacity onPress={onNavigateToBooking} style={styles.quickBookBtn}>
