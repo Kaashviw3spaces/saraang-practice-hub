@@ -337,6 +337,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderLeftWidth: 1.5,
     borderLeftColor: '#000000',
+    backgroundColor: '#DDD7C9',
   },
   bandSilhouettePhoto: {
     width: '100%',
