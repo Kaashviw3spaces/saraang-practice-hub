@@ -178,7 +178,7 @@ export default function App() {
             scaleTo={0.96}
           >
             <View style={styles.joinBtnRow}>
-              <LightningSvg color="#121212" size={12} style={{ marginRight: 4 }} />
+              <LightningSvg color="#EFECE6" size={11} style={{ marginRight: 5 }} />
               <Text style={styles.joinBtnText}>BOOK SLOT</Text>
             </View>
           </AnimatedPressable>
@@ -300,31 +300,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    width: '100%',
   },
   joinBtn: {
-    backgroundColor: '#EFECE6',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 0,
-    borderWidth: 2,
-    borderColor: '#121212',
-    shadowColor: '#C93032',
-    shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    backgroundColor: 'rgba(239, 236, 230, 0.08)',
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 236, 230, 0.28)',
   },
   joinBtnRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   joinBtnText: {
-    color: '#121212',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1.2,
+    color: '#EFECE6',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
     fontFamily: Platform.select({
-      web: '"Space Mono", "Oswald", monospace',
+      web: '"Space Mono", monospace',
       default: 'monospace',
     }),
   },
