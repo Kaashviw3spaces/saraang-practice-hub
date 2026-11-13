@@ -170,7 +170,6 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
       {/* Left Perforated Tear-off Stub */}
       <View style={styles.leftTearStub}>
         <TicketBarcodeSvg height={80} />
-        <Text style={styles.stubSerialText}>{bandMeta.serial}</Text>
         <Text style={styles.stubPassText}>PASS</Text>
       </View>
 
@@ -205,9 +204,6 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
 
         {/* Ticket Header & Metadata */}
         <View style={styles.ticketHeader}>
-          <View style={styles.dymoRigTag}>
-            <Text style={styles.dymoRigText}>{bandMeta.label}</Text>
-          </View>
           <Text style={styles.sessionTitle}>{session.name.toUpperCase()}</Text>
           <Text style={styles.capacityMonospace}>
             CAPACITY // UP TO {session.participant_limit} MUSICIANS
@@ -302,7 +298,7 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: '900',
     letterSpacing: 1.5,
-    marginTop: 4,
+    marginTop: 10,
   },
   perforationLine: {
     width: 0,
