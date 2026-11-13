@@ -257,7 +257,7 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
 
 const styles = StyleSheet.create({
   ticketCard: {
-    backgroundColor: '#EAE6DD',
+    backgroundColor: '#DDD7C9',
     borderWidth: 2,
     borderColor: '#181715',
     borderRadius: 2,
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   },
   leftTearStub: {
     width: 44,
-    backgroundColor: '#DFDBD0',
+    backgroundColor: '#D2CCBE',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     position: 'relative',
-    backgroundColor: '#EAE6DD',
+    backgroundColor: '#DDD7C9',
   },
   bandPhotoCutoutWrap: {
     position: 'absolute',
