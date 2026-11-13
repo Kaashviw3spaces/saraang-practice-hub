@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
   bandSilhouettePhoto: {
     width: '100%',
     height: '100%',
-    opacity: 0.82,
+    opacity: 0.95,
   },
   ticketHeader: {
     marginBottom: 8,
