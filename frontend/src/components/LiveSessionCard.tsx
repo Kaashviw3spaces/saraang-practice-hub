@@ -12,11 +12,39 @@ import {
 import { LiveSession } from '../api/client';
 import Svg, { Rect, Line, Circle } from 'react-native-svg';
 import { RockTextureOverlay } from './RockTextureOverlay';
+import { SoundwaveSvg } from './SoundwaveSvg';
 
 interface LiveSessionCardProps {
   session: LiveSession;
   onBookSession: (session: LiveSession) => void;
 }
+
+// 5-Line Musical Staff with Notation Component for Ticket Stub
+const MusicalStaffSvg: React.FC<{ width?: number; height?: number }> = ({ width = 28, height = 18 }) => {
+  return (
+    <View style={styles.staffWrap}>
+      <Svg width={width} height={height} viewBox="0 0 28 18">
+        {/* 5 Staff hairline lines */}
+        <Line x1="1" y1="2" x2="27" y2="2" stroke="#000000" strokeWidth="0.8" opacity={0.65} />
+        <Line x1="1" y1="5.5" x2="27" y2="5.5" stroke="#000000" strokeWidth="0.8" opacity={0.65} />
+        <Line x1="1" y1="9" x2="27" y2="9" stroke="#000000" strokeWidth="0.8" opacity={0.65} />
+        <Line x1="1" y1="12.5" x2="27" y2="12.5" stroke="#000000" strokeWidth="0.8" opacity={0.65} />
+        <Line x1="1" y1="16" x2="27" y2="16" stroke="#000000" strokeWidth="0.8" opacity={0.65} />
+        
+        {/* Quarter Note on 4th line */}
+        <Circle cx="6" cy="12.5" r="1.8" fill="#000000" />
+        <Line x1="7.7" y1="12.5" x2="7.7" y2="4" stroke="#000000" strokeWidth="1.1" />
+        
+        {/* Beamed Eighth Notes on 2nd & 3rd lines */}
+        <Circle cx="15" cy="9" r="1.7" fill="#000000" />
+        <Line x1="16.6" y1="9" x2="16.6" y2="3" stroke="#000000" strokeWidth="1.1" />
+        <Circle cx="22" cy="5.5" r="1.7" fill="#000000" />
+        <Line x1="23.6" y1="5.5" x2="23.6" y2="1.5" stroke="#000000" strokeWidth="1.1" />
+        <Line x1="16.6" y1="3" x2="23.8" y2="1.5" stroke="#000000" strokeWidth="1.8" />
+      </Svg>
+    </View>
+  );
+};
 
 // Vertical Barcode Graphic Component
 const TicketBarcodeSvg: React.FC<{ height?: number }> = ({ height = 75 }) => {
@@ -119,6 +147,9 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
         label: 'AC/DC // CUSTOM TUBE STACK',
         serial: 'SN-0826-A',
         watermark: require('../../assets/band6.jpg'),
+        acousticNote: '105 dB • HIGH-GAIN',
+        instruments: ['🥁 DRUMS', '🎸 E-GUITAR', '🎸 BASS', '🎛️ AMPS'],
+        waveVariant: 'dense' as const,
       };
     }
     if (n.includes('SESSION B')) {
@@ -126,6 +157,9 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
         label: 'THE BEATLES // ABBEY ROAD',
         serial: 'SN-1969-B',
         watermark: require('../../assets/sebs_clean.png'),
+        acousticNote: '85 dB • ACOUSTIC & KEYS',
+        instruments: ['🪕 ACOUSTIC', '🎹 PIANO', '🎤 VOCALS', '🎻 BASS'],
+        waveVariant: 'arctic' as const,
       };
     }
     if (n.includes('JAM SESSION')) {
@@ -133,6 +167,9 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
         label: 'ARENA ROCK // LIVE ENSEMBLE',
         serial: 'SN-9021-JAM',
         watermark: require('../../assets/band4.avif'),
+        acousticNote: '110 dB • LIVE ENSEMBLE',
+        instruments: ['🥁 DRUM KIT', '🎸 GUITARS', '🎹 SYNTH', '🎤 OPEN MIC'],
+        waveVariant: 'pulse' as const,
       };
     }
     if (n.includes('RECORDING')) {
@@ -140,12 +177,18 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
         label: 'METALLICA // RIDE THE LIGHTNING',
         serial: 'SN-1984-REC',
         watermark: require('../../assets/band3.jpg'),
+        acousticNote: '24-BIT / 96kHz • -32dB ISO',
+        instruments: ['🎙️ MICS', '🎧 MONITORS', '🎚️ 16-TRACK', '🎛️ ANALOG'],
+        waveVariant: 'metallica' as const,
       };
     }
     return {
       label: 'BACKSTAGE // SETLIST LOUNGE',
       serial: 'SN-2026-MTG',
       watermark: require('../../assets/band2.jpg'),
+      acousticNote: 'PLAYBACK • SETLIST LAB',
+      instruments: ['📝 SETLIST', '🎧 PLAYBACK', '📋 STAGE PLAN'],
+      waveVariant: 'arctic' as const,
     };
   };
 
@@ -169,8 +212,10 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
 
       {/* Left Perforated Tear-off Stub */}
       <View style={styles.leftTearStub}>
-        <TicketBarcodeSvg height={80} />
+        <MusicalStaffSvg width={28} height={18} />
+        <TicketBarcodeSvg height={62} />
         <Text style={styles.stubPassText}>PASS</Text>
+        <Text style={styles.stubPitchText}>440Hz</Text>
       </View>
 
       {/* Perforated Dashed Tear Line */}
@@ -201,12 +246,32 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
         <View style={styles.ticketHeader}>
           <Text style={styles.sessionTitle}>{session.name.toUpperCase()}</Text>
           <Text style={styles.capacityMonospace}>
-            CAPACITY // UP TO {session.participant_limit} MUSICIANS
+            CAPACITY // UP TO {session.participant_limit} MUSICIANS • {bandMeta.acousticNote}
           </Text>
         </View>
 
         {/* Copy / Description */}
         <Text style={styles.descriptionText}>{getSessionDescription(session.name)}</Text>
+
+        {/* Musical Rig Instruments & Acoustic Soundwave */}
+        <View style={styles.musicalRigRow}>
+          <View style={styles.gearChipsWrap}>
+            {bandMeta.instruments.map((inst, i) => (
+              <View key={i} style={styles.gearChip}>
+                <Text style={styles.gearChipText}>{inst}</Text>
+              </View>
+            ))}
+          </View>
+          <View style={styles.miniWaveBox}>
+            <SoundwaveSvg
+              height={10}
+              color="#000000"
+              secondaryColor="#000000"
+              variant={bandMeta.waveVariant}
+              style={{ opacity: 0.4 }}
+            />
+          </View>
+        </View>
 
         {/* Diagonally Stamped Rubber Badge: AMPS WARMED (Acid-Lime) or LIVE ON STAGE (Crimson) */}
         <Animated.View
@@ -278,7 +343,10 @@ const styles = StyleSheet.create({
   },
   barcodeWrap: {
     transform: [{ rotate: '90deg' }],
-    marginVertical: 12,
+    marginVertical: 10,
+  },
+  staffWrap: {
+    marginBottom: 2,
   },
   stubSerialText: {
     color: '#000000',
@@ -296,7 +364,18 @@ const styles = StyleSheet.create({
     fontSize: 8,
     fontWeight: '900',
     letterSpacing: 1.5,
-    marginTop: 10,
+    marginTop: 8,
+  },
+  stubPitchText: {
+    color: '#000000',
+    fontSize: 7.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    marginTop: 3,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   perforationLine: {
     width: 0,
@@ -395,9 +474,42 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     lineHeight: 15,
-    marginBottom: 14,
+    marginBottom: 8,
     maxWidth: '55%',
     zIndex: 2,
+  },
+  musicalRigRow: {
+    maxWidth: '55%',
+    marginBottom: 10,
+    zIndex: 2,
+  },
+  gearChipsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: 4,
+  },
+  gearChip: {
+    borderWidth: 1,
+    borderColor: '#000000',
+    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+    paddingHorizontal: 4,
+    paddingVertical: 1.5,
+    borderRadius: 1,
+  },
+  gearChipText: {
+    color: '#000000',
+    fontSize: 7.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  miniWaveBox: {
+    width: 130,
+    marginTop: 2,
   },
   rubberStampBox: {
     position: 'absolute',

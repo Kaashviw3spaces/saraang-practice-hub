@@ -14,6 +14,7 @@ import {
 import { api, LiveSession } from '../api/client';
 import { useStore } from '../store/useStore';
 import { LiveSessionCard } from '../components/LiveSessionCard';
+import { EqualizerBars } from '../components/EqualizerBars';
 
 interface DashboardScreenProps {
   onNavigateToBooking: () => void;
@@ -115,15 +116,34 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
     >
       {/* Rehearsal Header */}
       <View style={styles.headerBox}>
-        <Text style={styles.headerSubtitle}>CLAIM YOUR RIG</Text>
-        <Text style={styles.headerTitle}>BOOK YOUR SLOT</Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.headerSubtitle}>CLAIM YOUR RIG</Text>
+            <Text style={styles.headerTitle}>BOOK YOUR SLOT</Text>
+          </View>
+
+          {/* Musical Analog Audio Telemetry Rack Unit */}
+          <View style={styles.audioTelemetryBadge}>
+            <View style={styles.telemetryTopRow}>
+              <EqualizerBars active={true} size={11} color="#B0DA30" />
+              <Text style={styles.telemetryTitle}>LIVE REHEARSAL RIG</Text>
+            </View>
+            <Text style={styles.telemetryFreq}>440 Hz // CONCERT PITCH</Text>
+            <Text style={styles.telemetryStats}>INPUT CH-1/2: OK • STEREO FEED</Text>
+          </View>
+        </View>
       </View>
 
       {/* Room Roster: Concert Ticket Stub Cards */}
       <View style={styles.sessionsList}>
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionTitle}>SESSION TYPES</Text>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>SESSION TYPES</Text>
+              <View style={styles.musicNotationPill}>
+                <Text style={styles.musicNotationText}>♫ 44.1 kHz</Text>
+              </View>
+            </View>
             <Text style={styles.sectionSubtitle}>SELECT A PERFORATED PASS TO ENTER REHEARSAL</Text>
           </View>
           <TouchableOpacity onPress={onNavigateToBooking} style={styles.quickBookBtn}>
@@ -166,6 +186,59 @@ const styles = StyleSheet.create({
     borderBottomColor: '#27272A',
     paddingBottom: 12,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  audioTelemetryBadge: {
+    backgroundColor: '#161618',
+    borderWidth: 1.5,
+    borderColor: '#2E2E32',
+    borderRadius: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  telemetryTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
+  },
+  telemetryTitle: {
+    color: '#B0DA30',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 1,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  telemetryFreq: {
+    color: '#EFECE6',
+    fontSize: 8.5,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  telemetryStats: {
+    color: '#71717A',
+    fontSize: 7.5,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginTop: 1,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
   headerSubtitle: {
     color: '#B0DA30',
     fontSize: 10,
@@ -198,6 +271,29 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: '#3F3F46',
     paddingBottom: 8,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  musicNotationPill: {
+    backgroundColor: 'rgba(176, 218, 48, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(176, 218, 48, 0.3)',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 2,
+  },
+  musicNotationText: {
+    color: '#B0DA30',
+    fontSize: 8.5,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   sectionTitle: {
     color: '#EFECE6',
