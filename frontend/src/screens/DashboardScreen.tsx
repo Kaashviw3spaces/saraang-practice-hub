@@ -8,14 +8,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
-  Image,
   Animated,
   Easing,
 } from 'react-native';
 import { api, LiveSession } from '../api/client';
 import { useStore } from '../store/useStore';
 import { LiveSessionCard } from '../components/LiveSessionCard';
-import { GarageRockHeadline } from '../components/GarageRockHeadline';
 
 interface DashboardScreenProps {
   onNavigateToBooking: () => void;
@@ -61,59 +59,21 @@ const StaggeredCard: React.FC<{ index: number; children: React.ReactNode }> = ({
 };
 
 export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBooking }) => {
-  const { liveSessions, setLiveSessions, currentUser, selectSession } = useStore();
+  const { liveSessions, setLiveSessions, selectSession } = useStore();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [todayBookingsCount, setTodayBookingsCount] = useState(0);
-
-  const heroFade = useRef(new Animated.Value(0)).current;
-  const heroSlide = useRef(new Animated.Value(14)).current;
-  const quotaAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(heroFade, {
-        toValue: 1,
-        duration: 350,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
-      }),
-      Animated.timing(heroSlide, {
-        toValue: 0,
-        duration: 350,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
-      }),
-    ]).start();
-  }, [heroFade, heroSlide]);
-
-  useEffect(() => {
-    const targetPct = Math.min(100, Math.round((todayBookingsCount / 3) * 100));
-    Animated.timing(quotaAnim, {
-      toValue: targetPct,
-      duration: 650,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
-  }, [todayBookingsCount, quotaAnim]);
 
   const fetchSessions = useCallback(async () => {
     try {
       const sessions = await api.getLiveSessions();
       setLiveSessions(sessions);
-
-      // Fetch user's bookings today to display quota
-      const bookings = await api.getUserBookings(currentUser.id);
-      const todayStr = new Date().toISOString().split('T')[0];
-      const count = bookings.filter((b) => b.booking_date === todayStr && b.status !== 'Cancelled').length;
-      setTodayBookingsCount(count);
     } catch (err) {
       console.error('Failed to poll live sessions:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [currentUser.id, setLiveSessions]);
+  }, [setLiveSessions]);
 
   useEffect(() => {
     fetchSessions();
@@ -153,22 +113,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({ onNavigateToBo
         />
       }
     >
-      {/* Rehearsal Telemetry Header: Unboxed, matching screenshot */}
-      <Animated.View
-        style={[
-          styles.headerBox,
-          {
-            opacity: heroFade,
-            transform: [{ translateY: heroSlide }],
-          },
-        ]}
-      >
-        {/* Subtitle: CLAIM YOUR RIG */}
+      {/* Rehearsal Header */}
+      <View style={styles.headerBox}>
         <Text style={styles.headerSubtitle}>CLAIM YOUR RIG</Text>
-
-        {/* Display Title: BOOK YOUR SLOT with Garage Rock Animation */}
-        <GarageRockHeadline title="BOOK YOUR SLOT" align="left" />
-      </Animated.View>
+        <Text style={styles.headerTitle}>BOOK YOUR SLOT</Text>
+      </View>
 
       {/* Room Roster: Concert Ticket Stub Cards */}
       <View style={styles.sessionsList}>
@@ -215,15 +164,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderBottomWidth: 2,
     borderBottomColor: '#27272A',
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
   headerSubtitle: {
     color: '#B0DA30',
-    fontSize: 10.5,
-    letterSpacing: 1.8,
+    fontSize: 10,
+    letterSpacing: 1.5,
     fontWeight: '900',
-    marginBottom: 6,
-    textAlign: 'left',
+    marginBottom: 4,
     fontFamily: Platform.select({
       web: '"Space Mono", monospace',
       default: 'monospace',
@@ -231,71 +179,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: '#EFECE6',
-    fontSize: 36,
+    fontSize: 26,
     fontWeight: '900',
-    letterSpacing: 1.5,
-    textAlign: 'center',
+    letterSpacing: 1.2,
     fontFamily: Platform.select({
       web: '"Anton", "Oswald", "Arial Black", sans-serif',
       default: 'sans-serif',
     }),
-  },
-  quotaBanner: {
-    backgroundColor: '#15151A',
-    borderWidth: 1.5,
-    borderColor: '#261C20',
-    borderRadius: 10,
-    padding: 14,
-    marginTop: 8,
-  },
-  quotaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  quotaTitle: {
-    color: '#9E9891',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    flexShrink: 1,
-  },
-  quotaNum: {
-    fontSize: 11,
-    fontWeight: '900',
-    fontFamily: Platform.select({
-      ios: 'System',
-      android: 'sans-serif',
-      default: 'sans-serif',
-    }),
-    flexShrink: 0,
-    marginLeft: 8,
-  },
-  quotaSafe: {
-    color: '#F6F2EB',
-  },
-  quotaDanger: {
-    color: '#F87171',
-  },
-  quotaTrack: {
-    height: 4,
-    backgroundColor: '#0D0D10',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  quotaFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  fillSafe: {
-    backgroundColor: '#B0DA30',
-  },
-  fillWarning: {
-    backgroundColor: '#F59E0B',
-  },
-  fillDanger: {
-    backgroundColor: '#F87171',
   },
   sessionsList: {
     marginTop: 4,
