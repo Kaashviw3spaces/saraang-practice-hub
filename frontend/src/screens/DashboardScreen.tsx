@@ -24,8 +24,8 @@ const StaggeredCard: React.FC<{ index: number; children: React.ReactNode }> = ({
   index,
   children,
 }) => {
-  const cardFade = useRef(new Animated.Value(0)).current;
-  const cardSlide = useRef(new Animated.Value(14)).current;
+  const cardFade = useRef(new Animated.Value(1)).current;
+  const cardSlide = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
