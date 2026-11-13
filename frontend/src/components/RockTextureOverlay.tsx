@@ -5,7 +5,7 @@ import Svg, { Rect, Pattern, Defs, Circle } from 'react-native-svg';
 interface RockTextureOverlayProps {
   style?: ViewStyle;
   opacity?: number;
-  pattern?: 'mesh' | 'dots' | 'grooves' | 'zineGrain';
+  pattern?: 'mesh' | 'dots' | 'grooves' | 'zineGrain' | 'paperGrain';
 }
 
 export const RockTextureOverlay: React.FC<RockTextureOverlayProps> = ({
@@ -13,6 +13,17 @@ export const RockTextureOverlay: React.FC<RockTextureOverlayProps> = ({
   opacity = 0.03,
   pattern = 'zineGrain',
 }) => {
+  if (pattern === 'paperGrain') {
+    return (
+      <View style={[styles.container, style]} pointerEvents="none">
+        <Image
+          source={require('../../assets/ticket_paper_texture.png')}
+          style={[styles.paperTile, { opacity }]}
+          resizeMode="repeat"
+        />
+      </View>
+    );
+  }
   if (pattern === 'mesh') {
     return (
       <View style={[styles.container, style]} pointerEvents="none">
@@ -79,5 +90,10 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     opacity: 0.22,
+  },
+  paperTile: {
+    ...StyleSheet.absoluteFillObject,
+    width: '100%',
+    height: '100%',
   },
 });

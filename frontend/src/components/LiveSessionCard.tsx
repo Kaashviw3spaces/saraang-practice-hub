@@ -178,9 +178,6 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
 
       {/* Main Ticket Surface (Warm Aged Zine Paper) */}
       <View style={styles.ticketMain}>
-        {/* Subtle Halftone Print Texture */}
-        <RockTextureOverlay pattern="dots" opacity={0.03} />
-
         {/* High-Contrast Halftone Band Silhouette on Right */}
         {bandMeta.watermark && (
           <View style={styles.bandPhotoCutoutWrap}>
@@ -249,6 +246,9 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
           </Text>
         </Pressable>
       </View>
+
+      {/* Very Slight Tactile Cardstock / Paper Texture Overlay */}
+      <RockTextureOverlay pattern="paperGrain" opacity={0.35} style={styles.paperTextureOverlay} />
     </Animated.View>
   );
 };
@@ -347,6 +347,7 @@ const styles = StyleSheet.create({
   ticketHeader: {
     marginBottom: 8,
     maxWidth: '55%',
+    zIndex: 2,
   },
   dymoRigTag: {
     alignSelf: 'flex-start',
@@ -396,6 +397,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     marginBottom: 14,
     maxWidth: '55%',
+    zIndex: 2,
   },
   rubberStampBox: {
     position: 'absolute',
@@ -447,6 +449,7 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
     elevation: 3,
     borderRadius: 2,
+    zIndex: 6,
   },
   bookTicketBtnPressed: {
     transform: [{ translateX: 1.5 }, { translateY: 1.5 }],
@@ -461,5 +464,9 @@ const styles = StyleSheet.create({
       web: '"Oswald", "Space Mono", sans-serif',
       default: 'sans-serif',
     }),
+  },
+  paperTextureOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
 });
