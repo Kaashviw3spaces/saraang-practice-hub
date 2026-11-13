@@ -23,14 +23,14 @@ const TicketBarcodeSvg: React.FC<{ height?: number }> = ({ height = 75 }) => {
   return (
     <View style={styles.barcodeWrap}>
       <Svg width="22" height={height} viewBox="0 0 22 75">
-        <Rect x="1" y="0" width="2" height="75" fill="#121212" />
-        <Rect x="4" y="0" width="1" height="75" fill="#121212" />
-        <Rect x="6" y="0" width="3" height="75" fill="#121212" />
-        <Rect x="10" y="0" width="1" height="75" fill="#121212" />
-        <Rect x="12" y="0" width="2" height="75" fill="#121212" />
-        <Rect x="15" y="0" width="1" height="75" fill="#121212" />
-        <Rect x="17" y="0" width="3" height="75" fill="#121212" />
-        <Rect x="21" y="0" width="1" height="75" fill="#121212" />
+        <Rect x="1" y="0" width="2" height="75" fill="#000000" />
+        <Rect x="4" y="0" width="1" height="75" fill="#000000" />
+        <Rect x="6" y="0" width="3" height="75" fill="#000000" />
+        <Rect x="10" y="0" width="1" height="75" fill="#000000" />
+        <Rect x="12" y="0" width="2" height="75" fill="#000000" />
+        <Rect x="15" y="0" width="1" height="75" fill="#000000" />
+        <Rect x="17" y="0" width="3" height="75" fill="#000000" />
+        <Rect x="21" y="0" width="1" height="75" fill="#000000" />
       </Svg>
     </View>
   );
@@ -190,15 +190,13 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
                 styles.bandSilhouettePhoto,
                 Platform.select({
                   web: {
-                    filter: 'grayscale(100%) contrast(250%) brightness(1.02)',
+                    filter: 'grayscale(100%) contrast(290%) brightness(1.03)',
                     mixBlendMode: 'multiply',
                   } as any,
                 }),
               ]}
               resizeMode="cover"
             />
-            {/* Halftone print overlay over photo */}
-            <RockTextureOverlay pattern="mesh" opacity={0.08} />
           </View>
         )}
 
@@ -258,8 +256,8 @@ export const LiveSessionCard: React.FC<LiveSessionCardProps> = ({ session, onBoo
 const styles = StyleSheet.create({
   ticketCard: {
     backgroundColor: '#DDD7C9',
-    borderWidth: 2,
-    borderColor: '#181715',
+    borderWidth: 2.2,
+    borderColor: '#000000',
     borderRadius: 2,
     marginBottom: 18,
     flexDirection: 'row',
@@ -267,7 +265,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#000000',
     shadowOffset: { width: 3, height: 3 },
-    shadowOpacity: 0.75,
+    shadowOpacity: 0.85,
     shadowRadius: 0,
     elevation: 4,
   },
@@ -283,7 +281,7 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   stubSerialText: {
-    color: '#2A2622',
+    color: '#000000',
     fontSize: 7.5,
     fontWeight: '900',
     letterSpacing: 1,
@@ -294,7 +292,7 @@ const styles = StyleSheet.create({
     }),
   },
   stubPassText: {
-    color: '#8A867E',
+    color: '#524C44',
     fontSize: 8,
     fontWeight: '900',
     letterSpacing: 1.5,
@@ -302,8 +300,8 @@ const styles = StyleSheet.create({
   },
   perforationLine: {
     width: 0,
-    borderRightWidth: 1.8,
-    borderRightColor: '#242220',
+    borderRightWidth: 2,
+    borderRightColor: '#000000',
     borderStyle: 'dashed',
   },
   punchNotch: {
@@ -313,8 +311,8 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#121214',
     zIndex: 10,
-    borderWidth: 1.5,
-    borderColor: '#181715',
+    borderWidth: 1.8,
+    borderColor: '#000000',
   },
   notchTopLeft: {
     top: -7,
@@ -337,13 +335,13 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '42%',
     overflow: 'hidden',
-    borderLeftWidth: 1.2,
-    borderLeftColor: 'rgba(36, 34, 32, 0.4)',
+    borderLeftWidth: 1.5,
+    borderLeftColor: '#000000',
   },
   bandSilhouettePhoto: {
     width: '100%',
     height: '100%',
-    opacity: 0.45,
+    opacity: 0.82,
   },
   ticketHeader: {
     marginBottom: 8,
@@ -351,12 +349,12 @@ const styles = StyleSheet.create({
   },
   dymoRigTag: {
     alignSelf: 'flex-start',
-    backgroundColor: '#1C1A18',
+    backgroundColor: '#000000',
     paddingHorizontal: 6,
     paddingVertical: 2,
     marginBottom: 4,
     borderWidth: 1,
-    borderColor: '#3D3A36',
+    borderColor: '#222222',
   },
   dymoRigText: {
     color: '#EAE6DC',
@@ -369,7 +367,7 @@ const styles = StyleSheet.create({
     }),
   },
   sessionTitle: {
-    color: '#161412',
+    color: '#000000',
     fontSize: 24,
     fontWeight: '900',
     letterSpacing: 0.8,
@@ -380,7 +378,7 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   capacityMonospace: {
-    color: '#5C564E',
+    color: '#26221D',
     fontSize: 9.5,
     fontWeight: '800',
     letterSpacing: 1,
@@ -391,7 +389,7 @@ const styles = StyleSheet.create({
     }),
   },
   descriptionText: {
-    color: '#2E2B27',
+    color: '#12100E',
     fontSize: 11,
     fontWeight: '600',
     lineHeight: 15,
@@ -436,15 +434,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   bookTicketBtn: {
-    backgroundColor: '#1A1A1E',
+    backgroundColor: '#0D0D10',
     borderWidth: 1.5,
-    borderColor: '#2F2F38',
+    borderColor: '#000000',
     paddingVertical: 8,
     paddingHorizontal: 13,
     alignSelf: 'flex-start',
     shadowColor: '#000000',
     shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 0.7,
+    shadowOpacity: 0.85,
     shadowRadius: 0,
     elevation: 3,
     borderRadius: 2,
