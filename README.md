@@ -183,6 +183,11 @@ curl -s -X POST http://localhost:8001/api/bookings/acoustic-check \
 ### 5. Live Redis Telemetry
 - `GET /api/dashboard/now-playing`: Retrieves real-time room occupancy, active decibel levels, and instrument telemetry.
 
+### 6. Notifications & Expiry Alerts
+- `GET /api/notifications`: Retrieves user notification history and unread counts.
+- `GET /api/notifications/active-expiry-check`: Evaluates upcoming slot expirations (15-min warning) and session-over alerts.
+- Signature Google AI Studio crystalline chime with automated 3-loop and 4-loop audio alerts.
+
 ---
 
 ## 🛠️ Management & Teardown
