@@ -59,6 +59,26 @@ async def lifespan(app: FastAPI):
             command_timeout=10,
         )
         logger.info("Database pool established.")
+
+        # Ensure notifications table and indexes exist
+        async with db_pool.acquire() as conn:
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id SERIAL PRIMARY KEY,
+                    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    booking_id INT REFERENCES bookings(id) ON DELETE SET NULL,
+                    title VARCHAR(150) NOT NULL,
+                    message TEXT NOT NULL,
+                    type VARCHAR(30) NOT NULL DEFAULT 'info',
+                    channel VARCHAR(30) NOT NULL DEFAULT 'IN_APP',
+                    action_type VARCHAR(50) DEFAULT 'rebook_or_vacate',
+                    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_notifications_user_unread 
+                ON notifications(user_id, is_read, created_at DESC);
+            """)
+            logger.info("Notifications table verified.")
     except Exception as e:
         logger.error("Failed to connect to PostgreSQL: %s", e)
         raise e
@@ -1648,6 +1668,20 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
     # Trigger async notification task
     evaluation_effective_db = chosen_evaluation.effective_decibels if chosen_evaluation else 35.0
     try:
+        await conn.execute(
+            """
+            INSERT INTO notifications (user_id, booking_id, title, message, type, channel, action_type)
+            VALUES ($1, $2, $3, $4, 'success', 'IN_APP', 'none')
+            """,
+            booking.user_id,
+            booking_id,
+            "🎸 BOOKING CONFIRMED",
+            f"Your reservation for {assigned_room['name']} on {booking.booking_date} ({booking.start_time}-{booking.end_time}) is locked in!",
+        )
+    except Exception as notif_err:
+        logger.warning("Could not persist confirmation notification: %s", notif_err)
+
+    try:
         notifier.send_booking_confirmation.delay(
             booking_id=booking_id,
             user_name=user_row["name"],
@@ -1657,6 +1691,7 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
             start_time=str(booking.start_time),
             end_time=str(booking.end_time),
             effective_decibels=evaluation_effective_db,
+            push_token=user_row.get("push_token"),
         )
     except Exception as e:
         logger.warning("Celery dispatch unavailable (running synchronous notification mock): %s", e)
@@ -1669,6 +1704,7 @@ async def create_booking(booking: BookingCreate, conn=Depends(get_db)):
             start_time=str(booking.start_time),
             end_time=str(booking.end_time),
             effective_decibels=evaluation_effective_db,
+            push_token=user_row.get("push_token"),
         )
 
     return BookingOut(
@@ -1745,6 +1781,21 @@ async def cancel_booking(booking_id: int, conn=Depends(get_db)):
     # Clear active state in Redis
     await NowPlayingCache.clear_room(booking["room_id"])
 
+    # Record cancellation in notifications table
+    try:
+        await conn.execute(
+            """
+            INSERT INTO notifications (user_id, booking_id, title, message, type, channel, action_type)
+            VALUES ($1, $2, $3, $4, 'alert', 'IN_APP', 'none')
+            """,
+            booking["user_id"],
+            booking_id,
+            "🛑 RESERVATION CANCELLED",
+            f"Your reservation #{booking_id} for {booking['room_name']} on {booking['booking_date']} has been cancelled.",
+        )
+    except Exception as notif_err:
+        logger.warning("Could not persist cancellation notification: %s", notif_err)
+
     # Dispatch cancellation notification
     try:
         notifier.send_cancellation_alert.delay(
@@ -1754,6 +1805,7 @@ async def cancel_booking(booking_id: int, conn=Depends(get_db)):
             room_name=booking["room_name"],
             booking_date=str(booking["booking_date"]),
             start_time=str(booking["start_time"]),
+            push_token=booking.get("push_token"),
         )
     except Exception as e:
         logger.warning("Celery dispatch unavailable (running synchronous notification mock): %s", e)
@@ -1764,11 +1816,307 @@ async def cancel_booking(booking_id: int, conn=Depends(get_db)):
             room_name=booking["room_name"],
             booking_date=str(booking["booking_date"]),
             start_time=str(booking["start_time"]),
+            push_token=booking.get("push_token"),
         )
 
     return {
         "status": "success",
         "message": f"Booking #{booking_id} cancelled successfully. The room slot is now available for rebooking.",
+    }
+
+
+# ---------------------------------------------------------
+# Notifications API & 15-Minute Expiry Warning (Rebook / Vacate)
+# ---------------------------------------------------------
+
+@app.get("/api/notifications", tags=["Notifications"])
+async def get_user_notifications(user_id: int, conn=Depends(get_db)):
+    """Retrieves recent notification history and unread count for the specified user."""
+    rows = await conn.fetch(
+        """
+        SELECT id, user_id, booking_id, title, message, type, channel, action_type, is_read, created_at
+        FROM notifications
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 50
+        """,
+        user_id,
+    )
+    unread_count = await conn.fetchval(
+        "SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = FALSE",
+        user_id,
+    )
+    return {
+        "notifications": [
+            {
+                "id": r["id"],
+                "user_id": r["user_id"],
+                "booking_id": r["booking_id"],
+                "title": r["title"],
+                "message": r["message"],
+                "type": r["type"],
+                "channel": r["channel"],
+                "action_type": r["action_type"],
+                "is_read": r["is_read"],
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            }
+            for r in rows
+        ],
+        "unread_count": unread_count or 0,
+    }
+
+
+@app.patch("/api/notifications/{id}/read", tags=["Notifications"])
+async def mark_notification_read(id: int, conn=Depends(get_db)):
+    """Marks a single notification as read."""
+    await conn.execute("UPDATE notifications SET is_read = TRUE WHERE id = $1", id)
+    return {"status": "success", "id": id}
+
+
+@app.post("/api/notifications/mark-all-read", tags=["Notifications"])
+async def mark_all_notifications_read(user_id: int, conn=Depends(get_db)):
+    """Marks all notifications for a user as read."""
+    await conn.execute("UPDATE notifications SET is_read = TRUE WHERE user_id = $1", user_id)
+    return {"status": "success", "user_id": user_id}
+
+
+@app.get("/api/notifications/active-expiry-check", tags=["Notifications"])
+async def check_active_session_expiry(user_id: int, conn=Depends(get_db)):
+    """
+    Checks if user currently has:
+    1) A session that just completed within the last 10 minutes (4-loop chime: SESSION IS NOW OVER)
+    2) An active confirmed booking ending in <= 15 minutes today (3-loop chime: REBOOK OR VACATE)
+    """
+    # 1. Check for just-completed session
+    ended_row = await conn.fetchrow(
+        """
+        SELECT b.id, b.booking_date, b.start_time, b.end_time,
+               r.name as room_name, st.name as session_name
+        FROM bookings b
+        JOIN rooms r ON b.room_id = r.id
+        JOIN session_types st ON b.session_type_id = st.id
+        WHERE b.user_id = $1
+          AND b.status = 'Confirmed'
+          AND b.booking_date = CURRENT_DATE
+          AND LOCALTIMESTAMP >= (b.booking_date + b.end_time)
+          AND (LOCALTIMESTAMP - (b.booking_date + b.end_time)) <= INTERVAL '10 minutes'
+        ORDER BY b.end_time DESC
+        LIMIT 1
+        """,
+        user_id,
+    )
+    if ended_row:
+        end_time_str = str(ended_row["end_time"])[:5]
+        return {
+            "has_ended_session": True,
+            "has_expiring_session": False,
+            "booking_id": ended_row["id"],
+            "room_name": ended_row["room_name"],
+            "session_name": ended_row["session_name"],
+            "end_time": end_time_str,
+            "title": "🛑 SESSION IS NOW OVER // PLEASE VACATE",
+            "message": (
+                f"Your 1-hour rehearsal slot in {ended_row['room_name']} ended at {end_time_str}. "
+                "The session is now officially over. Please pack up all instruments and vacate the room for the next band."
+            ),
+            "action_type": "session_over",
+            "sound_loops": 4,
+        }
+
+    # 2. Check for expiring session (<= 15 minutes remaining)
+    row = await conn.fetchrow(
+        """
+        SELECT b.id, b.booking_date, b.start_time, b.end_time,
+               r.name as room_name, st.name as session_name
+        FROM bookings b
+        JOIN rooms r ON b.room_id = r.id
+        JOIN session_types st ON b.session_type_id = st.id
+        WHERE b.user_id = $1
+          AND b.status = 'Confirmed'
+          AND b.booking_date = CURRENT_DATE
+          AND (b.booking_date + b.end_time) > LOCALTIMESTAMP
+          AND ((b.booking_date + b.end_time) - LOCALTIMESTAMP) <= INTERVAL '15 minutes'
+        ORDER BY b.end_time ASC
+        LIMIT 1
+        """,
+        user_id,
+    )
+    if not row:
+        return {"has_expiring_session": False, "has_ended_session": False}
+
+    end_time_str = str(row["end_time"])[:5]
+    return {
+        "has_ended_session": False,
+        "has_expiring_session": True,
+        "booking_id": row["id"],
+        "room_name": row["room_name"],
+        "session_name": row["session_name"],
+        "end_time": end_time_str,
+        "title": "⚠️ 15 MINS REMAINING // REBOOK OR VACATE",
+        "message": (
+            f"Your rehearsal slot in {row['room_name']} ends at {end_time_str}. "
+            "Please either rebook an available upcoming slot or prepare to vacate the room."
+        ),
+        "action_type": "rebook_or_vacate",
+        "sound_loops": 3,
+    }
+
+
+@app.post("/api/notifications/simulate-expiry-warning", tags=["Notifications"])
+async def simulate_expiry_warning(user_id: int = 3, conn=Depends(get_db)):
+    """
+    Triggers / simulates the 15-minute slot expiry warning on demand:
+    Stores the notification in PostgreSQL and calls notifier.send_session_expiry_warning.
+    """
+    user = await conn.fetchrow("SELECT id, name, email, push_token FROM users WHERE id = $1", user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    latest_booking = await conn.fetchrow(
+        """
+        SELECT b.id, b.booking_date, b.start_time, b.end_time, r.name as room_name
+        FROM bookings b
+        JOIN rooms r ON b.room_id = r.id
+        WHERE b.user_id = $1 AND b.status = 'Confirmed'
+        ORDER BY b.booking_date DESC, b.start_time DESC
+        LIMIT 1
+        """,
+        user_id,
+    )
+
+    booking_id = latest_booking["id"] if latest_booking else 999
+    room_name = latest_booking["room_name"] if latest_booking else "Room // 01 (Soundproof)"
+    end_time = str(latest_booking["end_time"])[:5] if latest_booking else "19:00"
+    booking_date = str(latest_booking["booking_date"]) if latest_booking else "TODAY"
+
+    title = "⚠️ 15 MINS REMAINING // REBOOK OR VACATE"
+    message = (
+        f"Your rehearsal slot in {room_name} ends at {end_time}. "
+        "Please either rebook an available upcoming slot or prepare to vacate the room."
+    )
+
+    row_id = await conn.fetchval(
+        """
+        INSERT INTO notifications (user_id, booking_id, title, message, type, channel, action_type)
+        VALUES ($1, $2, $3, $4, 'warning', 'IN_APP', 'rebook_or_vacate')
+        RETURNING id
+        """,
+        user_id,
+        booking_id,
+        title,
+        message,
+    )
+
+    try:
+        notifier.send_session_expiry_warning.delay(
+            booking_id=booking_id,
+            user_name=user["name"],
+            user_email=user["email"],
+            room_name=room_name,
+            booking_date=booking_date,
+            end_time=end_time,
+            push_token=user["push_token"],
+        )
+    except Exception as e:
+        logger.warning("Celery dispatch unavailable (running synchronous mock): %s", e)
+        notifier.send_session_expiry_warning(
+            booking_id=booking_id,
+            user_name=user["name"],
+            user_email=user["email"],
+            room_name=room_name,
+            booking_date=booking_date,
+            end_time=end_time,
+            push_token=user["push_token"],
+        )
+
+    return {
+        "status": "success",
+        "notification_id": row_id,
+        "title": title,
+        "message": message,
+        "action_type": "rebook_or_vacate",
+        "sound_loops": 3,
+        "end_time": end_time,
+        "room_name": room_name,
+    }
+
+
+@app.post("/api/notifications/simulate-session-over", tags=["Notifications"])
+async def simulate_session_over(user_id: int = 3, conn=Depends(get_db)):
+    """
+    Triggers / simulates the session over alert on demand:
+    Loops Google AI Studio chime 4 times, stores alert in PostgreSQL, and dispatches Celery task.
+    """
+    user = await conn.fetchrow("SELECT id, name, email, push_token FROM users WHERE id = $1", user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    latest_booking = await conn.fetchrow(
+        """
+        SELECT b.id, b.booking_date, b.start_time, b.end_time, r.name as room_name
+        FROM bookings b
+        JOIN rooms r ON b.room_id = r.id
+        WHERE b.user_id = $1 AND b.status = 'Confirmed'
+        ORDER BY b.booking_date DESC, b.start_time DESC
+        LIMIT 1
+        """,
+        user_id,
+    )
+
+    booking_id = latest_booking["id"] if latest_booking else 999
+    room_name = latest_booking["room_name"] if latest_booking else "Room // 01 (Soundproof)"
+    end_time = str(latest_booking["end_time"])[:5] if latest_booking else "19:00"
+    booking_date = str(latest_booking["booking_date"]) if latest_booking else "TODAY"
+
+    title = "🛑 SESSION IS NOW OVER // PLEASE VACATE"
+    message = (
+        f"Your 1-hour rehearsal session in {room_name} has officially ended. "
+        "Please pack up all instruments and vacate the room for the next band."
+    )
+
+    row_id = await conn.fetchval(
+        """
+        INSERT INTO notifications (user_id, booking_id, title, message, type, channel, action_type)
+        VALUES ($1, $2, $3, $4, 'alert', 'IN_APP', 'session_over')
+        RETURNING id
+        """,
+        user_id,
+        booking_id,
+        title,
+        message,
+    )
+
+    try:
+        notifier.send_session_over_alert.delay(
+            booking_id=booking_id,
+            user_name=user["name"],
+            user_email=user["email"],
+            room_name=room_name,
+            booking_date=booking_date,
+            end_time=end_time,
+            push_token=user["push_token"],
+        )
+    except Exception as e:
+        logger.warning("Celery dispatch unavailable (running synchronous mock): %s", e)
+        notifier.send_session_over_alert(
+            booking_id=booking_id,
+            user_name=user["name"],
+            user_email=user["email"],
+            room_name=room_name,
+            booking_date=booking_date,
+            end_time=end_time,
+            push_token=user["push_token"],
+        )
+
+    return {
+        "status": "success",
+        "notification_id": row_id,
+        "title": title,
+        "message": message,
+        "action_type": "session_over",
+        "sound_loops": 4,
+        "end_time": end_time,
+        "room_name": room_name,
     }
 
 

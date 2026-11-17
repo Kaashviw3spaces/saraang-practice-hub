@@ -34,7 +34,8 @@ export const NotificationBanner: React.FC = () => {
 
   if (!activeNotification) return null;
 
-  const isWarning = activeNotification.type === 'warning' || activeNotification.type === 'alert';
+  const isAlert = activeNotification.type === 'alert';
+  const isWarning = activeNotification.type === 'warning';
 
   return (
     <Animated.View
@@ -42,21 +43,46 @@ export const NotificationBanner: React.FC = () => {
         styles.container,
         { transform: [{ translateY: slideAnim }] },
         isWarning && styles.warningContainer,
+        isAlert && styles.alertContainer,
       ]}
     >
       <TouchableOpacity activeOpacity={0.9} onPress={dismiss} style={styles.content}>
         <View style={styles.iconContainer}>
-          <Text style={styles.icon}>{isWarning ? '🔔' : '🚀'}</Text>
+          <Text style={styles.icon}>{isAlert ? '🛑' : isWarning ? '⚠️' : '🚀'}</Text>
         </View>
 
         <View style={styles.textContainer}>
           <View style={styles.titleRow}>
-            <Text style={[styles.title, isWarning && styles.warningTitle]}>
+            <Text
+              style={[
+                styles.title,
+                isWarning && styles.warningTitle,
+                isAlert && styles.alertTitle,
+              ]}
+            >
               {activeNotification.title}
             </Text>
             <Text style={styles.timeText}>{activeNotification.timestamp}</Text>
           </View>
           <Text style={styles.message}>{activeNotification.message}</Text>
+
+          {activeNotification.actionText && (
+            <TouchableOpacity
+              style={[styles.actionBtn, isAlert && styles.alertActionBtn]}
+              activeOpacity={0.85}
+              onPress={() => {
+                const action = activeNotification.onAction;
+                dismiss();
+                if (action) {
+                  action();
+                }
+              }}
+            >
+              <Text style={[styles.actionBtnText, isAlert && styles.alertActionBtnText]}>
+                {activeNotification.actionText}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <TouchableOpacity onPress={dismiss} style={styles.closeBtn}>
@@ -88,6 +114,13 @@ const styles = StyleSheet.create({
     borderColor: '#82191F',
     backgroundColor: '#240C10',
   },
+  alertContainer: {
+    borderColor: '#EF4444',
+    backgroundColor: '#2E060A',
+    shadowColor: '#EF4444',
+    shadowOpacity: 0.8,
+    shadowRadius: 16,
+  },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -118,6 +151,9 @@ const styles = StyleSheet.create({
   warningTitle: {
     color: '#F6F2EB',
   },
+  alertTitle: {
+    color: '#FF6B6B',
+  },
   timeText: {
     color: '#9E9891',
     fontSize: 10,
@@ -137,5 +173,31 @@ const styles = StyleSheet.create({
     color: '#9E9891',
     fontSize: 14,
     fontWeight: '800',
+  },
+  actionBtn: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: '#EF4444',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+  },
+  alertActionBtn: {
+    backgroundColor: '#DC2626',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+  },
+  actionBtnText: {
+    color: '#121212',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  alertActionBtnText: {
+    color: '#FFFFFF',
   },
 });

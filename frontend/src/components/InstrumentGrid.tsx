@@ -79,9 +79,10 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
 
   const getBandColor = (band?: string) => {
     const b = (band || '').toUpperCase();
+    if (b.includes('LOW-MID') || b.includes('MID-LOW')) return '#F87171';
     if (b.includes('LOW') || b.includes('SUB') || b.includes('BASS')) return '#EF4444';
-    if (b.includes('HI') || b.includes('TREBLE')) return '#00E5FF';
-    return '#FFFFFF';
+    if (b.includes('HI') || b.includes('TREBLE')) return '#F87171';
+    return '#F87171';
   };
 
   return (
@@ -129,7 +130,7 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
                 <Text style={styles.instName}>{inst.name.toUpperCase()}</Text>
                 {isSelected && (
                   <View style={[styles.checkBadge, { backgroundColor: bandColor }]}>
-                    <Text style={[styles.checkText, { color: bandColor === '#00E5FF' || bandColor === '#FFFFFF' ? '#0D0D10' : '#FFFFFF' }]}>✓</Text>
+                    <Text style={[styles.checkText, { color: '#0D0D10' }]}>✓</Text>
                   </View>
                 )}
               </View>
@@ -138,8 +139,8 @@ export const InstrumentGrid: React.FC<InstrumentGridProps> = ({
                 <View style={styles.metaPill}>
                   <Text style={styles.metaBadge}>{inst.category || 'Gear'}</Text>
                 </View>
-                <View style={[styles.metaPill, { borderColor: bandColor, borderWidth: 1 }]}>
-                  <Text style={[styles.metaBadge, { color: bandColor, fontWeight: '900' }]}>
+                <View style={[styles.metaPill, { borderColor: '#B83232', borderWidth: 1, backgroundColor: '#B83232' }]}>
+                  <Text style={[styles.metaBadge, { color: '#121212', fontWeight: '900' }]}>
                     {inst.frequency_band || 'Mid'}
                   </Text>
                 </View>

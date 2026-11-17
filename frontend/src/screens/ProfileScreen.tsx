@@ -7,7 +7,11 @@ import { RockTextureOverlay } from '../components/RockTextureOverlay';
 import { SoundwaveSvg } from '../components/SoundwaveSvg';
 import { LightningSvg } from '../components/LightningSvg';
 
-export const ProfileScreen: React.FC = () => {
+interface ProfileScreenProps {
+  onNavigateToBooking?: () => void;
+}
+
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({ onNavigateToBooking }) => {
   const { currentUser, setCurrentUser, showNotification } = useStore();
   const [pushTokenStatus, setPushTokenStatus] = useState<string>('Token registered with Celery.');
 
@@ -16,11 +20,41 @@ export const ProfileScreen: React.FC = () => {
     { id: 4, name: 'Priya Nair', email: 'priya@musicclub.org' },
   ];
 
-  const handleTestNotification = () => {
+  const handleTestNotification = async () => {
+    try {
+      await api.simulateExpiryWarning(currentUser.id);
+    } catch (err) {
+      console.log('Simulate expiry warning call finished:', err);
+    }
+
     showNotification({
-      title: 'SESSION REMINDER (15M MARK)',
-      message: 'Your rehearsal session starts in 15 minutes. Please proceed to Room // 01.',
+      title: '⚠️ 15 MINS REMAINING // REBOOK OR VACATE',
+      message: 'Your rehearsal slot ends in 15 minutes. Either rebook an available upcoming slot or prepare to vacate the room.',
       type: 'warning',
+      soundLoops: 3,
+      actionText: 'REBOOK NEXT SLOT →',
+      onAction: () => {
+        onNavigateToBooking?.();
+      },
+    });
+  };
+
+  const handleTestSessionOver = async () => {
+    try {
+      await api.simulateSessionOver(currentUser.id);
+    } catch (err) {
+      console.log('Simulate session over call finished:', err);
+    }
+
+    showNotification({
+      title: '🛑 SESSION IS NOW OVER // PLEASE VACATE',
+      message: 'Your 1-hour rehearsal session has officially ended. Please pack up all instruments and vacate the room for the next band.',
+      type: 'alert',
+      soundLoops: 4,
+      actionText: 'BOOK NEXT SESSION →',
+      onAction: () => {
+        onNavigateToBooking?.();
+      },
     });
   };
 
@@ -113,7 +147,15 @@ export const ProfileScreen: React.FC = () => {
           </AnimatedPressable>
 
           <AnimatedPressable style={styles.testBtn} onPress={handleTestNotification} scaleTo={0.97}>
-            <Text style={styles.testBtnText}>SIMULATE 15-MIN FOREGROUND BANNER</Text>
+            <Text style={styles.testBtnText}>SIMULATE 15-MIN EXPIRY (REBOOK OR VACATE)</Text>
+          </AnimatedPressable>
+
+          <AnimatedPressable
+            style={[styles.testBtn, styles.sessionOverBtn]}
+            onPress={handleTestSessionOver}
+            scaleTo={0.97}
+          >
+            <Text style={styles.sessionOverBtnText}>🛑 SIMULATE SESSION OVER (4-LOOP CHIME)</Text>
           </AnimatedPressable>
         </View>
       </View>
@@ -349,6 +391,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
+  },
+  sessionOverBtn: {
+    backgroundColor: '#350A0E',
+    borderColor: '#DC2626',
+    marginTop: 10,
+  },
+  sessionOverBtnText: {
+    color: '#FF6B6B',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.9,
   },
   policyCard: {
     backgroundColor: '#200B0E',

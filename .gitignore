@@ -26,6 +26,7 @@ frontend/web-build/
 # OS generated files
 .DS_Store
 Screenshot*.png
+/maybe.webp
 
 # Tooling & Assistant
 .agent/

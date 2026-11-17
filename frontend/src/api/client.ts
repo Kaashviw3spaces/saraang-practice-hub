@@ -211,4 +211,63 @@ export const api = {
     const res = await apiClient.get('/api/dashboard/now-playing');
     return res.data;
   },
+
+  getNotifications: async (userId: number) => {
+    const res = await apiClient.get<{ notifications: any[]; unread_count: number }>(`/api/notifications?user_id=${userId}`);
+    return res.data;
+  },
+
+  markNotificationRead: async (notificationId: number) => {
+    const res = await apiClient.patch(`/api/notifications/${notificationId}/read`);
+    return res.data;
+  },
+
+  markAllNotificationsRead: async (userId: number) => {
+    const res = await apiClient.post(`/api/notifications/mark-all-read?user_id=${userId}`);
+    return res.data;
+  },
+
+  checkActiveExpiry: async (userId: number) => {
+    const res = await apiClient.get<{
+      has_expiring_session?: boolean;
+      has_ended_session?: boolean;
+      booking_id?: number;
+      room_name?: string;
+      session_name?: string;
+      end_time?: string;
+      title?: string;
+      message?: string;
+      action_type?: string;
+      sound_loops?: number;
+    }>(`/api/notifications/active-expiry-check?user_id=${userId}`);
+    return res.data;
+  },
+
+  simulateExpiryWarning: async (userId: number) => {
+    const res = await apiClient.post<{
+      status: string;
+      notification_id: number;
+      title: string;
+      message: string;
+      action_type: string;
+      sound_loops: number;
+      end_time: string;
+      room_name: string;
+    }>(`/api/notifications/simulate-expiry-warning?user_id=${userId}`);
+    return res.data;
+  },
+
+  simulateSessionOver: async (userId: number) => {
+    const res = await apiClient.post<{
+      status: string;
+      notification_id: number;
+      title: string;
+      message: string;
+      action_type: string;
+      sound_loops: number;
+      end_time: string;
+      room_name: string;
+    }>(`/api/notifications/simulate-session-over?user_id=${userId}`);
+    return res.data;
+  },
 };

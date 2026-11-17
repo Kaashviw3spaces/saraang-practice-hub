@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, Platform, Animated } from 'react-native';
 import { AnimatedPressable } from './AnimatedPressable';
+import { RockTextureOverlay } from './RockTextureOverlay';
+import { LightningSvg } from './LightningSvg';
 
 interface AcousticRejectionModalProps {
   visible: boolean;
@@ -62,15 +64,18 @@ export const AcousticRejectionModal: React.FC<AcousticRejectionModalProps> = ({
             },
           ]}
         >
+          <RockTextureOverlay pattern="mesh" opacity={0.06} />
+
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.warningBadge}>
-              <Text style={styles.warningIcon}>⚠️</Text>
-              <Text style={styles.headerTitle}>ACOUSTIC AI REJECTION</Text>
+              <LightningSvg color="#F87171" size={11} style={{ marginRight: 5 }} />
+              <Text style={styles.badgeText}>ACOUSTIC AI LIMIT EXCEEDED</Text>
             </View>
+            <Text style={styles.headerTitle}>RESERVATION CONFLICT</Text>
           </View>
 
-          {/* Primary Reason (Step 2C Required Text) */}
+          {/* Primary Reason */}
           <Text style={styles.mainReason}>
             Booking rejected by Acoustic AI:{' '}
             <Text style={styles.reasonHighlight}>{reason || 'Acoustic limits exceeded.'}</Text>
@@ -93,7 +98,7 @@ export const AcousticRejectionModal: React.FC<AcousticRejectionModalProps> = ({
           {/* Frequency Collisions */}
           {details?.frequency_collisions && details.frequency_collisions.length > 0 && (
             <View style={styles.collisionBox}>
-              <Text style={styles.collisionHeader}>⚡ FREQUENCY CONFLICTS:</Text>
+              <Text style={styles.collisionHeader}>FREQUENCY CONFLICTS:</Text>
               {details.frequency_collisions.map((c, i) => (
                 <Text key={i} style={styles.collisionItem}>• {c}</Text>
               ))}
@@ -103,19 +108,19 @@ export const AcousticRejectionModal: React.FC<AcousticRejectionModalProps> = ({
           {/* Action Buttons */}
           <View style={styles.buttonRow}>
             <AnimatedPressable
-              style={styles.modifyBtn}
-              onPress={onAdjustInstruments}
-              scaleTo={0.96}
-            >
-              <Text style={styles.modifyBtnText}>ADJUST INSTRUMENTS →</Text>
-            </AnimatedPressable>
-
-            <AnimatedPressable
               style={styles.cancelBtn}
               onPress={onClose}
               scaleTo={0.96}
             >
               <Text style={styles.cancelBtnText}>DISMISS</Text>
+            </AnimatedPressable>
+
+            <AnimatedPressable
+              style={styles.modifyBtn}
+              onPress={onAdjustInstruments}
+              scaleTo={0.96}
+            >
+              <Text style={styles.modifyBtnText}>ADJUST RIG →</Text>
             </AnimatedPressable>
           </View>
         </Animated.View>
@@ -127,7 +132,7 @@ export const AcousticRejectionModal: React.FC<AcousticRejectionModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.88)',
+    backgroundColor: 'rgba(0, 0, 0, 0.82)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -137,46 +142,57 @@ const styles = StyleSheet.create({
     maxWidth: 440,
     backgroundColor: '#15151A',
     borderWidth: 2,
-    borderColor: '#82191F',
+    borderColor: '#7D1D22',
     borderRadius: 10,
-    padding: 22,
-    shadowColor: '#82191F',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 8,
+    padding: 20,
+    position: 'relative',
+    overflow: 'hidden',
   },
   header: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   warningBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
     backgroundColor: '#240C10',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#7D1D22',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 999,
+    marginBottom: 6,
   },
-  warningIcon: {
-    fontSize: 14,
-    marginRight: 6,
+  badgeText: {
+    color: '#F87171',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   headerTitle: {
-    color: '#F6F2EB',
-    fontSize: 11,
+    color: '#EFECE6',
+    fontSize: 20,
     fontWeight: '900',
-    letterSpacing: 0.9,
+    letterSpacing: 1,
+    fontFamily: Platform.select({
+      web: '"Anton", "Oswald", "Arial Black", sans-serif',
+      default: 'sans-serif',
+    }),
   },
   mainReason: {
     color: '#F6F2EB',
-    fontSize: 15,
+    fontSize: 12.5,
     fontWeight: '700',
-    lineHeight: 22,
-    marginBottom: 16,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
+    lineHeight: 18,
+    marginBottom: 14,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   reasonHighlight: {
     color: '#F87171',
@@ -184,53 +200,54 @@ const styles = StyleSheet.create({
   },
   telemetryBox: {
     backgroundColor: '#0D0D10',
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#261C20',
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 14,
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 12,
   },
   telemetryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   telemetryLabel: {
     color: '#9E9891',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
   },
   telemetryDanger: {
     color: '#F87171',
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '900',
   },
   telemetrySafe: {
-    color: '#9E9891',
-    fontSize: 12,
-    fontWeight: '800',
+    color: '#10B981',
+    fontSize: 11.5,
+    fontWeight: '900',
   },
   collisionBox: {
-    backgroundColor: '#200B0E',
-    borderWidth: 1.5,
-    borderColor: '#7D1D22',
-    borderRadius: 8,
-    padding: 14,
-    marginBottom: 20,
+    backgroundColor: '#0D0D10',
+    borderWidth: 1,
+    borderColor: '#261C20',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 16,
   },
   collisionHeader: {
-    color: '#F6F2EB',
-    fontSize: 11,
+    color: '#F87171',
+    fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.8,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   collisionItem: {
-    color: '#E0D0D1',
-    fontSize: 12,
-    lineHeight: 17,
-    marginBottom: 4,
+    color: '#F6F2EB',
+    fontSize: 11,
+    lineHeight: 15,
+    marginBottom: 3,
+    fontWeight: '700',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -238,32 +255,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  modifyBtn: {
-    backgroundColor: '#F6F2EB',
-    paddingVertical: 12,
-    paddingHorizontal: 18,
+  cancelBtn: {
+    backgroundColor: '#240C10',
+    borderWidth: 1.5,
+    borderColor: '#7D1D22',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     borderRadius: 6,
-    borderWidth: 1,
+  },
+  cancelBtnText: {
+    color: '#F87171',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  modifyBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1.5,
     borderColor: '#FFFFFF',
   },
   modifyBtnText: {
     color: '#0D0D10',
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 0.9,
-  },
-  cancelBtn: {
-    backgroundColor: '#22222A',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#2E2E38',
-  },
-  cancelBtnText: {
-    color: '#F6F2EB',
-    fontSize: 11,
-    fontWeight: '800',
     letterSpacing: 0.8,
   },
 });

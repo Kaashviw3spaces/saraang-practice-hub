@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { LiveSession, SessionType, Instrument, BookingResponse, AcousticCheckResponse } from '../api/client';
+import { playNotificationSound } from '../utils/sound';
 
 export interface InAppNotification {
   id: string;
@@ -7,6 +8,9 @@ export interface InAppNotification {
   message: string;
   type: 'info' | 'warning' | 'success' | 'alert';
   timestamp: string;
+  actionText?: string;
+  onAction?: () => void;
+  soundLoops?: number;
 }
 
 export interface BookingWizardState {
@@ -236,13 +240,17 @@ export const useStore = create<AppState>((set, get) => ({
     })),
 
   activeNotification: null,
-  showNotification: (notification) =>
+  showNotification: (notification) => {
+    const loops = notification.soundLoops ?? (notification.type === 'alert' ? 4 : 3);
+    playNotificationSound(notification.type, loops);
     set({
       activeNotification: {
         ...notification,
+        soundLoops: loops,
         id: Math.random().toString(36).substring(7),
         timestamp: new Date().toLocaleTimeString(),
       },
-    }),
+    });
+  },
   dismissNotification: () => set({ activeNotification: null }),
 }));

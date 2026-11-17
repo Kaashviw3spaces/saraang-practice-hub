@@ -19,16 +19,81 @@ import { SessionCard } from '../components/SessionCard';
 import { InstrumentGrid } from '../components/InstrumentGrid';
 import { AcousticRejectionModal } from '../components/AcousticRejectionModal';
 import { AnimatedPressable } from '../components/AnimatedPressable';
-import { SoundwaveSvg } from '../components/SoundwaveSvg';
 import { RockTextureOverlay } from '../components/RockTextureOverlay';
 import { LightningSvg } from '../components/LightningSvg';
-import { EqualizerBars } from '../components/EqualizerBars';
+import Svg, { Rect, Line, Circle } from 'react-native-svg';
 
-const getFreqColor = (band?: string) => {
+const getSessionBandTag = (name: string) => {
+  const n = (name || '').toUpperCase();
+  if (n.includes('SESSION A')) {
+    return {
+      label: 'AC/DC // CUSTOM TUBE STACK',
+      serial: 'SN-0826-A',
+      watermark: require('../../assets/band6.jpg'),
+    };
+  }
+  if (n.includes('SESSION B')) {
+    return {
+      label: 'THE BEATLES // ABBEY ROAD',
+      serial: 'SN-1969-B',
+      watermark: require('../../assets/sebs_clean.png'),
+    };
+  }
+  if (n.includes('JAM SESSION')) {
+    return {
+      label: 'ARENA ROCK // LIVE ENSEMBLE',
+      serial: 'SN-9021-JAM',
+      watermark: require('../../assets/band4.avif'),
+    };
+  }
+  if (n.includes('RECORDING')) {
+    return {
+      label: 'METALLICA // RIDE THE LIGHTNING',
+      serial: 'SN-1984-REC',
+      watermark: require('../../assets/band3.jpg'),
+    };
+  }
+  return {
+    label: 'BACKSTAGE // SETLIST LOUNGE',
+    serial: 'SN-2026-MTG',
+    watermark: require('../../assets/band2.jpg'),
+  };
+};
+
+interface FreqColorMeta {
+  bg: string;
+  border: string;
+  text: string;
+}
+
+const getFreqColor = (band?: string): FreqColorMeta => {
   const b = (band || '').toUpperCase();
-  if (b.includes('LOW') || b.includes('SUB') || b.includes('BASS')) return '#EF4444';
-  if (b.includes('HI') || b.includes('TREBLE')) return '#00E5FF';
-  return '#F59E0B';
+  if (b.includes('LOW-MID') || b.includes('MID-LOW')) {
+    return {
+      bg: '#B83232',
+      border: '#B83232',
+      text: '#121212',
+    };
+  }
+  if (b.includes('LOW') || b.includes('SUB') || b.includes('BASS')) {
+    return {
+      bg: '#B83232',
+      border: '#B83232',
+      text: '#121212',
+    };
+  }
+  if (b.includes('HI') || b.includes('TREBLE')) {
+    return {
+      bg: '#B83232',
+      border: '#B83232',
+      text: '#121212',
+    };
+  }
+  return {
+    bg: '#B83232',
+    border: '#B83232',
+    text: '#121212',
+  };
 };
 
 interface BookingWizardScreenProps {
@@ -70,12 +135,12 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
   const ticketScale = useRef(new Animated.Value(0.92)).current;
 
   useEffect(() => {
-    stepFade.setValue(0.25);
-    stepSlide.setValue(14);
+    stepFade.setValue(0.3);
+    stepSlide.setValue(10);
     Animated.parallel([
       Animated.timing(stepFade, {
         toValue: 1,
-        duration: 220,
+        duration: 200,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
@@ -86,7 +151,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
         useNativeDriver: true,
       }),
     ]).start();
-  }, [wizard.step]);
+  }, [wizard.selectedSession?.id]);
 
   useEffect(() => {
     Animated.spring(dropdownAnim, {
@@ -118,7 +183,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     }
   }, [successBooking, ticketFade, ticketScale]);
 
-  // Load catalogues
+  // Load catalogues and auto-select initial room
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -129,6 +194,9 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
         ]);
         setSessionTypes(st);
         setInstruments(inst);
+        if (!wizard.selectedSession && st.length > 0) {
+          selectSession(st[0]);
+        }
       } catch (err) {
         console.error('Failed to load booking catalogues:', err);
       } finally {
@@ -138,7 +206,13 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     loadData();
   }, []);
 
-  // Debounced Acoustic AI Check during Step 2B
+  useEffect(() => {
+    if (sessionTypes.length > 0 && !wizard.selectedSession) {
+      selectSession(sessionTypes[0]);
+    }
+  }, [sessionTypes, wizard.selectedSession, selectSession]);
+
+  // Debounced Acoustic AI Check
   const runAcousticCheck = useCallback(async () => {
     if (!wizard.selectedSession) return;
 
@@ -163,17 +237,17 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
   }, [wizard.selectedSession, wizard.instruments, wizard.practiceMode]);
 
   useEffect(() => {
-    if (wizard.step === 2) {
+    if (wizard.selectedSession) {
       const timer = setTimeout(() => {
         runAcousticCheck();
       }, 400);
       return () => clearTimeout(timer);
     }
-  }, [wizard.step, wizard.instruments, wizard.practiceMode, runAcousticCheck]);
+  }, [wizard.selectedSession?.id, wizard.instruments, wizard.practiceMode, runAcousticCheck]);
 
   // Fetch live hour-wise slots availability for operating hours (6:00 AM - 11:00 PM)
   useEffect(() => {
-    if (wizard.step === 2 && wizard.selectedSession) {
+    if (wizard.selectedSession) {
       let isMounted = true;
       const fetchSlots = async () => {
         try {
@@ -254,7 +328,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     if (isSolo && selectedSlot && (selectedSlot.current_participants || 0) > 0) {
       Alert.alert(
         'Solo Practice Notice',
-        'Solo practice requires an empty room with no other musicians. This slot already has active musicians playing collaborative practice. Please select an empty slot or choose Collaborative Practice.'
+        'Solo practice requires an empty room. This slot is already in use. Please select an empty slot or choose Collaborative Practice.'
       );
       return;
     }
@@ -262,7 +336,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     if (isFullBandA && selectedSlot && ((selectedSlot.current_participants || 0) > 0 || !selectedSlot.is_available)) {
       Alert.alert(
         'Full Band Rehearsal Exclusivity',
-        'Full Band Rehearsal reserves the entire sound room exclusively for your band. This slot already has active musicians or is reserved. Please select an empty available slot.'
+        'Full band rehearsal reserves the entire room. This slot is already occupied. Please select an empty available slot.'
       );
       return;
     }
@@ -270,7 +344,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     if (isRecording && selectedSlot && (selectedSlot.current_participants || 0) > 0) {
       Alert.alert(
         'Recording Studio Isolation',
-        'Recording sessions require complete studio isolation and cannot share a slot with any other session or musicians. Please select an available open slot.'
+        'Recording sessions require complete room isolation. Please select an empty available slot.'
       );
       return;
     }
@@ -432,20 +506,10 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
     );
   }
 
-  // Success Ticket View: VIP Backstage Laminate Pass
+  // Success View: Minimalist Pass matching MY REHEARSALS
   if (successBooking) {
     const isRecordingSuccess = (successBooking.session_name || '').toUpperCase().includes('RECORDING');
     const isMeetingSuccess = (successBooking.session_name || '').toUpperCase().includes('MEETING');
-    const sName = (successBooking.session_name || '').toUpperCase();
-    const passWatermark = sName.includes('SESSION A')
-      ? require('../../assets/band6.jpg')
-      : sName.includes('SESSION B')
-      ? require('../../assets/band1.jpg')
-      : sName.includes('RECORDING')
-      ? require('../../assets/band3.jpg')
-      : isMeetingSuccess
-      ? require('../../assets/band2.jpg')
-      : require('../../assets/band4.avif');
 
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -458,59 +522,39 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             },
           ]}
         >
-          {/* Subtle Room Texture */}
           <RockTextureOverlay pattern="mesh" opacity={0.06} />
 
-          {/* Authentic Rock Band Watermark */}
-          <Image
-            source={passWatermark}
-            style={styles.ticketWatermark}
-            resizeMode="cover"
-          />
-
-          {/* Lanyard Hole / VIP Header Stamp */}
-          <View style={styles.ticketLanyardSlot}>
-            <View style={styles.ticketHole} />
-            <LightningSvg color="#FFFFFF" size={13} style={{ marginRight: 6 }} />
-            <Text style={styles.ticketLanyardText}>★ ALL ACCESS BACKSTAGE PASS ★</Text>
+          {/* Header Row matching BookingsListScreen cardHeader */}
+          <View style={styles.ticketHeaderRow}>
+            <Text style={styles.bookingId}>PASS #{successBooking.id}</Text>
+            <View style={styles.ticketBadge}>
+              <LightningSvg color="#FFFFFF" size={10} style={{ marginRight: 4 }} />
+              <Text style={styles.ticketBadgeText}>★ ALL ACCESS PASS</Text>
+            </View>
           </View>
 
-          <View style={styles.ticketBadge}>
-            <Text style={styles.ticketBadgeText}>RESERVATION CONFIRMED</Text>
-          </View>
-
-          <Text style={styles.ticketTitle}>PASS #{successBooking.id}</Text>
+          <Text style={styles.ticketTitle}>{successBooking.session_name.toUpperCase()}</Text>
           <Text style={styles.ticketSession}>
             {isRecordingSuccess
-              ? `Booking Confirmed! Your ${successBooking.session_name} studio recording slot is locked in.`
+              ? `Booking Confirmed! Studio recording session locked in.`
               : isMeetingSuccess
-              ? `Booking Confirmed! Your ${successBooking.session_name} slot is locked in.`
+              ? `Booking Confirmed! Meeting session locked in.`
               : (successBooking.practice_mode || '').toUpperCase().includes('FULL BAND')
-              ? `Booking Confirmed! Your ${successBooking.session_name} Full Band Rehearsal is locked in.`
-              : `Booking Confirmed! Your ${successBooking.session_name} rehearsal slot is locked in.`}
+              ? `Booking Confirmed! Full Band Rehearsal locked in.`
+              : `Booking Confirmed! Rehearsal slot locked in.`}
           </Text>
-
-          {/* Metallica & Arctic Monkeys dual-channel Soundwave */}
-          <View style={styles.ticketSoundwaveWrap}>
-            <SoundwaveSvg
-              color="#EF4444"
-              secondaryColor="#00E5FF"
-              height={22}
-              variant="metallica"
-            />
-          </View>
 
           <View style={styles.ticketGrid}>
             <View style={styles.ticketField}>
-              <Text style={styles.ticketLabel}>ROOM / SESSION:</Text>
-              <Text style={[styles.ticketVal, { color: '#00E5FF' }]}>{successBooking.session_name.toUpperCase()}</Text>
+              <Text style={styles.ticketLabel}>ROOM // SESSION:</Text>
+              <Text style={styles.ticketVal}>{successBooking.session_name}</Text>
             </View>
             {successBooking.practice_mode ? (
               <View style={styles.ticketField}>
                 <Text style={styles.ticketLabel}>
-                  {isMeetingSuccess ? 'CONTEXT:' : 'PRACTICE MODE:'}
+                  {isMeetingSuccess ? 'CONTEXT:' : 'MODE:'}
                 </Text>
-                <Text style={[styles.ticketVal, { color: '#FFFFFF' }]}>{successBooking.practice_mode.toUpperCase()}</Text>
+                <Text style={styles.ticketVal}>{successBooking.practice_mode}</Text>
               </View>
             ) : null}
             <View style={styles.ticketField}>
@@ -518,7 +562,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               <Text style={styles.ticketVal}>{successBooking.booking_date}</Text>
             </View>
             <View style={styles.ticketField}>
-              <Text style={styles.ticketLabel}>TIME WINDOW:</Text>
+              <Text style={styles.ticketLabel}>WINDOW:</Text>
               <Text style={styles.ticketVal}>{successBooking.start_time} - {successBooking.end_time}</Text>
             </View>
             <View style={styles.ticketField}>
@@ -526,15 +570,13 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                 {isMeetingSuccess ? 'PARTICIPANTS:' : 'PEOPLE PLAYING:'}
               </Text>
               <Text style={styles.ticketVal}>
-                {successBooking.participant_count} {successBooking.participant_count === 1 ? 'PERSON' : 'PEOPLE'}
+                {successBooking.participant_count} {successBooking.participant_count === 1 ? 'Person' : 'People'}
               </Text>
             </View>
           </View>
 
-          <View style={styles.ticketPerforatedLine} />
-
           <Text style={styles.pushNote}>
-            🔔 Automatic FCM session reminders active at 45m and 60m marks.
+            Automatic session reminders active at 45m and 60m marks.
           </Text>
 
           <AnimatedPressable
@@ -547,7 +589,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             scaleTo={0.97}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-              <LightningSvg color="#0D0D10" size={15} style={{ marginRight: 6 }} />
+              <LightningSvg color="#0D0D10" size={13} style={{ marginRight: 6 }} />
               <Text style={styles.doneBtnText}>VIEW MY BOOKINGS →</Text>
             </View>
           </AnimatedPressable>
@@ -558,114 +600,50 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Studio Header Console with Rock Progress Indicators */}
-      <View style={styles.heroConsole}>
-        <RockTextureOverlay pattern="mesh" opacity={0.06} />
+      {/* Header matching MY REHEARSALS */}
+      <View style={styles.headerBox}>
+        <Text style={styles.headerSubtitle}>LOCK IN TIME</Text>
+        <Text style={styles.headerTitle}>
+          {wizard.selectedSession?.name?.toUpperCase().includes('RECORDING')
+            ? 'RECORDING STUDIO BOOKING'
+            : 'REHEARSAL ROOM BOOKING'}
+        </Text>
+      </View>
 
-        {/* Dual-step Rock Progress Pills */}
-        <View style={styles.progressRow}>
-          <TouchableOpacity
-            style={[
-              styles.progressStepPill,
-              wizard.step === 1 ? styles.progressStepPillActive : styles.progressStepPillDone,
-            ]}
-            onPress={() => setWizardStep(1)}
-            activeOpacity={0.8}
-          >
-            <LightningSvg
-              color={wizard.step === 1 ? '#0D0D10' : '#10B981'}
-              size={11}
-              style={{ marginRight: 5 }}
-            />
-            <Text
-              style={[
-                styles.progressStepText,
-                wizard.step === 1 ? styles.progressStepTextActive : styles.progressStepTextDone,
-              ]}
-            >
-              01 // ROOM
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.progressStepDivider} />
-
-          <View
-            style={[
-              styles.progressStepPill,
-              wizard.step === 2 ? styles.progressStepPillActive : styles.progressStepPillPending,
-            ]}
-          >
-            <LightningSvg
-              color={wizard.step === 2 ? '#0D0D10' : '#6A6560'}
-              size={11}
-              style={{ marginRight: 5 }}
-            />
-            <Text
-              style={[
-                styles.progressStepText,
-                wizard.step === 2 ? styles.progressStepTextActive : styles.progressStepTextPending,
-              ]}
-            >
-              02 // RIG & TIME
-            </Text>
-          </View>
-        </View>
-
-        {/* Header Title with Soundwave Equalizer */}
-        <View style={styles.consoleTitleRow}>
-          <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={styles.consoleTitle}>
-              {wizard.selectedSession?.name?.toUpperCase().includes('RECORDING')
-                ? 'RECORDING STUDIO BOOKING'
-                : 'REHEARSAL ROOM BOOKING'}
-            </Text>
-            <Text style={styles.consoleSubtitle}>
-              {wizard.step === 1
-                ? 'SELECT A ROOM TO CONFIGURE YOUR SESSION'
-                : 'CALIBRATE YOUR RIG, LOCK IN TIME & CONFIRM YOUR SLOT'}
-            </Text>
-          </View>
-          <EqualizerBars active={true} color="#EF4444" size={14} />
-        </View>
-
-        {/* Mini soundwave divider */}
-        <View style={styles.consoleSoundwaveWrap}>
-          <SoundwaveSvg color="#EF4444" secondaryColor="#38BDF8" height={16} variant="metallica" />
-        </View>
+      {/* Room Selector Pills (Instant Room Switcher replacing 01 // ROOM page) */}
+      <View style={styles.roomSelectorRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.roomSelectorScroll}
+        >
+          {sessionTypes.map((session) => {
+            const isSelected = wizard.selectedSession?.id === session.id;
+            return (
+              <TouchableOpacity
+                key={session.id}
+                style={[styles.roomPill, isSelected && styles.roomPillSelected]}
+                onPress={() => selectSession(session)}
+                activeOpacity={0.8}
+              >
+                {isSelected && (
+                  <View style={styles.roomPillDot} />
+                )}
+                <Text
+                  style={[styles.roomPillText, isSelected && styles.roomPillTextSelected]}
+                >
+                  {session.name.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* ========================================================= */}
-      {/* STEP 2A: SESSION SELECTION                                 */}
+      {/* BOOKING CONFIGURATION & STRICT INSTRUMENT FILTERING        */}
       {/* ========================================================= */}
-      {wizard.step === 1 && (
-        <Animated.View style={{ opacity: stepFade, transform: [{ translateY: stepSlide }] }}>
-          <View style={styles.carouselHintBar}>
-            <Text style={styles.carouselHintText}>◀ SWIPE ROOMS • TAP CARD TO CONFIGURE ▶</Text>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            decelerationRate="fast"
-            snapToInterval={326}
-            contentContainerStyle={styles.horizontalCarouselContent}
-          >
-            {sessionTypes.map((session, index) => (
-              <SessionCard
-                key={session.id}
-                session={session}
-                roomNumber={`0${index + 1}`}
-                isSelected={wizard.selectedSession?.id === session.id}
-                onBookSlot={() => selectSession(session)}
-              />
-            ))}
-          </ScrollView>
-        </Animated.View>
-      )}
-
-      {/* ========================================================= */}
-      {/* STEP 2B & 2C: CONFIGURATION & STRICT INSTRUMENT FILTERING */}
-      {/* ========================================================= */}
-      {wizard.step === 2 && wizard.selectedSession && (() => {
+      {wizard.selectedSession && (() => {
         const sessionNameUpper = (wizard.selectedSession?.name || '').toUpperCase();
         const isMeetingSession = sessionNameUpper.includes('MEETING');
         const isSessionA = sessionNameUpper.includes('SESSION A');
@@ -721,27 +699,111 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
           return true;
         });
 
+        const sessionBandMeta = getSessionBandTag(wizard.selectedSession.name);
+
         return (
           <Animated.View style={{ opacity: stepFade, transform: [{ translateY: stepSlide }] }}>
-            {/* Selected Session Channel Rack Banner */}
-            <View style={styles.selectedSessionPill}>
-              <RockTextureOverlay pattern="grooves" opacity={0.06} />
-              <View style={{ flex: 1, marginRight: 10 }}>
-                <Text style={styles.pillValue}>{wizard.selectedSession.name.toUpperCase()}</Text>
-                <Text style={styles.rackSessionMeta}>
-                  CAPACITY // UP TO {effectiveParticipantLimit} MUSICIANS
-                </Text>
+            {/* Selected Session Concert Ticket Stub (Matching BOOK SLOT Ticket Design) */}
+            <View style={styles.selectedTicketCard}>
+              {/* Semi-circular Ticket Punch Notches on Perforation Ends */}
+              <View style={[styles.selectedPunchNotch, styles.selectedNotchTopLeft]} />
+              <View style={[styles.selectedPunchNotch, styles.selectedNotchBottomLeft]} />
+
+              {/* Left Perforated Tear-off Stub */}
+              <View style={styles.selectedLeftTearStub}>
+                <View style={styles.selectedBarcodeWrap}>
+                  <Svg width="22" height="70" viewBox="0 0 22 75">
+                    <Rect x="0" y="0" width="3" height="75" fill="#000000" />
+                    <Rect x="4" y="0" width="1" height="75" fill="#000000" />
+                    <Rect x="6" y="0" width="2" height="75" fill="#000000" />
+                    <Rect x="9" y="0" width="1" height="75" fill="#000000" />
+                    <Rect x="12" y="0" width="2" height="75" fill="#000000" />
+                    <Rect x="15" y="0" width="1" height="75" fill="#000000" />
+                    <Rect x="17" y="0" width="3" height="75" fill="#000000" />
+                    <Rect x="21" y="0" width="1" height="75" fill="#000000" />
+                  </Svg>
+                </View>
+                <Text style={styles.selectedStubPassText}>PASS</Text>
               </View>
-              <AnimatedPressable style={styles.changeBtn} onPress={() => setWizardStep(1)} scaleTo={0.95}>
-                <Text style={styles.changeBtnText}>CHANGE ↻</Text>
-              </AnimatedPressable>
+
+              {/* Perforated Dashed Tear Line */}
+              <View style={styles.selectedPerforationLine} />
+
+              {/* Main Ticket Surface (Warm Aged Zine Paper) */}
+              <View style={styles.selectedTicketMain}>
+                {/* High-Contrast Halftone Band Silhouette on Right */}
+                {sessionBandMeta.watermark && (
+                  <View style={styles.selectedBandPhotoCutoutWrap}>
+                    <Image
+                      source={sessionBandMeta.watermark}
+                      style={[
+                        styles.selectedBandSilhouettePhoto,
+                        Platform.select({
+                          web: {
+                            filter: 'grayscale(100%) contrast(290%) brightness(1.03)',
+                            mixBlendMode: 'multiply',
+                          } as any,
+                        }),
+                      ]}
+                      resizeMode="cover"
+                    />
+                  </View>
+                )}
+
+                {/* Slanted Gritty Grainy Rubber Stamp Watermark: "APPROVED" */}
+                <View style={styles.approvedWatermarkBox} pointerEvents="none">
+                  <View style={styles.approvedStampFrameOuter}>
+                    <View style={styles.approvedStampFrameInner}>
+                      <Text style={styles.approvedStampWord}>APPROVED</Text>
+                    </View>
+                  </View>
+                  {/* Gritty Erosion Scratches & Stray Ink Speckles */}
+                  <Svg width="215" height="52" viewBox="0 0 215 52" style={StyleSheet.absoluteFillObject} pointerEvents="none">
+                    <Line x1="12" y1="14" x2="85" y2="14" stroke="#DDD7C9" strokeWidth="1.2" strokeDasharray="3, 8, 2, 6" />
+                    <Line x1="50" y1="27" x2="200" y2="27" stroke="#DDD7C9" strokeWidth="1.4" strokeDasharray="4, 12, 1, 9, 3" />
+                    <Line x1="18" y1="39" x2="155" y2="39" stroke="#DDD7C9" strokeWidth="1.1" strokeDasharray="2, 10, 3, 7" />
+                    <Line x1="95" y1="18" x2="205" y2="18" stroke="#DDD7C9" strokeWidth="1.1" strokeDasharray="5, 14, 2, 8" />
+                    <Circle cx="8" cy="8" r="0.8" fill="#8B1E22" />
+                    <Circle cx="206" cy="12" r="0.9" fill="#8B1E22" />
+                    <Circle cx="5" cy="32" r="0.7" fill="#8B1E22" />
+                    <Circle cx="208" cy="42" r="0.8" fill="#8B1E22" />
+                    <Circle cx="108" cy="4" r="0.6" fill="#8B1E22" />
+                    <Circle cx="165" cy="48" r="0.7" fill="#8B1E22" />
+                    <Circle cx="24" cy="46" r="0.9" fill="#8B1E22" />
+                  </Svg>
+                </View>
+
+                {/* Ticket Header & Metadata */}
+                <View style={styles.selectedTicketHeader}>
+                  <View style={styles.rackLiveDotRow}>
+                    <View style={styles.rackLiveDot} />
+                    <Text style={styles.pillLabel}>SELECTED SOUND ROOM:</Text>
+                  </View>
+                  <Text style={styles.selectedSessionTitle}>
+                    {wizard.selectedSession.name.toUpperCase()}
+                  </Text>
+                  <Text style={styles.rackSessionMeta}>
+                    CAPACITY // UP TO {effectiveParticipantLimit} MUSICIANS
+                  </Text>
+                </View>
+
+                {/* Diagonally Stamped Rubber Badge: AMPS WARMED (Acid-Lime) */}
+                <View style={styles.selectedRubberStampBox}>
+                  <Text style={styles.selectedStampText}>
+                    ⚡ AMPS WARMED
+                  </Text>
+                </View>
+              </View>
+
+              {/* Tactile Cardstock / Paper Texture Overlay */}
+              <RockTextureOverlay pattern="paperGrain" opacity={0.35} style={styles.paperTextureOverlay} />
             </View>
 
-            {/* Step 2B: Practice Mode Selection */}
+            {/* Practice Mode Selection */}
             {practiceModes.length > 0 && (
               <View style={styles.formGroup}>
                 <Text style={styles.fieldLabel}>
-                  {isRecordingSession ? 'RECORDING MODE (STEP 2B):' : 'PRACTICE MODE (STEP 2B):'}
+                  {isRecordingSession ? 'RECORDING MODE:' : 'PRACTICE MODE:'}
                 </Text>
                 <View style={styles.modeRow}>
                   {practiceModes.map((mode) => {
@@ -755,7 +817,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                       >
                         <View style={styles.modeBtnContent}>
                           {isSelected && (
-                            <LightningSvg color="#FFFFFF" size={11} style={{ marginRight: 6 }} />
+                            <View style={styles.modeBtnDot} />
                           )}
                           <Text style={[styles.modeBtnText, isSelected && styles.modeBtnTextSelected]}>
                             {mode.toUpperCase()}
@@ -772,14 +834,16 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             {isMeetingSession ? (
               <View style={styles.meetingConfigBox}>
                 <View style={styles.policyCard}>
+                  <RockTextureOverlay pattern="mesh" opacity={0.06} />
                   <Text style={styles.policyTitle}>📋 MEETING SESSION</Text>
                   <Text style={styles.policyText}>
-                    Standard reservation for music club meetings, setlists, and production planning. No musical instruments required.
+                    Private room for club meetings, setlists, and production planning. No instruments required.
                   </Text>
                 </View>
 
                 {/* Meeting Context Input */}
                 <View style={styles.meetingContextCard}>
+                  <RockTextureOverlay pattern="mesh" opacity={0.06} />
                   <Text style={styles.fieldLabel}>MEETING CONTEXT / AGENDA (TYPE IT):</Text>
                   <TextInput
                     style={styles.meetingContextInput}
@@ -798,22 +862,21 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               <View style={styles.formGroup}>
                 <View style={styles.policyCard}>
                   <RockTextureOverlay pattern="mesh" opacity={0.06} />
-                  <Text style={styles.policyTitle}>🥁 SESSION A FULL BAND REHEARSAL</Text>
+                  <Text style={styles.policyTitle}>🥁 FULL BAND REHEARSAL</Text>
                   <Text style={styles.policyText}>
-                    Full Band Rehearsal reserves the entire sound room exclusively for your band (up to 11 musicians). Select date and 1-hour time slot, and manually enter your band's participant count below. No individual instrument selection needed. This is not a collaborative practice—the entire room is private and locked so no outside musicians can join your slot.
+                    Private, locked room reserved exclusively for your band. No outside bookings allowed.
                   </Text>
                 </View>
               </View>
             ) : isJamSession ? (
               <View style={styles.formGroup}>
-                <Text style={styles.fieldLabel}>
-                  ALL INSTRUMENTS FOR JAM SESSION (ONE USER BOOKS FOR ALL):
-                </Text>
+                <Text style={styles.fieldLabel}>ONE USER BOOKS FOR ALL:</Text>
 
                 <View style={styles.policyCard}>
-                  <Text style={styles.policyTitle}>🥁 JAM SESSION RESERVATION</Text>
+                  <RockTextureOverlay pattern="mesh" opacity={0.06} />
+                  <Text style={styles.policyTitle}>🥁 JAM SESSION</Text>
                   <Text style={styles.policyText}>
-                    One user selects all the instruments being used for the jam session, and books everything for everyone. Constraint: Maximum 8 musicians. Once booked, this slot is reserved exclusively for your session.
+                    One user books gear for the entire group. Room is locked exclusively for your jam.
                   </Text>
                 </View>
 
@@ -855,7 +918,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                         key={inst.id}
                         style={[styles.jamInstrumentCard, isSelected && styles.jamInstrumentCardSelected]}
                       >
-                        <RockTextureOverlay pattern="dots" opacity={0.04} />
+                        <RockTextureOverlay pattern="mesh" opacity={isSelected ? 0.08 : 0.03} />
                         <View style={styles.jamInstrumentHeader}>
                           <Text style={[styles.jamInstrumentName, isSelected && styles.jamInstrumentNameSelected]}>
                             {inst.name.toUpperCase()}
@@ -867,8 +930,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                           )}
                         </View>
                         <View style={styles.bandTagRow}>
-                          <View style={[styles.bandTagPill, { borderColor: freqColor }]}>
-                            <Text style={[styles.bandTagPillText, { color: freqColor }]}>
+                          <View style={[styles.bandTagPill, { borderColor: freqColor.border, backgroundColor: freqColor.bg }]}>
+                            <Text style={[styles.bandTagPillText, { color: freqColor.text }]}>
                               {inst.frequency_band?.toUpperCase() || 'MID'} FREQ
                             </Text>
                           </View>
@@ -917,14 +980,13 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               </View>
             ) : isRecordingGroup ? (
               <View style={styles.formGroup}>
-                <Text style={styles.fieldLabel}>
-                  INSTRUMENTS FOR GROUP RECORDING (ONE USER BOOKS FOR ALL):
-                </Text>
+                <Text style={styles.fieldLabel}>ONE USER BOOKS FOR ALL:</Text>
 
                 <View style={styles.policyCard}>
-                  <Text style={styles.policyTitle}>🎙️ GROUP RECORDING RESERVATION</Text>
+                  <RockTextureOverlay pattern="mesh" opacity={0.06} />
+                  <Text style={styles.policyTitle}>🎙️ GROUP RECORDING</Text>
                   <Text style={styles.policyText}>
-                    Record you and multiple instruments playing together. One single user books everything for everyone they want to record with by selecting multiple instruments. Constraint: Maximum 4 musicians. Any instrument can be chosen. Slot is completely isolated.
+                    Private room booking for multi-instrument recording. One user books for all.
                   </Text>
                 </View>
 
@@ -966,7 +1028,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                         key={inst.id}
                         style={[styles.jamInstrumentCard, isSelected && styles.jamInstrumentCardSelected]}
                       >
-                        <RockTextureOverlay pattern="dots" opacity={0.04} />
+                        <RockTextureOverlay pattern="mesh" opacity={isSelected ? 0.08 : 0.03} />
                         <View style={styles.jamInstrumentHeader}>
                           <Text style={[styles.jamInstrumentName, isSelected && styles.jamInstrumentNameSelected]}>
                             {inst.name.toUpperCase()}
@@ -978,8 +1040,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                           )}
                         </View>
                         <View style={styles.bandTagRow}>
-                          <View style={[styles.bandTagPill, { borderColor: freqColor }]}>
-                            <Text style={[styles.bandTagPillText, { color: freqColor }]}>
+                          <View style={[styles.bandTagPill, { borderColor: freqColor.border, backgroundColor: freqColor.bg }]}>
+                            <Text style={[styles.bandTagPillText, { color: freqColor.text }]}>
                               {inst.frequency_band?.toUpperCase() || 'MID'} FREQ
                             </Text>
                           </View>
@@ -1028,46 +1090,44 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
               </View>
             ) : (
               <View style={styles.formGroup}>
-                <Text style={styles.fieldLabel}>
-                  {isRecordingSolo
-                    ? 'YOUR INSTRUMENT TO RECORD (SOLO RECORDING - STUDIO ISOLATION):'
-                    : isSoloPractice
-                    ? 'YOUR INSTRUMENT (SOLO PRACTICE - PRIVATE ROOM):'
-                    : 'YOUR INSTRUMENT (COLLABORATIVE PRACTICE):'}
-                </Text>
+                <Text style={styles.fieldLabel}>YOUR INSTRUMENT:</Text>
 
                 {isRecordingSolo && (
                   <View style={styles.policyCard}>
+                    <RockTextureOverlay pattern="mesh" opacity={0.06} />
                     <Text style={styles.policyTitle}>🎙️ SOLO RECORDING</Text>
                     <Text style={styles.policyText}>
-                      Record your solo instrument with complete studio room isolation. Select exactly one instrument. Any instrument can be chosen.
+                      Private room booking for one musician with complete isolation. Select your instrument below.
                     </Text>
                   </View>
                 )}
 
                 {isSessionA && isSoloPractice && (
                   <View style={styles.policyCard}>
-                    <Text style={styles.policyTitle}>🎸 SESSION A SOLO PRACTICE</Text>
+                    <RockTextureOverlay pattern="mesh" opacity={0.06} />
+                    <Text style={styles.policyTitle}>🎸 SOLO PRACTICE (SESSION A)</Text>
                     <Text style={styles.policyText}>
-                      Solo practice: practice drums or electric guitar with no one else in the room. The slot is reserved exclusively for you.
+                      Private room reserved exclusively for solo drums or electric guitar.
                     </Text>
                   </View>
                 )}
 
                 {isSessionA && !isSoloPractice && (
                   <View style={styles.policyCard}>
-                    <Text style={styles.policyTitle}>⚡ SESSION A COLLABORATIVE PRACTICE</Text>
+                    <RockTextureOverlay pattern="mesh" opacity={0.06} />
+                    <Text style={styles.policyTitle}>⚡ COLLABORATIVE PRACTICE (SESSION A)</Text>
                     <Text style={styles.policyText}>
-                      Collaborative practice: practice with other electric guitarists or drummers in Session A (max {participantLimit} in slot).
+                      Shared session for electric guitar and drums.
                     </Text>
                   </View>
                 )}
 
                 {isSessionB && (
                   <View style={styles.policyCard}>
-                    <Text style={styles.policyTitle}>🎻 SESSION B COLLABORATIVE PRACTICE</Text>
+                    <RockTextureOverlay pattern="mesh" opacity={0.06} />
+                    <Text style={styles.policyTitle}>🎻 COLLABORATIVE PRACTICE (SESSION B)</Text>
                     <Text style={styles.policyText}>
-                      Collaborative practice: play with other Session B musicians (max {participantLimit} in slot). Solo practice removed as it can be done in hostel rooms. Drums and electric guitar are prohibited.
+                      Shared acoustic and low-gain session. Drums and electric guitar are prohibited.
                     </Text>
                   </View>
                 )}
@@ -1095,7 +1155,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                           });
                         }}
                       >
-                        <RockTextureOverlay pattern="dots" opacity={0.04} />
+                        <RockTextureOverlay pattern="mesh" opacity={isSelected ? 0.08 : 0.03} />
                         <View style={styles.soloCardHeader}>
                           <Text style={[styles.soloInstrumentName, isSelected && styles.soloInstrumentNameSelected]}>
                             {inst.name.toUpperCase()}
@@ -1109,8 +1169,8 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                           )}
                         </View>
                         <View style={styles.bandTagRow}>
-                          <View style={[styles.bandTagPill, { borderColor: freqColor }]}>
-                            <Text style={[styles.bandTagPillText, { color: freqColor }]}>
+                          <View style={[styles.bandTagPill, { borderColor: freqColor.border, backgroundColor: freqColor.bg }]}>
+                            <Text style={[styles.bandTagPillText, { color: freqColor.text }]}>
                               {inst.frequency_band?.toUpperCase() || 'MID'} FREQ
                             </Text>
                           </View>
@@ -1129,11 +1189,17 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             )}
 
             {/* Minimalist Acoustic Warning (No Decibel Meter) */}
-            {wizard.acousticPreview?.warnings && wizard.acousticPreview.warnings.length > 0 && (
-              <View style={styles.warningBox}>
-                <Text style={styles.warningText}>⚠️ {wizard.acousticPreview.warnings[0]}</Text>
-              </View>
-            )}
+            {(() => {
+              const activeWarnings = (wizard.acousticPreview?.warnings || []).filter(
+                (w) => !w.toLowerCase().includes('recording lockdown active in live studio')
+              );
+              if (activeWarnings.length === 0) return null;
+              return (
+                <View style={styles.warningBox}>
+                  <Text style={styles.warningText}>⚠️ {activeWarnings[0]}</Text>
+                </View>
+              );
+            })()}
 
             {/* Date, Time Slot & Dynamic Participants in Slot */}
             {(() => {
@@ -1175,12 +1241,12 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                       >
                         <View style={styles.quickDateInner}>
                           <LightningSvg
-                            color={wizard.bookingDate === todayStr ? '#EF4444' : '#8A8580'}
+                            color={wizard.bookingDate === todayStr ? '#F87171' : '#8A8A96'}
                             size={11}
                             style={{ marginRight: 6 }}
                           />
                           <Text style={[styles.quickDateBtnText, wizard.bookingDate === todayStr && styles.quickDateBtnTextSelected]}>
-                            TODAY (LIVE)
+                            TODAY
                           </Text>
                         </View>
                       </AnimatedPressable>
@@ -1192,7 +1258,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                       >
                         <View style={styles.quickDateInner}>
                           <LightningSvg
-                            color={wizard.bookingDate === tomorrowStr ? '#38BDF8' : '#8A8580'}
+                            color={wizard.bookingDate === tomorrowStr ? '#F87171' : '#8A8A96'}
                             size={11}
                             style={{ marginRight: 6 }}
                           />
@@ -1244,7 +1310,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                   <Text style={styles.dropdownActiveSessionSub}>
                                     {selectedSlot.active_session_name || selectedSlot.booked_session_name
                                       ? `ACTIVE SESSION: ${(selectedSlot.active_session_name || selectedSlot.booked_session_name)!.toUpperCase()}`
-                                      : 'STATUS: OPEN / AVAILABLE'}
+                                      : 'STATUS: AVAILABLE'}
                                   </Text>
                                 )}
                               </View>
@@ -1386,28 +1452,28 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                           if (isSlotFullBandBlocked || (isFullBandA && ((slot.current_participants || 0) > 0 || !slot.is_available))) {
                                             Alert.alert(
                                               'Full Band Rehearsal Exclusivity',
-                                              'Full Band Rehearsal reserves the entire sound room exclusively for your band. This slot already has active musicians or is reserved. Please select an empty available slot.'
+                                              'Full band rehearsal reserves the entire room. This slot is already occupied. Please select an empty available slot.'
                                             );
                                             return;
                                           }
                                           if (isSlotJamOccupied || (isJamSession && !slot.is_available)) {
                                             Alert.alert(
                                               'Jam Session Reserved',
-                                              'If a Jam session is going on in a slot by User A, User B cannot select that slot; they need to select a different one.'
+                                              'This slot is already reserved for a private jam session. Please select an empty slot.'
                                             );
                                             return;
                                           }
                                           if (isSlotRecOccupied || (isRecordingSession && (!slot.is_available || (slot.current_participants || 0) > 0))) {
                                             Alert.alert(
                                               'Recording Studio Isolation',
-                                              'Recording sessions require complete studio isolation and cannot share a slot with any other session or musicians. Please select an available open slot.'
+                                              'Recording sessions require complete room isolation. Please select an empty available slot.'
                                             );
                                             return;
                                           }
                                           if (isSlotMeetingOccupied || (isMeetingSession && (!slot.is_available || (slot.current_participants || 0) > 0))) {
                                             Alert.alert(
                                               'Meeting Room Occupied',
-                                              'This slot already has active bookings. Meeting sessions require an empty room reservation. Please select an available slot.'
+                                              'Meeting sessions require a private room. Please select an empty available slot.'
                                             );
                                             return;
                                           }
@@ -1464,7 +1530,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                             >
                                               {activeSession
                                                 ? `● ACTIVE: ${activeSession.toUpperCase()}`
-                                                : '○ AVAILABLE (OPEN)'}
+                                                : '○ AVAILABLE'}
                                             </Text>
                                           </View>
 
@@ -1510,7 +1576,7 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                     })()}
 
                     <Text style={styles.timeSlotHelper}>
-                      Operating hours: 6:00 AM – 11:00 PM daily • 1-hour sessions (re-book to extend or vacate immediately)
+                      Operating hours: 6:00 AM – 11:00 PM daily
                     </Text>
                   </View>
 
@@ -1518,9 +1584,9 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                   <View style={styles.formGroup}>
                     <Text style={styles.fieldLabel}>
                       {isMeetingSession
-                        ? 'PEOPLE IN MEETING (PARTICIPANTS IN SLOT - MANUAL ENTRY):'
+                        ? 'PEOPLE IN MEETING (PARTICIPANTS IN SLOT):'
                         : isFullBandA
-                        ? 'BAND MEMBERS (PARTICIPANTS IN SLOT - MANUAL ENTRY):'
+                        ? 'BAND MEMBERS (PARTICIPANTS IN SLOT):'
                         : 'PEOPLE PLAYING (PARTICIPANTS IN SLOT):'}
                     </Text>
 
@@ -1535,15 +1601,13 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                                 ? `${wizard.participantCount || 0} ${wizard.participantCount === 1 ? 'MEMBER' : 'MEMBERS'} IN BAND`
                                 : `${wizard.participantCount || 0} ${wizard.participantCount === 1 ? 'PERSON' : 'PEOPLE'} ATTENDING`}
                             </Text>
-                            <Text style={styles.autoPeopleSub}>
-                              {isReserved
-                                ? (isFullBandA
-                                    ? '⚠️ This slot already has active musicians or is reserved. Full band rehearsal requires an empty room.'
-                                    : '⚠️ This slot is already booked for another session. Please select an available slot.')
-                                : isFullBandA
-                                ? `Enter number of band members manually (1 to ${effectiveParticipantLimit} max). Room reserved exclusively for your band.`
-                                : `Type number of attendees manually (1 to ${participantLimit} max)`}
-                            </Text>
+                            {isReserved && (
+                              <Text style={styles.autoPeopleSub}>
+                                {isFullBandA
+                                  ? '⚠️ Slot already has active musicians or is reserved.'
+                                  : '⚠️ Slot is already booked for another session.'}
+                              </Text>
+                            )}
                           </View>
 
                           {!isReserved && (
@@ -1618,33 +1682,28 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                             </Text>
                           </View>
                         </View>
-                        <Text style={styles.autoPeopleSub}>
-                          {isRecordingSolo
-                            ? (isReserved
-                                ? '⚠️ Slot is already booked. Recording sessions require complete studio isolation.'
-                                : 'Complete studio room isolation for your solo recording. No other session or musicians can enter.')
-                            : isRecordingGroup
-                            ? (isReserved
-                                ? '⚠️ Slot is already booked. Recording sessions require complete studio isolation.'
-                                : `One user booking for all ${totalRecordingInstruments} recording musician(s) (Constraint Max: 4). Complete studio isolation.`)
-                            : isSoloPractice
-                            ? (isSlotSoloBlocked
-                                ? '⚠️ Slot already has active musicians. Solo practice requires an empty room.'
-                                : '0 existing musicians in slot • Private room for you alone (no other players allowed)')
-                            : isJamSession
-                            ? (isReserved
-                                ? '⚠️ A Jam session is already booked in this slot by another user. User B cannot select this slot; please select a different one.'
-                                : `One user booking for all ${totalJamInstruments} musician(s) in this Jam Session (Constraint Max: 8). This slot will be reserved exclusively for your session.`)
-                            : isReserved
-                            ? (selectedSlot?.booked_session_name?.toUpperCase().includes('JAM') || selectedSlot?.status?.toUpperCase().includes('JAM')
-                                ? '⚠️ This slot is reserved by a Jam Session and only belongs to it. Not available for Session A or B collaborative practice.'
-                                : selectedSlot?.booked_session_name?.toUpperCase().includes('RECORDING') || selectedSlot?.status?.toUpperCase().includes('RECORDING')
-                                ? '⚠️ This slot is reserved by a Recording Session with complete studio isolation.'
-                                : `Maximum capacity reached (${existingParticipants}/${maxCapacity}). This slot is reserved.`)
-                            : existingParticipants === 0
-                            ? `No musicians currently in this slot. You will be participant 1 of ${maxCapacity}.`
-                            : `${existingParticipants} existing ${existingParticipants === 1 ? 'musician' : 'musicians'} (${selectedSlot?.instruments_summary?.join(', ') || 'playing'}) • Adding your booking makes it ${nextTotalParticipants}/${maxCapacity}`}
-                        </Text>
+                        {(() => {
+                          // Only show subtitle in People Playing for Session A and Session B
+                          if ((!isSessionA && !isSessionB) || isFullBandA) {
+                            return null;
+                          }
+
+                          if (isSoloPractice) {
+                            const soloSub = isSlotSoloBlocked
+                              ? '⚠️ Slot already in use. Solo practice requires an empty room.'
+                              : 'Private room reserved exclusively for you.';
+                            return <Text style={styles.autoPeopleSub}>{soloSub}</Text>;
+                          }
+
+                          if (isReserved) {
+                            return <Text style={styles.autoPeopleSub}>Slot is at full capacity.</Text>;
+                          }
+
+                          const statusText = existingParticipants === 0
+                            ? 'Slot is currently empty.'
+                            : `${existingParticipants} active ${existingParticipants === 1 ? 'musician' : 'musicians'}${selectedSlot?.instruments_summary?.length ? ` (${selectedSlot.instruments_summary.join(', ')})` : ''} in slot.`;
+                          return <Text style={styles.autoPeopleSub}>{statusText}</Text>;
+                        })()}
                       </View>
                     )}
                   </View>
@@ -1660,10 +1719,10 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
             scaleTo={0.98}
           >
             {isSubmitting ? (
-              <ActivityIndicator color="#0D0D10" />
+              <ActivityIndicator color="rgba(176, 218, 48, 0.75)" />
             ) : (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-                <LightningSvg color="#0D0D10" size={16} style={{ marginRight: 8 }} />
+                <LightningSvg color="rgba(176, 218, 48, 0.75)" size={14} style={{ marginRight: 8 }} />
                 <Text style={styles.confirmBtnText}>
                   {isRecordingSession
                     ? 'CONFIRM RECORDING RESERVATION'
@@ -1671,7 +1730,6 @@ export const BookingWizardScreen: React.FC<BookingWizardScreenProps> = ({ onBook
                     ? 'CONFIRM FULL BAND RESERVATION'
                     : 'CONFIRM RESERVATION'}
                 </Text>
-                <LightningSvg color="#0D0D10" size={16} style={{ marginLeft: 8 }} />
               </View>
             )}
           </AnimatedPressable>
@@ -1698,7 +1756,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 48,
+    paddingBottom: 40,
   },
   horizontalCarouselContent: {
     paddingVertical: 8,
@@ -1709,150 +1767,242 @@ const styles = StyleSheet.create({
     backgroundColor: '#121212',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 40,
   },
   loadingText: {
-    color: '#9E9891',
-    fontSize: 12,
-    letterSpacing: 0.8,
-    fontWeight: '700',
+    color: '#EFECE6',
+    fontSize: 10,
+    letterSpacing: 1.5,
+    fontWeight: '900',
     marginTop: 12,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
 
   /* ========================================================= */
-  /* STUDIO HERO CONSOLE & PROGRESS STEPPERS                   */
+  /* HEADER (MATCHING MY REHEARSALS)                           */
   /* ========================================================= */
-  heroConsole: {
+  headerBox: {
+    marginBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: '#27272A',
+    paddingBottom: 14,
+  },
+  headerSubtitle: {
+    color: 'rgba(176, 218, 48, 0.80)',
+    fontSize: 10,
+    letterSpacing: 1.5,
+    fontWeight: '900',
+    marginBottom: 4,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  headerTitle: {
+    color: '#EFECE6',
+    fontSize: 26,
+    fontWeight: '900',
+    letterSpacing: 1.2,
+    fontFamily: Platform.select({
+      web: '"Anton", "Oswald", "Arial Black", sans-serif',
+      default: 'sans-serif',
+    }),
+  },
+
+  /* ========================================================= */
+  /* ROOM SELECTOR ROW (IN-PLACE ROOM SWITCHER)                */
+  /* ========================================================= */
+  roomSelectorRow: {
+    marginBottom: 16,
+  },
+  roomSelectorScroll: {
+    paddingRight: 16,
+    gap: 8,
+  },
+  roomPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#15151A',
     borderWidth: 1.5,
-    borderColor: '#262635',
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 16,
-    position: 'relative',
-    overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  progressStepPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderColor: '#333338',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: 999,
-    borderWidth: 1,
   },
-  progressStepPillActive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
+  roomPillSelected: {
+    backgroundColor: '#1E1E24',
+    borderColor: '#A1A1AA',
     shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 0 8px rgba(255, 255, 255, 0.25)',
+      },
+      default: {},
+    }),
   },
-  progressStepPillDone: {
-    backgroundColor: '#0F291E',
-    borderColor: '#10B981',
+  roomPillDot: {
+    width: 6.5,
+    height: 6.5,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    marginRight: 6,
   },
-  progressStepPillPending: {
-    backgroundColor: '#1C1C24',
-    borderColor: '#2E2E3E',
-  },
-  progressStepDivider: {
-    width: 24,
-    height: 1,
-    backgroundColor: '#2E2E3E',
-    marginHorizontal: 8,
-  },
-  progressStepText: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.9,
-  },
-  progressStepTextActive: {
-    color: '#0D0D10',
-  },
-  progressStepTextDone: {
-    color: '#10B981',
-  },
-  progressStepTextPending: {
-    color: '#6A6560',
-  },
-  consoleTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  consoleTitle: {
-    color: '#FFFFFF',
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
-  },
-  consoleSubtitle: {
+  roomPillText: {
     color: '#9E9891',
-    fontSize: 11,
-    lineHeight: 16,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-    marginTop: 4,
-  },
-  consoleSoundwaveWrap: {
-    width: '100%',
-    marginTop: 4,
-  },
-  carouselHintBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#15151A',
-    borderWidth: 1,
-    borderColor: '#262635',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginBottom: 12,
-  },
-  carouselHintText: {
-    color: '#A0A0A0',
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1.2,
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  roomPillTextSelected: {
+    color: '#FFFFFF',
+    fontWeight: '900',
   },
 
   /* ========================================================= */
-  /* CHANNEL RACK BANNER & ROOM SPECS                          */
+  /* SELECTED SOUND ROOM TICKET (MATCHING BOOK SLOT TICKET)   */
   /* ========================================================= */
-  selectedSessionPill: {
+  selectedTicketCard: {
+    backgroundColor: '#DDD7C9',
+    borderWidth: 2.2,
+    borderColor: '#000000',
+    borderRadius: 2,
+    marginBottom: 22,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#14141A',
-    borderWidth: 1.5,
-    borderColor: '#262638',
-    borderLeftWidth: 3.5,
-    borderLeftColor: '#EF4444',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
     position: 'relative',
     overflow: 'hidden',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 0.85,
+    shadowRadius: 0,
+    elevation: 4,
+  },
+  selectedLeftTearStub: {
+    width: 44,
+    backgroundColor: '#D2CCBE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  selectedBarcodeWrap: {
+    transform: [{ rotate: '90deg' }],
+    marginVertical: 10,
+  },
+  selectedStubPassText: {
+    color: '#524C44',
+    fontSize: 8,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+    marginTop: 8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  selectedPerforationLine: {
+    width: 0,
+    borderRightWidth: 2,
+    borderRightColor: '#000000',
+    borderStyle: 'dashed',
+  },
+  selectedPunchNotch: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#0A0A0C',
+    zIndex: 10,
+    borderWidth: 1.8,
+    borderColor: '#000000',
+  },
+  selectedNotchTopLeft: {
+    top: -7,
+    left: 37,
+  },
+  selectedNotchBottomLeft: {
+    bottom: -7,
+    left: 37,
+  },
+  selectedTicketMain: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    position: 'relative',
+    backgroundColor: '#DDD7C9',
+    justifyContent: 'center',
+  },
+  selectedBandPhotoCutoutWrap: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    width: '36%',
+    overflow: 'hidden',
+    borderLeftWidth: 1.5,
+    borderLeftColor: '#000000',
+    backgroundColor: '#DDD7C9',
+  },
+  selectedBandSilhouettePhoto: {
+    width: '100%',
+    height: '100%',
+    opacity: 0.95,
+  },
+  approvedWatermarkBox: {
+    position: 'absolute',
+    left: '35%',
+    top: 42,
+    width: 215,
+    zIndex: 1,
+    opacity: 0.35,
+    transform: [{ rotate: '-13deg' }],
+    pointerEvents: 'none',
+    ...Platform.select({
+      web: {
+        mixBlendMode: 'multiply',
+      } as any,
+      default: {},
+    }),
+  },
+  approvedStampFrameOuter: {
+    borderWidth: 2.6,
+    borderColor: '#8B1E22',
+    borderStyle: 'dashed',
+    borderRadius: 4,
+    padding: 2.5,
+  },
+  approvedStampFrameInner: {
+    borderWidth: 1.4,
+    borderColor: '#8B1E22',
+    borderRadius: 2,
+    paddingHorizontal: 16,
+    paddingVertical: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  approvedStampWord: {
+    color: '#8B1E22',
+    fontSize: 27,
+    fontWeight: '900',
+    letterSpacing: 6.5,
+    lineHeight: 30,
+    fontFamily: Platform.select({
+      web: '"Anton", "Impact", "Arial Black", sans-serif',
+      default: 'sans-serif',
+    }),
+  },
+  selectedTicketHeader: {
+    maxWidth: '62%',
+    zIndex: 2,
   },
   rackLiveDotRow: {
     flexDirection: 'row',
@@ -1860,63 +2010,92 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   rackLiveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
+    width: 6.5,
+    height: 6.5,
+    borderRadius: 999,
+    backgroundColor: '#000000',
     marginRight: 6,
   },
   pillLabel: {
-    color: '#8A8FA0',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.9,
+    color: '#524C44',
+    fontSize: 9.5,
+    fontWeight: '900',
+    letterSpacing: 1.1,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
-  pillValue: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  selectedSessionTitle: {
+    color: '#000000',
+    fontSize: 24,
     fontWeight: '900',
     letterSpacing: 0.8,
-    marginTop: 2,
+    lineHeight: 28,
+    fontFamily: Platform.select({
+      web: '"Anton", "Impact", "Arial Black", sans-serif',
+      default: 'sans-serif',
+    }),
   },
   rackSessionMeta: {
-    color: '#8A8FA0',
+    color: '#000000',
     fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.7,
-    marginTop: 4,
-  },
-  changeBtn: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  changeBtnText: {
-    color: '#0D0D10',
-    fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.8,
+    marginTop: 4,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
+  },
+  paperTextureOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1,
+  },
+  selectedRubberStampBox: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    borderWidth: 1.6,
+    borderStyle: 'dashed',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    zIndex: 5,
+    backgroundColor: '#B0DA30',
+    borderColor: '#121212',
+    transform: [{ rotate: '-8deg' }],
+  },
+  selectedStampText: {
+    fontSize: 7.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    color: '#121212',
+    fontFamily: Platform.select({
+      web: '"Space Mono", "JetBrains Mono", monospace',
+      default: 'monospace',
+    }),
   },
 
   /* ========================================================= */
   /* FORMS & PRACTICE MODES                                    */
   /* ========================================================= */
   formGroup: {
-    marginBottom: 18,
+    marginBottom: 28,
   },
   fieldLabel: {
-    color: '#9E9891',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    color: '#C8C4BC',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.5,
     marginBottom: 8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   modeRow: {
     flexDirection: 'row',
@@ -1924,73 +2103,108 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   modeBtn: {
-    backgroundColor: '#14141A',
+    backgroundColor: '#16161B',
     borderWidth: 1.5,
-    borderColor: '#262638',
+    borderColor: '#282830',
     borderRadius: 8,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     marginRight: 8,
     marginBottom: 8,
   },
   modeBtnSelected: {
     borderColor: '#EF4444',
-    backgroundColor: '#1E1E28',
-    borderWidth: 2,
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
+    backgroundColor: '#2C1418',
   },
   modeBtnContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  modeBtnDot: {
+    width: 6.5,
+    height: 6.5,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    marginRight: 7,
+  },
   modeBtnText: {
-    color: '#9E9891',
-    fontSize: 11,
+    color: '#8A8A96',
+    fontSize: 10.5,
     fontWeight: '800',
     letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   modeBtnTextSelected: {
     color: '#FFFFFF',
     fontWeight: '900',
   },
   policyCard: {
-    backgroundColor: '#161410',
-    borderWidth: 1.5,
-    borderColor: '#382D18',
-    borderRadius: 10,
-    padding: 14,
+    backgroundColor: '#141418',
+    borderTopWidth: 1.2,
+    borderTopColor: '#EAE6DC',
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     marginBottom: 16,
     position: 'relative',
     overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45,
+    shadowRadius: 10,
+    elevation: 3,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 6px 18px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.35)',
+      },
+      default: {},
+    }),
   },
   policyTitle: {
-    color: '#FBBF24',
+    color: '#F87171',
     fontSize: 11,
     fontWeight: '900',
-    letterSpacing: 0.8,
-    marginBottom: 4,
+    letterSpacing: 1.1,
+    marginBottom: 8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   policyText: {
-    color: '#E0D6C8',
+    color: '#FAF6EE',
     fontSize: 11,
     lineHeight: 16,
+    fontWeight: '600',
+    fontFamily: Platform.select({
+      ios: 'System',
+      android: 'sans-serif',
+      default: 'sans-serif',
+    }),
   },
   warningBox: {
-    backgroundColor: '#18130E',
+    backgroundColor: '#240C10',
     borderWidth: 1.5,
-    borderColor: '#4A3312',
+    borderColor: '#7D1D22',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
   },
   warningText: {
-    color: '#FDE68A',
+    color: '#F87171',
     fontSize: 11,
     lineHeight: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
 
   /* ========================================================= */
@@ -2000,88 +2214,97 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#131319',
+    backgroundColor: '#15151A',
     borderWidth: 1.5,
-    borderColor: '#262638',
+    borderColor: '#261C20',
     borderRadius: 10,
     padding: 14,
     marginBottom: 14,
-    position: 'relative',
-    overflow: 'hidden',
   },
   jamCounterLeft: {
     flex: 1,
   },
   jamCounterLabel: {
-    color: '#8A8FA0',
+    color: '#9E9891',
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   jamCounterValue: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: '#F6F2EB',
+    fontSize: 18,
     fontWeight: '900',
     marginTop: 2,
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Anton", "Oswald", sans-serif',
+      default: 'sans-serif',
+    }),
   },
   jamCounterBadge: {
-    backgroundColor: '#1E1628',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
+    backgroundColor: '#240C10',
     borderWidth: 1,
-    borderColor: '#3D2A54',
+    borderColor: '#7D1D22',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
   jamCounterBadgeFull: {
-    backgroundColor: '#261218',
+    backgroundColor: '#350E14',
     borderColor: '#EF4444',
   },
   jamCounterBadgeText: {
-    color: '#C084FC',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.6,
+    color: '#F87171',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
 
   /* ========================================================= */
   /* INSTRUMENT CARDS (JAM, GROUP & SOLO)                      */
   /* ========================================================= */
   jamInstrumentCard: {
-    width: 250,
-    backgroundColor: '#14141B',
+    width: 240,
+    backgroundColor: '#15151A',
     borderWidth: 1.5,
-    borderColor: '#252538',
-    borderRadius: 12,
-    padding: 16,
+    borderColor: '#261C20',
+    borderRadius: 8,
+    padding: 14,
     marginRight: 12,
     justifyContent: 'space-between',
     position: 'relative',
     overflow: 'hidden',
   },
   jamInstrumentCardSelected: {
-    borderColor: '#EF4444',
-    backgroundColor: '#1A1A24',
-    borderWidth: 2,
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 3,
+    backgroundColor: '#181820',
+    borderColor: '#7D1D22',
   },
   jamInstrumentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
+    zIndex: 2,
   },
   jamInstrumentName: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    color: '#F6F2EB',
+    fontSize: 15,
     fontWeight: '900',
     flex: 1,
     marginRight: 6,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
+    fontFamily: Platform.select({
+      web: '"Anton", "Oswald", sans-serif',
+      default: 'sans-serif',
+    }),
   },
   jamInstrumentNameSelected: {
     color: '#FFFFFF',
@@ -2091,60 +2314,78 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 10,
+    zIndex: 2,
   },
   bandTagPill: {
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
-    backgroundColor: '#0E0E14',
+    backgroundColor: '#B83232',
+    borderColor: '#B83232',
   },
   bandTagPillText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.6,
+    fontSize: 8.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    color: '#121212',
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   soloCategoryText: {
-    color: '#8A8FA0',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.6,
+    color: '#9E9891',
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   selectedCheckBadge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#EF4444',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: '#240C10',
+    borderWidth: 1,
+    borderColor: '#7D1D22',
     alignItems: 'center',
     justifyContent: 'center',
   },
   selectedCheckText: {
-    color: '#FFFFFF',
-    fontSize: 11,
+    color: '#F87171',
+    fontSize: 9,
     fontWeight: '900',
   },
   unselectedRadioCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 16,
+    height: 16,
+    borderRadius: 999,
     borderWidth: 1.5,
     borderColor: '#4A4A5A',
   },
   selectedStatusStrip: {
-    backgroundColor: '#1C1926',
-    paddingVertical: 4,
+    backgroundColor: '#240C10',
+    paddingVertical: 3,
     paddingHorizontal: 8,
     borderRadius: 4,
     alignSelf: 'flex-start',
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#383850',
+    borderColor: '#7D1D22',
+    zIndex: 2,
   },
   selectedStatusStripText: {
-    color: '#E2E8F0',
-    fontSize: 9,
+    color: '#F87171',
+    fontSize: 8.5,
     fontWeight: '900',
     letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
 
   /* Stepper controls */
@@ -2152,94 +2393,103 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0D0D12',
-    borderRadius: 8,
-    padding: 4,
+    backgroundColor: '#0D0D10',
+    borderRadius: 6,
+    padding: 3,
     borderWidth: 1,
-    borderColor: '#242436',
+    borderColor: '#261C20',
+    zIndex: 2,
   },
   jamStepBtn: {
-    width: 32,
-    height: 32,
-    backgroundColor: '#1E1E2A',
-    borderRadius: 6,
+    width: 28,
+    height: 28,
+    backgroundColor: '#15151A',
+    borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#333348',
+    borderColor: '#261C20',
   },
   jamStepBtnDisabled: {
-    opacity: 0.35,
-    backgroundColor: '#141418',
-    borderColor: '#202026',
+    opacity: 0.3,
   },
   jamStepBtnText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
-    lineHeight: 20,
+    color: '#F6F2EB',
+    fontSize: 14,
+    fontWeight: '900',
+    lineHeight: 16,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   jamStepBtnTextDisabled: {
     color: '#555566',
   },
   jamQtyBox: {
-    minWidth: 32,
-    height: 32,
+    minWidth: 28,
+    height: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginHorizontal: 6,
-    paddingHorizontal: 4,
+    marginHorizontal: 4,
+    backgroundColor: '#16161B',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#282830',
   },
   jamQtyBoxSelected: {
-    backgroundColor: '#EF4444',
-    borderRadius: 6,
+    backgroundColor: '#2C1418',
+    borderColor: '#EF4444',
   },
   jamQtyText: {
-    color: '#8A8FA0',
-    fontSize: 14,
-    fontWeight: '800',
+    color: '#8A8A96',
+    fontSize: 12,
+    fontWeight: '900',
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   jamQtyTextSelected: {
-    color: '#FFFFFF',
+    color: '#F87171',
     fontWeight: '900',
   },
 
   /* Solo instrument cards */
   soloInstrumentCard: {
     width: 240,
-    backgroundColor: '#14141B',
+    backgroundColor: '#15151A',
     borderWidth: 1.5,
-    borderColor: '#252538',
-    borderRadius: 12,
-    padding: 16,
+    borderColor: '#261C20',
+    borderRadius: 8,
+    padding: 14,
     marginRight: 12,
     justifyContent: 'space-between',
     position: 'relative',
     overflow: 'hidden',
   },
   soloInstrumentCardSelected: {
+    backgroundColor: '#2C1418',
     borderColor: '#EF4444',
-    backgroundColor: '#1A1A24',
-    borderWidth: 2,
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 3,
   },
   soloCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    zIndex: 2,
   },
   soloInstrumentName: {
-    color: '#FFFFFF',
-    fontSize: 14,
+    color: '#F6F2EB',
+    fontSize: 15,
     fontWeight: '900',
     flex: 1,
     marginRight: 6,
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
+    fontFamily: Platform.select({
+      web: '"Anton", "Oswald", sans-serif',
+      default: 'sans-serif',
+    }),
   },
   soloInstrumentNameSelected: {
     color: '#FFFFFF',
@@ -2249,17 +2499,20 @@ const styles = StyleSheet.create({
   /* DATE & TIME SLOT DROPDOWN                                 */
   /* ========================================================= */
   textInput: {
-    backgroundColor: '#14141B',
+    backgroundColor: '#15151A',
     borderWidth: 1.5,
-    borderColor: '#262638',
+    borderColor: '#261C20',
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: '#FFFFFF',
-    fontSize: 13,
-    letterSpacing: 0.6,
-    fontWeight: '700',
-    fontFamily: Platform.select({ ios: 'System', android: 'sans-serif', default: 'sans-serif' }),
+    color: '#F6F2EB',
+    fontSize: 12.5,
+    letterSpacing: 0.8,
+    fontWeight: '800',
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   quickDateRow: {
     flexDirection: 'row',
@@ -2268,9 +2521,9 @@ const styles = StyleSheet.create({
   },
   quickDateBtn: {
     flex: 1,
-    backgroundColor: '#14141B',
+    backgroundColor: '#16161B',
     borderWidth: 1.5,
-    borderColor: '#242436',
+    borderColor: '#282830',
     borderRadius: 8,
     paddingVertical: 10,
     alignItems: 'center',
@@ -2278,21 +2531,11 @@ const styles = StyleSheet.create({
   },
   quickDateBtnTodaySelected: {
     borderColor: '#EF4444',
-    backgroundColor: '#1D1216',
-    borderWidth: 2,
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
+    backgroundColor: '#2C1418',
   },
   quickDateBtnTomorrowSelected: {
-    borderColor: '#38BDF8',
-    backgroundColor: '#101724',
-    borderWidth: 2,
-    shadowColor: '#38BDF8',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
+    borderColor: '#EF4444',
+    backgroundColor: '#2C1418',
   },
   quickDateInner: {
     flexDirection: 'row',
@@ -2300,17 +2543,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   quickDateBtnText: {
-    color: '#8A8FA0',
-    fontSize: 11,
+    color: '#8A8A96',
+    fontSize: 10.5,
     fontWeight: '800',
     letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   quickDateBtnTextSelected: {
-    color: '#FFFFFF',
+    color: '#F87171',
     fontWeight: '900',
   },
   quickDateBtnTomorrowTextSelected: {
-    color: '#38BDF8',
+    color: '#F87171',
     fontWeight: '900',
   },
   timeDropdownHeader: {
@@ -2325,31 +2572,35 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   loadingSlotsText: {
-    color: '#8A8FA0',
-    fontSize: 10,
-    fontWeight: '700',
+    color: '#F87171',
+    fontSize: 9.5,
+    fontWeight: '800',
     letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   dropdownContainer: {
     position: 'relative',
     zIndex: 10,
   },
   dropdownTrigger: {
-    backgroundColor: '#14141B',
+    backgroundColor: '#15151A',
     borderWidth: 1.5,
-    borderColor: '#262638',
+    borderColor: '#261C20',
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 54,
+    minHeight: 52,
   },
   dropdownTriggerOpen: {
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    borderColor: '#38BDF8',
+    borderColor: '#7D1D22',
   },
   dropdownLeft: {
     flexDirection: 'row',
@@ -2365,20 +2616,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dropdownActiveSessionSub: {
-    color: '#8A8FA0',
-    fontSize: 10,
-    fontWeight: '700',
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
     marginTop: 2,
     letterSpacing: 0.6,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   dropdownValueText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    color: '#F6F2EB',
+    fontSize: 12.5,
+    fontWeight: '900',
+    letterSpacing: 0.6,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   dropdownPlaceholderText: {
-    color: '#6A6560',
+    color: '#71717A',
     fontStyle: 'italic',
   },
   dropdownRight: {
@@ -2387,24 +2646,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   dropdownChevron: {
-    color: '#8A8FA0',
+    color: '#EFECE6',
     fontSize: 10,
     marginLeft: 4,
   },
   dropdownMenu: {
-    backgroundColor: '#14141B',
+    backgroundColor: '#15151A',
     borderWidth: 1.5,
-    borderColor: '#2E3548',
+    borderColor: '#261C20',
     borderTopWidth: 0,
     borderBottomLeftRadius: 8,
     borderBottomRightRadius: 8,
     maxHeight: 220,
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.7,
-    shadowRadius: 10,
-    elevation: 8,
   },
   dropdownScroll: {
     maxHeight: 220,
@@ -2416,61 +2670,69 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#20202C',
+    borderBottomColor: '#261C20',
   },
   dropdownItemLeft: {
     flex: 1,
     marginRight: 8,
   },
   dropdownItemSelected: {
-    backgroundColor: '#1E1418',
+    backgroundColor: '#2C1418',
   },
   dropdownItemReserved: {
-    backgroundColor: '#0F0F12',
-    opacity: 0.55,
+    backgroundColor: '#0D0D10',
+    opacity: 0.45,
   },
   dropdownItemText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    color: '#F6F2EB',
+    fontSize: 11.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   dropdownItemTextSelected: {
-    color: '#FFFFFF',
+    color: '#F87171',
     fontWeight: '900',
   },
   dropdownItemTextReserved: {
-    color: '#6A6560',
+    color: '#71717A',
     textDecorationLine: 'line-through',
   },
   dropdownBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 4,
+    borderRadius: 999,
     borderWidth: 1,
   },
   dropdownBadgeAvailable: {
-    backgroundColor: '#0F261C',
-    borderColor: '#10B981',
+    backgroundColor: '#1E1E26',
+    borderColor: '#FFFFFF',
   },
   dropdownBadgeSelected: {
-    backgroundColor: '#261217',
+    backgroundColor: '#350E14',
     borderColor: '#EF4444',
   },
   dropdownBadgeReserved: {
-    backgroundColor: '#181822',
-    borderColor: '#2E2E40',
+    backgroundColor: '#0D0D10',
+    borderColor: '#261C20',
   },
   dropdownBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.6,
+    fontSize: 8.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   dropdownBadgeTextAvailable: {
-    color: '#10B981',
+    color: '#FFFFFF',
   },
   dropdownBadgeTextSelected: {
-    color: '#EF4444',
+    color: '#FFFFFF',
   },
   dropdownBadgeTextReserved: {
     color: '#71717A',
@@ -2481,72 +2743,96 @@ const styles = StyleSheet.create({
   },
   dropdownEmptyText: {
     color: '#8A8FA0',
-    fontSize: 12,
+    fontSize: 11,
     fontStyle: 'italic',
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   timeSlotHelper: {
-    color: '#8A8FA0',
-    fontSize: 11,
+    color: '#9E9891',
+    fontSize: 10,
     marginTop: 6,
-    letterSpacing: 0.4,
-    lineHeight: 15,
+    letterSpacing: 0.5,
+    lineHeight: 14,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   activeSlotCallout: {
-    backgroundColor: '#101420',
-    borderWidth: 1,
-    borderColor: '#1E2B40',
+    backgroundColor: '#15151A',
+    borderWidth: 1.5,
+    borderColor: '#261C20',
     borderRadius: 8,
     padding: 12,
     marginTop: 8,
   },
   activeSlotCalloutTitle: {
-    color: '#38BDF8',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    color: '#F87171',
+    fontSize: 9.5,
+    fontWeight: '900',
+    letterSpacing: 1,
     marginBottom: 3,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   activeSlotCalloutText: {
-    color: '#CBD5E1',
-    fontSize: 11,
-    fontWeight: '600',
+    color: '#F6F2EB',
+    fontSize: 10.5,
+    fontWeight: '700',
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   dropdownSlotInstruments: {
-    color: '#8A8FA0',
-    fontSize: 10,
+    color: '#9E9891',
+    fontSize: 9.5,
     marginTop: 3,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   slotActiveSessionRow: {
     marginTop: 2,
   },
   slotActiveSessionText: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 9.5,
+    fontWeight: '800',
     letterSpacing: 0.6,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   slotActiveSessionTextActive: {
     color: '#FFFFFF',
   },
   slotActiveSessionTextOpen: {
-    color: '#8A8FA0',
+    color: '#FFFFFF',
   },
 
   /* ========================================================= */
   /* DYNAMIC PEOPLE IN ROOM TELEMETRY BOX                      */
   /* ========================================================= */
   autoPeopleBox: {
-    backgroundColor: '#14141B',
+    backgroundColor: '#15151A',
     borderWidth: 1.5,
-    borderColor: '#262638',
-    borderRadius: 10,
+    borderColor: '#261C20',
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
     justifyContent: 'center',
   },
   autoPeopleBoxReserved: {
-    backgroundColor: '#1C1316',
-    borderColor: '#6B2026',
+    backgroundColor: '#240C10',
+    borderColor: '#7D1D22',
   },
   autoPeopleRow: {
     flexDirection: 'row',
@@ -2554,40 +2840,52 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   autoPeopleVal: {
-    color: '#FFFFFF',
-    fontSize: 13,
+    color: '#F6F2EB',
+    fontSize: 12.5,
     fontWeight: '900',
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   autoPeopleValReserved: {
-    color: '#FFFFFF',
+    color: '#F87171',
   },
   autoTag: {
-    backgroundColor: '#101A24',
+    backgroundColor: '#1E1E26',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 4,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#203A50',
+    borderColor: '#FFFFFF',
   },
   autoTagText: {
-    color: '#38BDF8',
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.6,
+    color: '#FFFFFF',
+    fontSize: 8.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   autoTagReserved: {
-    backgroundColor: '#261015',
+    backgroundColor: '#350E14',
     borderColor: '#EF4444',
   },
   autoTagTextReserved: {
-    color: '#EF4444',
+    color: '#F87171',
   },
   autoPeopleSub: {
-    color: '#8A8FA0',
-    fontSize: 11,
+    color: '#9E9891',
+    fontSize: 10,
     marginTop: 4,
-    lineHeight: 15,
+    lineHeight: 14,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
 
   /* ========================================================= */
@@ -2595,31 +2893,54 @@ const styles = StyleSheet.create({
   /* ========================================================= */
   meetingConfigBox: {
     gap: 12,
+    marginBottom: 26,
   },
   meetingContextCard: {
-    backgroundColor: '#14141A',
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#262638',
-    padding: 16,
+    backgroundColor: '#141418',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 38, 38, 0.42)',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.65,
+    shadowRadius: 18,
+    elevation: 6,
+    ...Platform.select({
+      web: {
+        boxShadow: '0 10px 30px rgba(0, 0, 0, 0.75), 0 3px 10px rgba(0, 0, 0, 0.45)',
+      },
+      default: {},
+    }),
   },
   meetingContextInput: {
-    backgroundColor: '#0E0E12',
-    borderWidth: 1.5,
-    borderColor: '#262638',
-    borderRadius: 8,
-    color: '#FFFFFF',
-    fontSize: 13,
-    paddingVertical: 10,
+    backgroundColor: '#0A0A0E',
+    borderWidth: 1,
+    borderColor: '#383842',
+    borderRadius: 6,
+    color: '#FAF6EE',
+    fontSize: 12,
+    paddingVertical: 11,
     paddingHorizontal: 12,
     marginTop: 8,
-    fontWeight: '600',
+    fontWeight: '700',
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   meetingContextHelper: {
-    color: '#8A8FA0',
-    fontSize: 11,
+    color: '#9E9891',
+    fontSize: 10,
     marginTop: 6,
     fontStyle: 'italic',
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   meetingInputRow: {
     flexDirection: 'row',
@@ -2637,150 +2958,124 @@ const styles = StyleSheet.create({
   },
   meetingSmallInput: {
     backgroundColor: '#0D0D10',
-    borderWidth: 1.5,
-    borderColor: '#EF4444',
-    borderRadius: 8,
-    color: '#FFFFFF',
-    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#261C20',
+    borderRadius: 6,
+    color: '#F6F2EB',
+    fontSize: 14,
     fontWeight: '900',
     textAlign: 'center',
-    paddingVertical: 6,
+    paddingVertical: 5,
     paddingHorizontal: 8,
     width: 60,
-    height: 40,
+    height: 38,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
   meetingInputLimitTag: {
     color: '#8A8580',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    fontFamily: Platform.select({
+      web: '"Space Mono", monospace',
+      default: 'monospace',
+    }),
   },
 
   /* ========================================================= */
-  /* CONFIRM RESERVATION BUTTON                                */
+  /* CONFIRM RESERVATION BUTTON (LOCK IN TIME FADED GREEN)     */
   /* ========================================================= */
   confirmBtn: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 15,
-    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: 'rgba(176, 218, 48, 0.50)',
+    backgroundColor: 'rgba(176, 218, 48, 0.05)',
+    paddingVertical: 12,
+    borderRadius: 6,
     alignItems: 'center',
     marginTop: 18,
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 5,
   },
   confirmBtnDisabled: {
-    backgroundColor: '#262635',
-    borderColor: '#3A3A4E',
+    opacity: 0.35,
+    borderColor: 'rgba(176, 218, 48, 0.25)',
+    backgroundColor: 'rgba(176, 218, 48, 0.03)',
   },
   confirmBtnText: {
-    color: '#0D0D10',
-    fontSize: 13,
+    color: '#F6F2EB',
+    fontSize: 11.5,
     fontWeight: '900',
-    letterSpacing: 1.2,
+    letterSpacing: 0.8,
   },
 
   /* ========================================================= */
-  /* SUCCESS PASS LAMINATE TICKET                              */
+  /* SUCCESS PASS                                              */
   /* ========================================================= */
   ticketCard: {
     backgroundColor: '#15151A',
     borderWidth: 2,
-    borderColor: '#82191F',
-    borderRadius: 14,
-    padding: 22,
-    alignItems: 'center',
+    borderColor: '#261C20',
+    borderRadius: 10,
+    padding: 20,
     position: 'relative',
     overflow: 'hidden',
-    shadowColor: '#82191F',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 6,
   },
-  ticketWatermark: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    width: '60%',
-    opacity: 0.12,
-    borderTopRightRadius: 14,
-    borderBottomRightRadius: 14,
+  ticketHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+    width: '100%',
   },
-  ticketLanyardSlot: {
+  bookingId: {
+    color: '#9E9891',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  ticketBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#240C10',
     borderWidth: 1,
     borderColor: '#7D1D22',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 4,
-    marginBottom: 14,
-  },
-  ticketHole: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#0D0D10',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#7D1D22',
-  },
-  ticketLanyardText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-  },
-  ticketBadge: {
-    backgroundColor: '#200B0E',
-    borderWidth: 1,
-    borderColor: '#7D1D22',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    marginBottom: 10,
   },
   ticketBadgeText: {
-    color: '#F6F2EB',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
+    color: '#F87171',
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.8,
   },
   ticketTitle: {
     color: '#F6F2EB',
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '900',
-    letterSpacing: 1.2,
+    letterSpacing: 0.8,
     marginBottom: 4,
+    fontFamily: Platform.select({
+      web: '"Anton", "Oswald", "Arial Black", sans-serif',
+      default: 'sans-serif',
+    }),
   },
   ticketSession: {
     color: '#9E9891',
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 18,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  ticketSoundwaveWrap: {
-    width: '100%',
-    marginVertical: 10,
-    paddingVertical: 4,
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 16,
+    marginBottom: 14,
   },
   ticketGrid: {
     width: '100%',
     backgroundColor: '#0D0D10',
-    borderWidth: 1.5,
-    borderColor: '#262635',
-    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#261C20',
+    borderRadius: 6,
     padding: 14,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   ticketField: {
     flexDirection: 'row',
@@ -2795,49 +3090,30 @@ const styles = StyleSheet.create({
   },
   ticketVal: {
     color: '#F6F2EB',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  ticketPerforatedLine: {
-    width: '100%',
-    height: 1,
-    borderWidth: 1,
-    borderColor: '#3D1C24',
-    borderStyle: 'dashed',
-    marginBottom: 14,
-  },
-  ticketDivider: {
-    width: '100%',
-    height: 1,
-    backgroundColor: '#262635',
-    marginBottom: 14,
+    fontSize: 11,
+    fontWeight: '700',
   },
   pushNote: {
     color: '#9E9891',
-    fontSize: 11,
+    fontSize: 10,
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 16,
+    marginBottom: 16,
+    lineHeight: 14,
   },
   doneBtn: {
-    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#10B981',
+    backgroundColor: '#0E2416',
     width: '100%',
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
   },
   doneBtnText: {
-    color: '#0D0D10',
-    fontSize: 12,
+    color: '#F6F2EB',
+    fontSize: 11.5,
     fontWeight: '900',
-    letterSpacing: 1.1,
+    letterSpacing: 0.8,
   },
 });

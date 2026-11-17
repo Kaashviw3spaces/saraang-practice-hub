@@ -2086,6 +2086,49 @@ async def test_meeting_session_custom_typed_context(client):
     assert found["practice_mode"] == custom_context
 
 
+@pytest.mark.asyncio
+async def test_15_minute_slot_expiry_warning(client):
+    """
+    Verifies that the 15-minute slot expiry notification alert (rebook or vacate):
+    1. Triggers successfully with correct title and action_type ('rebook_or_vacate').
+    2. Persists to the notifications feed.
+    3. Decrements unread count when marked as read.
+    """
+    user_resp = await client.post(
+        "/api/users",
+        json={"name": "Expiry Musician", "email": f"expiry_{uuid.uuid4().hex[:8]}@test.com"},
+    )
+    assert user_resp.status_code == 201
+    user_id = user_resp.json()["id"]
+
+    # Trigger 15-minute slot expiry warning simulation
+    sim_resp = await client.post(f"/api/notifications/simulate-expiry-warning?user_id={user_id}")
+    assert sim_resp.status_code == 200
+    data = sim_resp.json()
+    assert "15 MINS REMAINING" in data["title"]
+    assert "rebook" in data["message"].lower() or "vacate" in data["message"].lower()
+    assert data["action_type"] == "rebook_or_vacate"
+    notification_id = data["notification_id"]
+
+    # Check notification appears in user's notification list
+    feed_resp = await client.get(f"/api/notifications?user_id={user_id}")
+    assert feed_resp.status_code == 200
+    feed = feed_resp.json()
+    assert feed["unread_count"] >= 1
+    found = next((n for n in feed["notifications"] if n["id"] == notification_id), None)
+    assert found is not None
+    assert found["is_read"] is False
+
+    # Mark as read
+    read_resp = await client.patch(f"/api/notifications/{notification_id}/read")
+    assert read_resp.status_code == 200
+
+    # Verify unread count decremented
+    updated_feed = (await client.get(f"/api/notifications?user_id={user_id}")).json()
+    assert updated_feed["unread_count"] == 0
+
+
+
 
 
 

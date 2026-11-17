@@ -143,9 +143,7 @@ def evaluate_acoustic_compatibility(
     if session_type.is_strict_lockdown:
         # Enforce a 10dB safety buffer during recording lockdown in standard/booth rooms to prevent bleed.
         # Designated live rooms (Studio A) are purpose-built and acoustically treated for high-SPL live tracking.
-        if "live room" in room.name.lower() or "studio a" in room.name.lower():
-            warnings.append("Recording lockdown active in Live Studio: room treated for high-SPL instrument tracking.")
-        else:
+        if not ("live room" in room.name.lower() or "studio a" in room.name.lower()):
             max_threshold = max(50.0, max_threshold - 10.0)
             warnings.append("Strict lockdown active: room max decibel threshold reduced by 10dB safety headroom.")
 

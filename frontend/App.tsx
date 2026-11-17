@@ -139,18 +139,90 @@ export default function App() {
     const notificationListener = Notifications.addNotificationReceivedListener((notification) => {
       const title = notification.request.content.title || 'ROOM ALERT';
       const body = notification.request.content.body || '';
+      const data: any = notification.request.content.data || {};
+
+      const isSessionOver = data.action === 'session_over' || title.includes('SESSION IS NOW OVER');
+      const isExpiryWarning = data.action === 'rebook_or_vacate' || title.includes('REBOOK OR VACATE');
 
       showNotification({
         title,
         message: body,
-        type: title.includes('WARNING') || title.includes('ALERT') ? 'warning' : 'info',
+        type: isSessionOver ? 'alert' : (isExpiryWarning || title.includes('WARNING') || title.includes('ALERT') ? 'warning' : 'info'),
+        soundLoops: isSessionOver ? 4 : (isExpiryWarning ? 3 : undefined),
+        actionText: isSessionOver ? 'BOOK NEXT SESSION →' : (isExpiryWarning ? 'REBOOK NEXT SLOT →' : undefined),
+        onAction: (isSessionOver || isExpiryWarning)
+          ? () => {
+              setWizardStep(1);
+              switchTab('booking');
+            }
+          : undefined,
       });
     });
 
     return () => {
       notificationListener.remove();
     };
-  }, [currentUser.id, showNotification]);
+  }, [currentUser.id, showNotification, setWizardStep]);
+
+  // Periodic check for active sessions reaching the 15-minute expiry or session-over mark
+  useEffect(() => {
+    let isCancelled = false;
+    const alertedExpiringBookings = new Set<number>();
+    const alertedOverBookings = new Set<number>();
+
+    const checkActiveExpiry = async () => {
+      try {
+        const res = await api.checkActiveExpiry(currentUser.id);
+        if (isCancelled) return;
+
+        // 1. Session is officially over (4-loop chime)
+        if (res.has_ended_session && res.booking_id && !alertedOverBookings.has(res.booking_id)) {
+          alertedOverBookings.add(res.booking_id);
+          showNotification({
+            title: res.title || '🛑 SESSION IS NOW OVER // PLEASE VACATE',
+            message:
+              res.message ||
+              'Your 1-hour rehearsal session has officially ended. Please pack up all instruments and vacate the room for the next band.',
+            type: 'alert',
+            soundLoops: 4,
+            actionText: 'BOOK NEXT SESSION →',
+            onAction: () => {
+              setWizardStep(1);
+              switchTab('booking');
+            },
+          });
+          return;
+        }
+
+        // 2. 15-Minute Expiry Warning (3-loop chime)
+        if (res.has_expiring_session && res.booking_id && !alertedExpiringBookings.has(res.booking_id)) {
+          alertedExpiringBookings.add(res.booking_id);
+          showNotification({
+            title: res.title || '⚠️ 15 MINS REMAINING // REBOOK OR VACATE',
+            message:
+              res.message ||
+              'Your rehearsal session ends in 15 minutes. Either rebook another available slot or prepare to vacate the room.',
+            type: 'warning',
+            soundLoops: 3,
+            actionText: 'REBOOK NEXT SLOT →',
+            onAction: () => {
+              setWizardStep(1);
+              switchTab('booking');
+            },
+          });
+        }
+      } catch (err) {
+        // Silently ignore network connectivity errors during polling
+      }
+    };
+
+    checkActiveExpiry();
+    const interval = setInterval(checkActiveExpiry, 20000);
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [currentUser.id, showNotification, setWizardStep]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -277,7 +349,14 @@ export default function App() {
             }}
           />
         )}
-        {activeTab === 'profile' && <ProfileScreen />}
+        {activeTab === 'profile' && (
+          <ProfileScreen
+            onNavigateToBooking={() => {
+              setWizardStep(1);
+              switchTab('booking');
+            }}
+          />
+        )}
       </Animated.View>
     </SafeAreaView>
   );

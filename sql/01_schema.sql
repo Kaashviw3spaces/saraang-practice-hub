@@ -99,6 +99,23 @@ WHERE status != 'Cancelled';
 CREATE INDEX IF NOT EXISTS idx_bookings_room_schedule 
 ON bookings(room_id, booking_date, start_time, end_time);
 
+-- 11. Notifications Table
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    booking_id INT REFERENCES bookings(id) ON DELETE SET NULL,
+    title VARCHAR(150) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(30) NOT NULL DEFAULT 'info' CHECK (type IN ('info', 'warning', 'success', 'alert')),
+    channel VARCHAR(30) NOT NULL DEFAULT 'IN_APP',
+    action_type VARCHAR(50) DEFAULT 'rebook_or_vacate',
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread 
+ON notifications(user_id, is_read, created_at DESC);
+
 -- Optimized for Rule 3 (AI acoustic query joins)
 CREATE INDEX IF NOT EXISTS idx_booking_instruments_booking_id ON booking_instruments(booking_id);
 CREATE INDEX IF NOT EXISTS idx_booking_instruments_instrument_id ON booking_instruments(instrument_id);
